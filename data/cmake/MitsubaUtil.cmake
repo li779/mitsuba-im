@@ -61,8 +61,8 @@ endmacro()
 # Macro to enable parallel compilation on MSVC
 macro (mts_msvc_mp target)
   if (MSVC_IDE AND MSVC_VERSION GREATER 1400)
-    set_property (TARGET ${target} APPEND
-      PROPERTY COMPILE_FLAGS " /MP")
+    set_property (TARGET ${target} APPEND_STRING
+      PROPERTY COMPILE_FLAGS " /MP ")
   endif ()
 endmacro()
 

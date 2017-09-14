@@ -358,13 +358,13 @@ macro (PVT_PCH_USE pch_header_filename pch_filename target_name srcs_var
   # If all sources are C++, set the property for the target, otherwise set
   # it in each file separately
   if (has_only_cxx_sources)
-    set_property (TARGET ${target_name} APPEND PROPERTY
-      COMPILE_FLAGS "${pch_flags}")
+    set_property (TARGET ${target_name} APPEND_STRING PROPERTY
+      COMPILE_FLAGS " " ${pch_flags} " ")
   else ()
     foreach (pch_src ${${srcs_var}})
       if (pch_src MATCHES ".+\\.[cCpPxX][cCpPxX]+$")
-        set_property (SOURCE ${pch_src} APPEND PROPERTY
-          COMPILE_FLAGS "${pch_flags}")
+        set_property (SOURCE ${pch_src} APPEND_STRING PROPERTY
+          COMPILE_FLAGS " " ${pch_flags} " ")
       endif()
     endforeach ()
   endif ()
