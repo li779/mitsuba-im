@@ -37,7 +37,7 @@ add_definitions(-DMTS_BUILD_MODULE=MTS_MODULE_PYTHON)
 
 # core.cpp and render.cpp are too large
 if (MSVC)
-  set_property (SOURCE core.cpp render.cpp APPEND PROPERTY COMPILE_FLAGS "/bigobj")
+  set_property (SOURCE core.cpp render.cpp APPEND_STRING PROPERTY COMPILE_FLAGS "/bigobj")
 endif ()
 
 
