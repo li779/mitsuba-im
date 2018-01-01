@@ -443,9 +443,7 @@ void Thread::dispatch(Thread *thread) {
 		const std::string threadName = "Mitsuba: " + thread->getName();
 #if defined(__LINUX__)
 		// Disabled for now, since it is not yet widely available in glibc
-		// pthread_setname_np(pthread_self(), threadName.c_str());
-
-		prctl(PR_SET_NAME, threadName.c_str());
+		pthread_setname_np(pthread_self(), threadName.c_str());
 #elif defined(__OSX__)
 		pthread_setname_np(threadName.c_str());
 #elif defined(__WINDOWS__)
@@ -639,8 +637,8 @@ void Thread::initializeOpenMP(size_t threadCount) {
 			}
 			const std::string threadName = "Mitsuba: " + thread->getName();
 
-			#if defined(__LINUX__)
-				prctl(PR_SET_NAME, threadName.c_str());
+			#if defined(__LINUX__) 
+				pthread_setname_np(pthread_self(), threadName.c_str());
 			#elif defined(__OSX__)
 				pthread_setname_np(threadName.c_str());
 			#elif defined(__WINDOWS__)
