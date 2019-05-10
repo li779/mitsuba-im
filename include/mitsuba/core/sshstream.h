@@ -21,7 +21,6 @@
 #define __MITSUBA_CORE_SSHSTREAM_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/scoped_ptr.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -123,7 +122,7 @@ protected:
 	virtual ~SSHStream();
 private:
 	struct SSHStreamPrivate;
-	boost::scoped_ptr<SSHStreamPrivate> d;
+	std::unique_ptr<SSHStreamPrivate> d;
 };
 
 MTS_NAMESPACE_END

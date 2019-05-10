@@ -57,10 +57,10 @@ endif()
 
 
 # Qt4 (optional)
-find_package(Qt4 4.7 COMPONENTS
-  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
-CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
-  "QT4_FOUND" OFF)
+#find_package(Qt4 4.7 COMPONENTS
+#  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
+#CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
+#  "QT4_FOUND" OFF)
   
 # System threading library, used for custom options
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
@@ -69,13 +69,38 @@ find_package(Threads REQUIRED)
 
 ###########################################################################
 # Boost 
-find_package(Boost 1.44 REQUIRED COMPONENTS "filesystem" "system" "thread")
+find_package(Boost 1.44) # REQUIRED COMPONENTS "filesystem" "system" "thread"
 # As of CMake 2.8.2, FindBoost doesn't honor the "REQUIRED" flag
 if (NOT Boost_FOUND)
+  set(Boost_INCLUDE_DIRS )
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-config/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-core/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-type_traits/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-assert/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-static_assert/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-exception/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-throw_exception/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-detail/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-iterator/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-range/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-algorithm/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-concept_check/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-move/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-tuple/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-integer/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-container_hash/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-foreach/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-bind/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-multi_index/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-bimap/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-preprocessor/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-utility/include)
+  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-mpl/include)
+  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-math/include)
   set(BOOST_ROOT "" CACHE PATH
     "Preferred installation prefix for searching for Boost.")
-  message(FATAL_ERROR
-    "Boost is missing. The required modules are math, filesystem and system.")
+#  message(FATAL_ERROR
+#    "Boost is missing. The required modules are math, filesystem and system.")
 endif()
 mark_as_advanced(Boost_LIB_DIAGNOSTIC_DEFINITIONS)
 
@@ -143,15 +168,15 @@ endif ()
 
 ###########################################################################
 
-find_package(Eigen 3.0 REQUIRED)
+#find_package(Eigen 3.0 REQUIRED)
 
-find_package(JPEG 6 REQUIRED)
-find_package(ZLIB 1.2 REQUIRED)
-find_package(PNG 1.2 REQUIRED)
+#find_package(JPEG 6 REQUIRED)
+#find_package(ZLIB 1.2 REQUIRED)
+#find_package(PNG 1.2 REQUIRED)
 add_definitions(${PNG_DEFINITIONS})
 
-find_package(IlmBase)
-find_package(OpenEXR)
+#find_package(IlmBase)
+#find_package(OpenEXR)
 if (OPENEXR_FOUND AND WIN32)
   set(CMAKE_REQUIRED_INCLUDES ${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
   set(CMAKE_REQUIRED_LIBRARIES ${ILMBASE_LIBRARIES} ${OPENEXR_LIBRARIES})
@@ -177,7 +202,7 @@ int main(int argc, char **argv) {
 endif()
 
 # XERCES_ROOT_DIR
-find_package(Xerces 3.0 REQUIRED)
+#find_package(Xerces 3.0 REQUIRED)
 
 
 # ColladaDOM (optional)
@@ -198,7 +223,7 @@ endif()
 
 find_package(OpenGL REQUIRED)
 set (GLEW_MX ON)
-find_package(GLEW REQUIRED)
+find_package(GLEW)
 if (GLEW_FOUND)
   set (GLEW_STATE_VARS ${GLEW_INCLUDE_DIRS} ${GLEW_LIBRARIES})
   if (NOT GLEW_TEST_STATE)

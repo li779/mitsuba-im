@@ -31,8 +31,7 @@
 #include <mitsuba/render/scenehandler.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/render/scene.h>
-#include <boost/algorithm/string.hpp>
-#include <boost/unordered_set.hpp>
+#include <unordered_set>
 
 MTS_NAMESPACE_BEGIN
 XERCES_CPP_NAMESPACE_USE
@@ -46,7 +45,7 @@ XERCES_CPP_NAMESPACE_USE
 	## __VA_ARGS__)
 
 typedef void (*CleanupFun) ();
-typedef boost::unordered_set<CleanupFun> CleanupSet;
+typedef std::unordered_set<CleanupFun> CleanupSet;
 static PrimitiveThreadLocal<CleanupSet> __cleanup_tls;
 
 SceneHandler::SceneHandler(const ParameterMap &params,
@@ -273,7 +272,7 @@ void pushSceneCleanupHandler(void (*cleanup)()) {
 void SceneHandler::endElement(const XMLCh* const xmlName) {
 	std::string name = transcode(xmlName);
 	ParseContext &context = m_context.top();
-	std::string type = boost::to_lower_copy(context.attributes["type"]);
+	std::string type = to_lower_copy(context.attributes["type"]);
 	context.properties.setPluginName(type);
 	if (context.attributes.find("id") != context.attributes.end())
 		context.properties.setID(context.attributes["id"]);
@@ -464,7 +463,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 					intent = Spectrum::EIlluminant;
 
 				if (context.attributes.find("intent") != context.attributes.end()) {
-					std::string intentString = boost::to_lower_copy(context.attributes["intent"]);
+					std::string intentString = to_lower_copy(context.attributes["intent"]);
 					if (intentString == "reflectance")
 						intent = Spectrum::EReflectance;
 					else if (intentString == "illuminant")
@@ -575,7 +574,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 							intent = Spectrum::EIlluminant;
 
 						if (hasIntent) {
-							std::string intentString = boost::to_lower_copy(context.attributes["intent"]);
+							std::string intentString = to_lower_copy(context.attributes["intent"]);
 							if (intentString == "reflectance")
 								intent = Spectrum::EReflectance;
 							else if (intentString == "illuminant")

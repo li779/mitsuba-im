@@ -20,7 +20,6 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/track.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -245,7 +244,7 @@ void PerspectiveCamera::configure() {
 		Float fov = m_properties.getFloat("fov");
 
 		std::string fovAxis =
-			boost::to_lower_copy(m_properties.getString("fovAxis", "x"));
+			to_lower_copy(m_properties.getString("fovAxis", "x"));
 
 		if (fovAxis == "smaller")
 			fovAxis = m_aspect > 1 ? "y" : "x";

@@ -26,7 +26,7 @@
 #include <mitsuba/core/mmap.h>
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/statistics.h>
-#include <boost/filesystem/fstream.hpp>
+//#include <boost/filesystem/fstream.hpp>
 
 MTS_NAMESPACE_BEGIN
 

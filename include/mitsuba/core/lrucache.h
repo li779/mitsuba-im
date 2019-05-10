@@ -20,10 +20,11 @@
 #define __LRUCACHE_H
 
 #include <mitsuba/mitsuba.h>
+#define BOOST_BIMAP_DISABLE_SERIALIZATION
 #include <boost/bimap.hpp>
 #include <boost/bimap/list_of.hpp>
 #include <boost/bimap/set_of.hpp>
-#include <boost/function.hpp>
+#include <functional>
 
 MTS_NAMESPACE_BEGIN
 
@@ -74,8 +75,8 @@ public:
 	// Constuctor specifies the cached function and
 	// the maximum number of records to be stored.
 	LRUCache(size_t capacity,
-		const boost::function<V(const K&)>& generatorFunction,
-		const boost::function<void (const V&)>& cleanupFunction = NULL)
+		const std::function<V(const K&)>& generatorFunction,
+		const std::function<void (const V&)>& cleanupFunction = NULL)
 		: m_capacity(capacity), m_generatorFunction(generatorFunction),
 		  m_cleanupFunction(cleanupFunction) {
 		SAssert(m_capacity != 0);
@@ -147,8 +148,8 @@ protected:
 
 private:
 	size_t m_capacity;
-	boost::function<V(const K&)> m_generatorFunction;
-	boost::function<void(const V&)> m_cleanupFunction;
+	std::function<V(const K&)> m_generatorFunction;
+	std::function<void(const V&)> m_cleanupFunction;
 	cache_type m_cache;
 };
 

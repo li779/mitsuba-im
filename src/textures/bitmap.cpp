@@ -17,6 +17,7 @@
 */
 
 #include <mitsuba/core/bitmap.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/mstream.h>
@@ -27,7 +28,6 @@
 #include <mitsuba/hw/renderer.h>
 #include <mitsuba/hw/gputexture.h>
 #include <mitsuba/hw/gpuprogram.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -182,7 +182,7 @@ public:
 		fs::path cacheFile;
 		ref<Bitmap> bitmap;
 
-		m_channel = boost::to_lower_copy(props.getString("channel", ""));
+		m_channel = to_lower_copy(props.getString("channel", ""));
 
 		if (props.hasProperty("bitmap")) {
 			/* Support initialization via raw data passed from another plugin */
@@ -195,8 +195,8 @@ public:
 			if (!fs::exists(m_filename))
 				Log(EError, "Texture file \"%s\" could not be found!", m_filename.string().c_str());
 
-			boost::system::error_code ec;
-			timestamp = (uint64_t) fs::last_write_time(m_filename, ec);
+			std::error_code ec;
+			timestamp = (uint64_t) fs::last_write_time(m_filename, ec).time_since_epoch().count();
 			if (ec.value())
 				Log(EError, "Could not determine modification time of \"%s\"!", m_filename.string().c_str());
 
@@ -210,7 +210,7 @@ public:
 			tryReuseCache = fs::exists(cacheFile) && props.getBoolean("cache", true);
 		}
 
-		std::string filterType = boost::to_lower_copy(props.getString("filterType", "ewa"));
+		std::string filterType = to_lower_copy(props.getString("filterType", "ewa"));
 		std::string wrapMode = props.getString("wrapMode", "repeat");
 		m_wrapModeU = parseWrapMode(props.getString("wrapModeU", wrapMode));
 		m_wrapModeV = parseWrapMode(props.getString("wrapModeV", wrapMode));
@@ -305,7 +305,7 @@ public:
 		int found = -1;
 		std::string channelNames;
 		for (int i=0; i<bitmap->getChannelCount(); ++i) {
-			std::string name = boost::to_lower_copy(bitmap->getChannelName(i));
+			std::string name = to_lower_copy(bitmap->getChannelName(i));
 			if (name == channel)
 				found = i;
 			channelNames += name;

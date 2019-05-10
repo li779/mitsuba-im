@@ -21,8 +21,8 @@
 #define __MITSUBA_CORE_CHISQUARE_H_
 
 #include <mitsuba/render/common.h>
-#include <boost/tuple/tuple.hpp>
-#include <boost/function.hpp>
+#include <tuple>
+#include <functional>
 
 MTS_NAMESPACE_BEGIN
 
@@ -141,13 +141,13 @@ public:
 	 * on how to invoke this function
 	 */
 	void fill(
-		const boost::function<boost::tuple<Vector, Float, EMeasure>()> &sampleFn,
-		const boost::function<Float (const Vector &, EMeasure)> &pdfFn);
+		const std::function<std::tuple<Vector, Float, EMeasure>()> &sampleFn,
+		const std::function<Float (const Vector &, EMeasure)> &pdfFn);
 
 	/**
 	 * \brief Dump the bin counts to a file using MATLAB format
 	 */
-	void dumpTables(const fs::path &filename);
+	void dumpTables(fs::pathref filename);
 
 	/**
 	 * \brief Perform the actual chi-square test
@@ -168,7 +168,7 @@ protected:
 
 	/// Functor to evaluate the pdf values in parallel using OpenMP
 	static void integrand(
-		const boost::function<Float (const Vector &, EMeasure)> &pdfFn,
+		const std::function<Float (const Vector &, EMeasure)> &pdfFn,
 			size_t nPts, const Float *in, Float *out) {
 		#if defined(MTS_OPENMP)
 		#pragma omp parallel for

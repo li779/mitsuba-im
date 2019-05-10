@@ -1,4 +1,5 @@
 #include <mitsuba/core/mmap.h>
+#include <mitsuba/core/filesystem.h>
 
 #if defined(__LINUX__) || defined(__OSX__)
 # include <sys/mman.h>
@@ -189,20 +190,20 @@ struct MemoryMappedFile::MemoryMappedFilePrivate {
 MemoryMappedFile::MemoryMappedFile()
 	: d(new MemoryMappedFilePrivate()) { }
 
-MemoryMappedFile::MemoryMappedFile(const fs::path &filename, size_t size)
+MemoryMappedFile::MemoryMappedFile(fs::pathref filename, size_t size)
 	: d(new MemoryMappedFilePrivate(filename, size)) {
 	SLog(ETrace, "Creating memory-mapped file \"%s\" (%s)..",
-		filename.filename().string().c_str(), memString(d->size).c_str());
+		filename.p.filename().string().c_str(), memString(d->size).c_str());
 	d->create();
 }
 
 
-MemoryMappedFile::MemoryMappedFile(const fs::path &filename, bool readOnly)
+MemoryMappedFile::MemoryMappedFile(fs::pathref filename, bool readOnly)
 	: d(new MemoryMappedFilePrivate(filename)) {
 	d->readOnly = readOnly;
 	d->map();
 	Log(ETrace, "Mapped \"%s\" into memory (%s)..",
-		filename.filename().string().c_str(), memString(d->size).c_str());
+		filename.p.filename().string().c_str(), memString(d->size).c_str());
 }
 
 MemoryMappedFile::~MemoryMappedFile() {
@@ -245,7 +246,7 @@ bool MemoryMappedFile::isReadOnly() const {
 	return d->readOnly;
 }
 
-const fs::path &MemoryMappedFile::getFilename() const {
+fs::pathref MemoryMappedFile::getFilename() const {
 	return d->filename;
 }
 

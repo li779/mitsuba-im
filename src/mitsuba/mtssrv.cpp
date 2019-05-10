@@ -30,7 +30,6 @@
 #include <mitsuba/core/bitmap.h>
 #include <fstream>
 #include <stdexcept>
-#include <boost/algorithm/string.hpp>
 
 #ifdef __WINDOWS__
 #include <io.h>
@@ -148,7 +147,7 @@ int mtssrv(int argc, char **argv) {
 					logLevel = EDebug;
 					break;
 				case 'L': {
-						std::string arg = boost::to_lower_copy(std::string(optarg));
+						std::string arg = to_lower_copy(std::string(optarg));
 						if (arg == "trace")
 							logLevel = ETrace;
 						else if (arg == "debug")

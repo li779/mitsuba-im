@@ -103,7 +103,7 @@ add_subdirectory(src/libcore)
 # Rendering-related APIs
 add_subdirectory(src/librender)
 # Hardware acceleration
-add_subdirectory(src/libhw)
+#add_subdirectory(src/libhw)
 # Bidirectional support library
 add_subdirectory(src/libbidir)
 # Python binding library
@@ -178,7 +178,9 @@ add_subdirectory(src/textures)
 # Integrators
 add_subdirectory(src/integrators)
 # Testcases
-add_subdirectory(src/tests)
+if (BUILD_TESTS)
+  add_subdirectory(src/tests)
+endif()
 
 
 # ===== Packaging =====

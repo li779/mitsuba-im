@@ -22,7 +22,7 @@
 
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/lock.h>
-#include <boost/static_assert.hpp>
+//#include <boost/static_assert.hpp>
 #include <stack>
 
 #if defined(__LINUX__)

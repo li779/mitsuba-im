@@ -18,13 +18,12 @@
 
 #include <mitsuba/render/film.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
 Film::Film(const Properties &props)
  : ConfigurableObject(props) {
-	bool isMFilm = boost::to_lower_copy(props.getPluginName()) == "mfilm";
+	bool isMFilm = to_lower_copy(props.getPluginName()) == "mfilm";
 
 	/* Horizontal and vertical film resolution in pixels */
 	m_size = Vector2i(

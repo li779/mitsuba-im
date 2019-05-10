@@ -22,13 +22,13 @@
 
 /* Keep the boost::variant includes outside of properties.h,
    since they noticeably add to the overall compile times */
-#include <boost/variant.hpp>
+#include <any>
 
 MTS_NAMESPACE_BEGIN
 
-typedef boost::variant<
+typedef /*boost::variant<
 	bool, int64_t, Float, Point, Vector, Transform, AnimatedTransform *,
-	Spectrum, std::string, Properties::Data> ElementData;
+	Spectrum, std::string, Properties::Data>*/ std::any ElementData;
 
 struct PropertyElement {
 	ElementData data;
@@ -47,7 +47,7 @@ struct PropertyElement {
 		std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name); \
 		if (it == m_elements->end()) \
 			SLog(EError, "Property \"%s\" has not been specified!", name.c_str()); \
-		const BaseType *result = boost::get<BaseType>(&it->second.data); \
+		const BaseType *result = std::any_cast<BaseType>(&it->second.data); \
 		if (!result) \
 			SLog(EError, "The property \"%s\" has the wrong type (expected <" #ReadableName ">). The " \
 					"complete property record is :\n%s", name.c_str(), toString().c_str()); \
@@ -59,7 +59,7 @@ struct PropertyElement {
 		std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name); \
 		if (it == m_elements->end()) \
 			return defVal; \
-		const BaseType *result = boost::get<BaseType>(&it->second.data); \
+		const BaseType *result = std::any_cast<BaseType>(&it->second.data); \
 		if (!result) \
 			SLog(EError, "The property \"%s\" has the wrong type (expected <" #ReadableName ">). The " \
 					"complete property record is :\n%s", name.c_str(), toString().c_str()); \
@@ -81,7 +81,7 @@ DEFINE_PROPERTY_ACCESSOR(Properties::Data, Properties::Data, Data, data)
 
 void Properties::setAnimatedTransform(const std::string &name, const AnimatedTransform *value, bool warnDuplicates) {
 	if (hasProperty(name)) {
-		AnimatedTransform **old = boost::get<AnimatedTransform *>(&((*m_elements)[name].data));
+		AnimatedTransform **old = std::any_cast<AnimatedTransform *>(&((*m_elements)[name].data));
 		if (old)
 			(*old)->decRef();
 		if (warnDuplicates)
@@ -96,8 +96,8 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
 	if (it == m_elements->end())
 		SLog(EError, "Property \"%s\" missing", name.c_str());
-	const AnimatedTransform * const * result1 = boost::get<AnimatedTransform *>(&it->second.data);
-	const Transform *result2 = boost::get<Transform>(&it->second.data);
+	const AnimatedTransform * const * result1 = std::any_cast<AnimatedTransform *>(&it->second.data);
+	const Transform *result2 = std::any_cast<Transform>(&it->second.data);
 
 	if (!result1 && !result2)
 		SLog(EError, "The property \"%s\" has the wrong type (expected <animation> or <transform>). The "
@@ -114,8 +114,8 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
 	if (it == m_elements->end())
 		return defVal;
-	AnimatedTransform * const * result1 = boost::get<AnimatedTransform *>(&it->second.data);
-	const Transform *result2 = boost::get<Transform>(&it->second.data);
+	AnimatedTransform * const * result1 = std::any_cast<AnimatedTransform *>(&it->second.data);
+	const Transform *result2 = std::any_cast<Transform>(&it->second.data);
 
 	if (!result1 && !result2)
 		SLog(EError, "The property \"%s\" has the wrong type (expected <animation> or <transform>). The "
@@ -134,8 +134,8 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 	if (it == m_elements->end())
 		return new AnimatedTransform(defVal);
 
-	AnimatedTransform * const * result1 = boost::get<AnimatedTransform *>(&it->second.data);
-	const Transform *result2 = boost::get<Transform>(&it->second.data);
+	AnimatedTransform * const * result1 = std::any_cast<AnimatedTransform *>(&it->second.data);
+	const Transform *result2 = std::any_cast<Transform>(&it->second.data);
 
 	if (!result1 && !result2)
 		SLog(EError, "The property \"%s\" has the wrong type (expected <animation> or <transform>). The "
@@ -217,7 +217,7 @@ Properties::Properties(const Properties &props)
 
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = boost::get<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->incRef();
 	}
@@ -226,7 +226,7 @@ Properties::Properties(const Properties &props)
 Properties::~Properties() {
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = boost::get<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->decRef();
 	}
@@ -237,7 +237,7 @@ Properties::~Properties() {
 void Properties::operator=(const Properties &props) {
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = boost::get<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->decRef();
 	}
@@ -248,7 +248,7 @@ void Properties::operator=(const Properties &props) {
 
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = boost::get<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->incRef();
 	}
@@ -262,7 +262,7 @@ bool Properties::removeProperty(const std::string &name) {
 	std::map<std::string, PropertyElement>::iterator it = m_elements->find(name);
 	if (it == m_elements->end())
 		return false;
-	AnimatedTransform **trafo = boost::get<AnimatedTransform *>(&(*it).second.data);
+	AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
 	if (trafo)
 		(*trafo)->decRef();
 	m_elements->erase(it);

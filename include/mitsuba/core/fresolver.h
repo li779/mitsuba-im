@@ -21,9 +21,6 @@
 #define __MITSUBA_CORE_FRESOLVER_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <deque>
 
 MTS_NAMESPACE_BEGIN
 
@@ -55,7 +52,7 @@ public:
 	 * supplied path with respect to each one. If everything fails,
 	 * the path is returned as-is.
 	 */
-	fs::path resolve(const fs::path &path) const;
+	fs::pathdat resolve(fs::pathref path) const;
 
 	/**
 	 * \brief Resolve a file using the stored list of search paths
@@ -63,22 +60,22 @@ public:
 	 * In comparison to \ref resolve(), this funtion returns all
 	 * matches instead of only the first one.
 	 */
-	std::vector<fs::path> resolveAll(const fs::path &path) const;
+	std::vector<fs::pathdat> resolveAll(fs::pathref path) const;
 
 	/**
 	 * \brief Does the same as \ref resolve(), but returns an
 	 * absolute path.
 	 */
-	fs::path resolveAbsolute(const fs::path &path) const;
+	fs::pathdat resolveAbsolute(fs::pathref path) const;
 
 	/// Create a clone of the file resolver
 	FileResolver *clone() const;
 
 	/// Append a search path to the resolver
-	void appendPath(const fs::path &path);
+	void appendPath(fs::pathref path);
 
 	/// Prepend a search path to the resolver
-	void prependPath(const fs::path &path);
+	void prependPath(fs::pathref path);
 
 	/// Clear all stored search paths
 	void clear();
@@ -87,7 +84,7 @@ public:
 	inline size_t getPathCount() const { return m_paths.size(); }
 
 	/// Return one of the stored paths
-	inline const fs::path &getPath(size_t index) const { return m_paths[index]; }
+	fs::pathref getPath(size_t index) const;
 
 	/// Return a human-readable string representation
 	std::string toString() const;
@@ -96,7 +93,7 @@ public:
 protected:
 	virtual ~FileResolver() { }
 private:
-	std::deque<fs::path> m_paths;
+	std::vector<fs::pathdat> m_paths;
 };
 
 MTS_NAMESPACE_END

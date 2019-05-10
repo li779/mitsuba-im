@@ -28,8 +28,8 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/emitter.h>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/unordered_map.hpp>
+//#include <boost/filesystem/fstream.hpp>
+#include <unordered_map>
 
 #define MTS_FILEFORMAT_HEADER     0x041C
 #define MTS_FILEFORMAT_VERSION_V3 0x0003

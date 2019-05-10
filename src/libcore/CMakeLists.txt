@@ -57,7 +57,7 @@ set(HDRS
   ${INCLUDE_DIR}/sched_remote.h
   ${INCLUDE_DIR}/serialization.h
   ${INCLUDE_DIR}/sfcurve.h
-  ${INCLUDE_DIR}/shvector.h
+#  ${INCLUDE_DIR}/shvector.h
   ${INCLUDE_DIR}/spectrum.h
   ${INCLUDE_DIR}/spline.h
   ${INCLUDE_DIR}/sse.h
@@ -86,7 +86,6 @@ set(SRCS
   appender.cpp
   bitmap.cpp
   brent.cpp
-  chisquare.cpp
   class.cpp
   cstream.cpp
   fmtconv.cpp
@@ -109,7 +108,7 @@ set(SRCS
   sched.cpp
   sched_remote.cpp
   serialization.cpp
-  shvector.cpp
+#  shvector.cpp
   spectrum.cpp
   spline.cpp
   ssemath.cpp
@@ -128,6 +127,10 @@ set(SRCS
   warp.cpp
   zstream.cpp
 )
+
+if (BUILD_TESTS)
+  list(APPEND SRCS chisquare.cpp)
+endif ()
 
 add_definitions(-DMTS_BUILD_MODULE=MTS_MODULE_CORE)
 

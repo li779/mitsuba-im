@@ -17,8 +17,9 @@
 */
 
 #include <mitsuba/core/quad.h>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/bind.hpp>
+#include <mitsuba/core/filesystem.h>
+#include <fstream>
+//#include <boost/filesystem/fstream.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -559,7 +560,7 @@ Float ContinuousSpectrum::average(Float lambdaMin, Float lambdaMax) const {
 
 	for (size_t i=0; i<nSteps; ++i) {
 		integral += integrator.integrate(
-			boost::bind(&ContinuousSpectrum::eval, this, _1),
+			std::bind(&ContinuousSpectrum::eval, this, std::placeholders::_1),
 			pos, pos + stepSize);
 		pos += stepSize;
 	}
@@ -572,11 +573,11 @@ InterpolatedSpectrum::InterpolatedSpectrum(size_t size) {
 	m_values.reserve(size);
 }
 
-InterpolatedSpectrum::InterpolatedSpectrum(const fs::path &path) {
-	fs::ifstream is(path);
+InterpolatedSpectrum::InterpolatedSpectrum(fs::pathref path) {
+	std::ifstream is(path.p.native());
 	if (is.bad() || is.fail())
 		SLog(EError, "InterpolatedSpectrum: could not open \"%s\"",
-			path.string().c_str());
+			path.p.string().c_str());
 
 	std::string line;
 	while (true) {
@@ -594,10 +595,10 @@ InterpolatedSpectrum::InterpolatedSpectrum(const fs::path &path) {
 
 	if (m_wavelengths.size() == 0)
 		SLog(EError, "\"%s\": unable to parse any entries!",
-				path.string().c_str());
+				path.p.string().c_str());
 
 	SLog(EInfo, "\"%s\": loaded a spectral power distribution with " SIZE_T_FMT
-			" entries (between %f and %f nm)", path.filename().string().c_str(), m_wavelengths.size(),
+			" entries (between %f and %f nm)", path.p.filename().string().c_str(), m_wavelengths.size(),
 			m_wavelengths[0], m_wavelengths[m_wavelengths.size()-1]);
 }
 

@@ -19,7 +19,6 @@
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/hw/basicshader.h>
-#include <boost/algorithm/string.hpp>
 #include "ior.h"
 
 MTS_NAMESPACE_BEGIN
@@ -159,7 +158,7 @@ public:
 		std::string materialName = props.getString("material", "Cu");
 
 		Spectrum intEta, intK;
-		if (boost::to_lower_copy(materialName) == "none") {
+		if (to_lower_copy(materialName) == "none") {
 			intEta = Spectrum(0.0f);
 			intK = Spectrum(1.0f);
 		} else {

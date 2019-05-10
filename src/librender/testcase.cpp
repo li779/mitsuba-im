@@ -19,7 +19,7 @@
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/testcase.h>
 #include <boost/math/distributions/students_t.hpp>
-#include <boost/filesystem/fstream.hpp>
+//#include <boost/filesystem/fstream.hpp>
 
 MTS_NAMESPACE_BEGIN
 

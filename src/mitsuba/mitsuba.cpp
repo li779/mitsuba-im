@@ -36,7 +36,6 @@
 #include <mitsuba/render/scenehandler.h>
 #include <fstream>
 #include <stdexcept>
-#include <boost/algorithm/string.hpp>
 
 #if defined(__WINDOWS__)
 #include <mitsuba/core/getopt.h>
@@ -197,7 +196,7 @@ int mitsuba_app(int argc, char **argv) {
 						logLevel = ETrace;
 					break;
 				case 'L': {
-						std::string arg = boost::to_lower_copy(std::string(optarg));
+						std::string arg = to_lower_copy(std::string(optarg));
 						if (arg == "trace")
 							logLevel = ETrace;
 						else if (arg == "debug")

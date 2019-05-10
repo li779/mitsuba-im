@@ -36,7 +36,6 @@
 #include <mitsuba/render/testcase.h>
 #include <mitsuba/render/renderjob.h>
 #include <mitsuba/render/scenehandler.h>
-#include <boost/algorithm/string.hpp>
 #include <fstream>
 #include <stdexcept>
 
@@ -96,7 +95,7 @@ void help() {
 		for (; it != end; ++it) {
 			if (!fs::is_regular_file(it->status()))
 				continue;
-			std::string extension(boost::to_lower_copy(it->path().extension().string()));
+			std::string extension(to_lower_copy(it->path().extension().string()));
 #if defined(__WINDOWS__)
 			if (extension != ".dll")
 				continue;
@@ -302,7 +301,7 @@ int mtsutil(int argc, char **argv) {
 				for (; it != end; ++it) {
 					if (!fs::is_regular_file(it->status()))
 						continue;
-					std::string extension(boost::to_lower_copy(it->path().extension().string()));
+					std::string extension(to_lower_copy(it->path().extension().string()));
 #if defined(__WINDOWS__)
 					if (extension != ".dll")
 						continue;

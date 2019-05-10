@@ -21,9 +21,10 @@
 #define __MITSUBA_MITSUBA_H_
 
 #include <mitsuba/core/platform.h>
-#include <boost/version.hpp>
+//#include <boost/version.hpp>
 #include <sstream>
 #include <string>
+#include <memory>
 #include <map>
 #include <iostream>
 #include <vector>
@@ -34,6 +35,7 @@
 #include <string.h>
 #include <stdexcept>
 #include <limits>
+#include <cassert>
 
 using std::cout;
 using std::cerr;

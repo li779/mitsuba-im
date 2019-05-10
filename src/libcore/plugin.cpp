@@ -22,6 +22,7 @@
 #include <mitsuba/core/lock.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/cobject.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/version.h>
 
 #if !defined(__WINDOWS__)
@@ -59,10 +60,10 @@ struct Plugin::PluginPrivate {
 	: shortName(sn), path(p) {}
 };
 
-Plugin::Plugin(const std::string &shortName, const fs::path &path)
+Plugin::Plugin(const std::string &shortName, fs::pathref path)
  : d(new PluginPrivate(shortName, path)) {
 #if defined(__WINDOWS__)
-	d->handle = LoadLibraryW(path.c_str());
+	d->handle = LoadLibraryW(path.p.c_str());
 	if (!d->handle) {
 		SLog(EError, "Error while loading plugin \"%s\": %s",
 				d->path.string().c_str(), lastErrorText().c_str());
@@ -143,7 +144,7 @@ std::string Plugin::getDescription() const {
 	return d->getDescription();
 }
 
-const fs::path& Plugin::getPath() const {
+fs::pathref Plugin::getPath() const {
 	return d->path;
 }
 

@@ -17,13 +17,13 @@
 */
 
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/filesystem.h>
 #include <cerrno>
 
 #if !defined(__WINDOWS__)
 # include <unistd.h>
 #else
 # include <windows.h>
-# include <boost/filesystem/detail/utf8_codecvt_facet.hpp>
 #endif
 
 MTS_NAMESPACE_BEGIN
@@ -48,7 +48,7 @@ FileStream::FileStream()
  : d(new FileStreamPrivate) {
 }
 
-FileStream::FileStream(const fs::path &path, EFileMode mode)
+FileStream::FileStream(fs::pathref path, EFileMode mode)
  : d(new FileStreamPrivate) {
 	open(path, mode);
 }
@@ -58,7 +58,7 @@ FileStream::~FileStream() {
 		close();
 }
 
-const fs::path& FileStream::getPath() const {
+fs::pathref FileStream::getPath() const {
 	return d->path;
 }
 
@@ -70,10 +70,10 @@ std::string FileStream::toString() const {
 	return oss.str();
 }
 
-void FileStream::open(const fs::path &path, EFileMode mode) {
+void FileStream::open(fs::pathref path, EFileMode mode) {
 	AssertEx(d->file == 0, "A file has already been opened using this stream");
 
-	Log(ETrace, "Opening \"%s\"", path.string().c_str());
+	Log(ETrace, "Opening \"%s\"", path.p.string().c_str());
 
 	d->path = path;
 	d->mode = mode;
@@ -113,7 +113,7 @@ void FileStream::open(const fs::path &path, EFileMode mode) {
 		break;
 	}
 
-	d->file = CreateFileW(path.c_str(), dwDesiredAccess,
+	d->file = CreateFileW(d->path.c_str(), dwDesiredAccess,
 		FILE_SHARE_WRITE | FILE_SHARE_READ, 0,
 		dwCreationDisposition, FILE_ATTRIBUTE_NORMAL, 0);
 
@@ -412,8 +412,12 @@ ref<FileStream> FileStream::createTemporary() {
 	return result;
 }
 
+#if 0
+// todo: std filesystem does not use global locales, it appears?
+// todo: make sure UTF8 conversions are done properly in relevant places ...
 #if defined(__WINDOWS__)
-static boost::filesystem::detail::utf8_codecvt_facet *__facet = NULL;
+#	include <boost/filesystem/detail/utf8_codecvt_facet.hpp>
+	static boost::filesystem::detail::utf8_codecvt_facet *__facet = NULL;
 #endif
 
 void FileStream::staticInitialization() {
@@ -434,6 +438,7 @@ void FileStream::staticShutdown() {
 	/* Can't delete __facet unfortunately, or we risk a crash .. oh well.. */
 #endif
 }
+#endif
 
 MTS_IMPLEMENT_CLASS(FileStream, false, Stream)
 MTS_NAMESPACE_END

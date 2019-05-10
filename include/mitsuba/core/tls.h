@@ -21,7 +21,6 @@
 #define __MITSUBA_CORE_TLS_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/scoped_ptr.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -55,7 +54,7 @@ namespace detail {
 		const void *get(bool &existed) const;
 	protected:
 		struct ThreadLocalPrivate;
-		mutable boost::scoped_ptr<ThreadLocalPrivate> d;
+		mutable std::unique_ptr<ThreadLocalPrivate> d;
 	};
 }; // namespace tls
 ///! \endcond

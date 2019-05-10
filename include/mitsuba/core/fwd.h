@@ -177,12 +177,6 @@ typedef AnimationTrack<Point> PointTrack;
 
 MTS_NAMESPACE_END
 
-#if BOOST_VERSION >= 105000
-namespace boost { namespace filesystem { class path; }}
-namespace fs = boost::filesystem;
-#else
-namespace boost { namespace filesystem3 { class path; }}
-namespace fs = boost::filesystem3;
-#endif
+namespace fs { struct pathref; struct pathdat; }
 
 #endif /* __MITSUBA_CORE_FWD_H_ */

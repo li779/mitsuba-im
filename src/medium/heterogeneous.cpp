@@ -19,7 +19,6 @@
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/volume.h>
 #include <mitsuba/core/statistics.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -192,7 +191,7 @@ public:
 		if (props.hasProperty("densityMultiplier"))
 			Log(EError, "The 'densityMultiplier' parameter has been deprecated and is now called 'scale'.");
 
-		std::string method = boost::to_lower_copy(props.getString("method", "woodcock"));
+		std::string method = to_lower_copy(props.getString("method", "woodcock"));
 		if (method == "woodcock")
 			m_method = EWoodcockTracking;
 		else if (method == "simpson")

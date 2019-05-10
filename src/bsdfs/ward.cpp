@@ -19,7 +19,6 @@
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/hw/basicshader.h>
 #include <mitsuba/core/warp.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -102,7 +101,7 @@ public:
 			props.getSpectrum("specularReflectance", Spectrum(0.2f)));
 
 		std::string type =
-			boost::to_lower_copy(props.getString("variant", "balanced"));
+			to_lower_copy(props.getString("variant", "balanced"));
 		if (type == "ward")
 			m_modelVariant = EWard;
 		else if (type == "ward-duer")

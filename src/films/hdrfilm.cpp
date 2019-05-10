@@ -20,7 +20,6 @@
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/statistics.h>
-#include <boost/algorithm/string.hpp>
 #include "banner.h"
 #include "annotations.h"
 
@@ -210,13 +209,13 @@ public:
 		/* Attach the log file as the EXR comment attribute? */
 		m_attachLog = props.getBoolean("attachLog", true);
 
-		std::string fileFormat = boost::to_lower_copy(
+		std::string fileFormat = to_lower_copy(
 			props.getString("fileFormat", "openexr"));
-		std::vector<std::string> pixelFormats = tokenize(boost::to_lower_copy(
+		std::vector<std::string> pixelFormats = tokenize(to_lower_copy(
 			props.getString("pixelFormat", "rgb")), " ,");
 		std::vector<std::string> channelNames = tokenize(
 			props.getString("channelNames", ""), ", ");
-		std::string componentFormat = boost::to_lower_copy(
+		std::string componentFormat = to_lower_copy(
 			props.getString("componentFormat", "float16"));
 
 		if (fileFormat == "openexr") {
@@ -340,7 +339,7 @@ public:
 
 		std::vector<std::string> keys = props.getPropertyNames();
 		for (size_t i=0; i<keys.size(); ++i) {
-			std::string key = boost::to_lower_copy(keys[i]);
+			std::string key = to_lower_copy(keys[i]);
 			key.erase(std::remove_if(key.begin(), key.end(), ::isspace), key.end());
 
 			if ((boost::starts_with(key, "metadata['") && boost::ends_with(key, "']")) ||

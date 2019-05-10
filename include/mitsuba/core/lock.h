@@ -22,8 +22,6 @@
 
 #include <mitsuba/mitsuba.h>
 
-#include <boost/scoped_ptr.hpp>
-
 MTS_NAMESPACE_BEGIN
 
 /**
@@ -49,7 +47,7 @@ protected:
 	virtual ~Mutex();
 private:
 	struct MutexPrivate;
-	boost::scoped_ptr<MutexPrivate> d;
+	std::unique_ptr<MutexPrivate> d;
 };
 
 /**
@@ -94,7 +92,7 @@ protected:
 	virtual ~WaitFlag();
 private:
 	struct WaitFlagPrivate;
-	boost::scoped_ptr<WaitFlagPrivate> d;
+	std::unique_ptr<WaitFlagPrivate> d;
 };
 
 /**
@@ -157,7 +155,7 @@ protected:
 	virtual ~ConditionVariable();
 private:
 	struct ConditionVariablePrivate;
-	boost::scoped_ptr<ConditionVariablePrivate> d;
+	std::unique_ptr<ConditionVariablePrivate> d;
 };
 
 /**

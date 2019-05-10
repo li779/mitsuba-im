@@ -20,8 +20,6 @@
 #include <mitsuba/core/version.h>
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/fstream.h>
-#include <boost/algorithm/string.hpp>
-#include <boost/scoped_array.hpp>
 #include <boost/thread/mutex.hpp>
 #include <set>
 
@@ -355,7 +353,7 @@ void Bitmap::readStream(EFileFormat format, Stream *stream, const std::string &p
 }
 
 void Bitmap::write(const fs::path &path, int compression) const {
-	std::string s = boost::to_lower_copy(path.string());
+	std::string s = to_lower_copy(path.string());
 	EFileFormat format;
 	if (boost::ends_with(s, "jpeg") || boost::ends_with(s, "jpg"))
 		format = EJPEG;
@@ -1882,11 +1880,11 @@ std::vector<Bitmap::Layer> Bitmap::getLayers() const {
 
 	ChannelMap channels;
 	for (size_t i=0; i<m_channelNames.size(); ++i)
-		channels[boost::to_lower_copy(m_channelNames[i])] = (int) i;
+		channels[to_lower_copy(m_channelNames[i])] = (int) i;
 
 	std::vector<Layer> layers;
 	for (size_t i=0; i<m_channelNames.size(); ++i) {
-		std::string name = boost::to_lower_copy(m_channelNames[i]);
+		std::string name = to_lower_copy(m_channelNames[i]);
 		if (channels.find(name) == channels.end())
 			continue;
 		std::string prefix = name;
@@ -2704,7 +2702,7 @@ void Bitmap::readJPEG(Stream *stream) {
 	m_data = static_cast<uint8_t *>(allocAligned(getBufferSize()));
 	m_ownsData = true;
 
-	boost::scoped_array<uint8_t*> scanlines(new uint8_t*[m_size.y]);
+	std::unique_ptr<uint8_t[]> scanlines(new uint8_t*[m_size.y]);
 	for (int i=0; i<m_size.y; ++i)
 		scanlines.get()[i] = m_data + row_stride*i;
 
@@ -2790,12 +2788,12 @@ void Bitmap::readOpenEXR(Stream *stream, const std::string &_prefix) {
 		*ch_ry = NULL, *ch_by = NULL, *ch_spec[SPECTRUM_SAMPLES];
 
 	memset(ch_spec, 0, sizeof(const char *) * SPECTRUM_SAMPLES);
-	std::string prefix = boost::to_lower_copy(_prefix);
+	std::string prefix = to_lower_copy(_prefix);
 	bool multichannel = false;
 
 	/* First of all, check which layers are there */
 	for (Imf::ChannelList::ConstIterator it = channels.begin(); it != channels.end(); ++it) {
-		std::string name = boost::to_lower_copy(std::string(it.name()));
+		std::string name = to_lower_copy(std::string(it.name()));
 
 		/* Skip layers that have the wrong prefix */
 		if (!boost::starts_with(name, prefix) && prefix != "*")

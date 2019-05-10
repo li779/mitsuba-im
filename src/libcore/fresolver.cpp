@@ -1,5 +1,5 @@
 #include <mitsuba/core/fresolver.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/filesystem.h>
 
 #if defined(__LINUX__)
 # if !defined(_GNU_SOURCE)
@@ -100,34 +100,34 @@ void FileResolver::clear() {
 	m_paths.clear();
 }
 
-void FileResolver::prependPath(const fs::path &path) {
+void FileResolver::prependPath(fs::pathref path) {
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		if (m_paths[i] == path)
+		if (m_paths[i].p == path.p)
 			return;
 	}
-	m_paths.push_front(path);
+	m_paths.push_front(path.p);
 }
 
-void FileResolver::appendPath(const fs::path &path) {
+void FileResolver::appendPath(fs::pathref path) {
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		if (m_paths[i] == path)
+		if (m_paths[i].p == path.p)
 			return;
 	}
-	m_paths.push_back(path);
+	m_paths.push_back(path.p);
 }
 
-fs::path FileResolver::resolve(const fs::path &path) const {
+fs::pathdat FileResolver::resolve(fs::pathref path) const {
 	/* First, try to resolve in case-sensitive mode */
 	for (size_t i=0; i<m_paths.size(); i++) {
-		fs::path newPath = m_paths[i] / path;
+		fs::path newPath = m_paths[i] / path.p;
 		if (fs::exists(newPath))
 			return newPath;
 	}
 
 	#if defined(__LINUX__)
 		/* On Linux, also try case-insensitive mode if the above failed */
-		fs::path parentPath = path.parent_path();
-		std::string filename = boost::to_lower_copy(path.filename().string());
+		fs::path parentPath = path.p.parent_path();
+		std::string filename = to_lower_copy(path.p.filename().string());
 
 		for (size_t i=0; i<m_paths.size(); i++) {
 			fs::path path = m_paths[i] / parentPath;
@@ -137,20 +137,20 @@ fs::path FileResolver::resolve(const fs::path &path) const {
 
 			fs::directory_iterator end, it(path);
 			for (; it != end; ++it) {
-				if (boost::algorithm::to_lower_copy(it->path().filename().string()) == filename)
+				if (to_lower_copy(it->path().filename().string()) == filename)
 					return it->path();
 			}
 		}
 	#endif
 
-	return path;
+	return path.p;
 }
 
-std::vector<fs::path> FileResolver::resolveAll(const fs::path &path) const {
+std::vector<fs::pathdat> FileResolver::resolveAll(fs::pathref path) const {
 	std::vector<fs::path> results;
 
 	for (size_t i=0; i<m_paths.size(); i++) {
-		fs::path newPath = m_paths[i] / path;
+		fs::path newPath = m_paths[i] / path.p;
 		if (fs::exists(newPath))
 			results.push_back(newPath);
 	}
@@ -158,16 +158,18 @@ std::vector<fs::path> FileResolver::resolveAll(const fs::path &path) const {
 	return results;
 }
 
-fs::path FileResolver::resolveAbsolute(const fs::path &path) const {
-	return fs::absolute(resolve(path));
+fs::pathdat FileResolver::resolveAbsolute(fs::pathref path) const {
+	return fs::absolute(resolve(path.p));
 }
+
+fs::pathref FileResolver::getPath(size_t index) const { return m_paths[index].p; }
 
 std::string FileResolver::toString() const {
 	std::ostringstream oss;
 	oss << "FileResolver[" << endl
 		<< "  paths = {" << endl;
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		oss << "    \"" << m_paths[i].string() << "\"";
+		oss << "    \"" << m_paths[i].p.string() << "\"";
 		if (i+1 < m_paths.size())
 			oss << ",";
 		oss << endl;

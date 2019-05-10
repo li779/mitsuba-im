@@ -22,8 +22,6 @@
 
 #include <mitsuba/mitsuba.h>
 #include <mitsuba/core/stream.h>
-#include <boost/filesystem.hpp>
-#include <boost/scoped_ptr.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -55,7 +53,7 @@ public:
 	FileStream();
 
 	/// Create a file stream class and open a file with a given EFileMode
-	explicit FileStream(const fs::path &path, EFileMode mode = EReadOnly);
+	explicit FileStream(fs::pathref path, EFileMode mode = EReadOnly);
 
 	//! @}
 	// =============================================================
@@ -65,10 +63,10 @@ public:
 	// =============================================================
 
 	/// Return the file path
-	const fs::path &getPath() const;
+	fs::pathref getPath() const;
 
 	/// Open a file with a given open mode
-	void open(const fs::path &filename, EFileMode mode = EReadOnly);
+	void open(fs::pathref filename, EFileMode mode = EReadOnly);
 
 	/// Close the current file
 	void close();
@@ -130,7 +128,7 @@ protected:
 	virtual ~FileStream();
 private:
 	struct FileStreamPrivate;
-	boost::scoped_ptr<FileStreamPrivate> d;
+	std::unique_ptr<FileStreamPrivate> d;
 };
 
 MTS_NAMESPACE_END

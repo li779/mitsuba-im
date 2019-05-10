@@ -18,7 +18,7 @@
 
 #include <mitsuba/render/renderjob.h>
 #include <mitsuba/render/renderproc.h>
-#include <boost/filesystem.hpp>
+#include <mitsuba/core/filesystem.h>
 
 MTS_NAMESPACE_BEGIN
 

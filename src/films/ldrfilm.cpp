@@ -20,7 +20,6 @@
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/statistics.h>
-#include <boost/algorithm/string.hpp>
 #include "banner.h"
 #include "annotations.h"
 
@@ -131,11 +130,11 @@ public:
 		/* Should an Mitsuba banner be added to the output image? */
 		m_hasBanner = props.getBoolean("banner", true);
 
-		std::string fileFormat = boost::to_lower_copy(
+		std::string fileFormat = to_lower_copy(
 			props.getString("fileFormat", "png"));
-		std::string pixelFormat = boost::to_lower_copy(
+		std::string pixelFormat = to_lower_copy(
 			props.getString("pixelFormat", "rgb"));
-		std::string tonemapMethod = boost::to_lower_copy(
+		std::string tonemapMethod = to_lower_copy(
 			props.getString("tonemapMethod", "gamma"));
 
 		if (fileFormat == "png") {
@@ -184,7 +183,7 @@ public:
 
 		std::vector<std::string> keys = props.getPropertyNames();
 		for (size_t i=0; i<keys.size(); ++i) {
-			std::string key = boost::to_lower_copy(keys[i]);
+			std::string key = to_lower_copy(keys[i]);
 			key.erase(std::remove_if(key.begin(), key.end(), ::isspace), key.end());
 
 			if ((boost::starts_with(key, "metadata['") && boost::ends_with(key, "']")) ||
@@ -333,7 +332,7 @@ public:
 		}
 
 		fs::path filename = m_destFile;
-		std::string extension = boost::to_lower_copy(filename.extension().string());
+		std::string extension = to_lower_copy(filename.extension().string());
 		std::string expectedExtension;
 		switch (m_fileFormat) {
 			case Bitmap::EPNG: expectedExtension = ".png"; break;
@@ -368,7 +367,7 @@ public:
 				Log(EError, "Unknown file format!");
 				return false;
 		}
-		if (boost::to_lower_copy(filename.extension().string()) != extension)
+		if (to_lower_copy(filename.extension().string()) != extension)
 			filename.replace_extension(extension);
 		return fs::exists(filename);
 	}

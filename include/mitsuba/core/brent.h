@@ -21,7 +21,7 @@
 #define __MITSUBA_CORE_BRENT_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/function.hpp>
+#include <functional>
 
 MTS_NAMESPACE_BEGIN
 
@@ -94,7 +94,7 @@ public:
 	 * \param max the upper bound for the interval.
 	 * \return the value where the function is zero
 	 */
-	Result solve(const boost::function<Float (Float)> &func,
+	Result solve(const std::function<Float (Float)> &func,
 			Float min, Float max) const;
 
 	/**
@@ -111,7 +111,7 @@ public:
 	 *    if no initial point is known)
 	 * \return the value where the function is zero
 	 */
-	Result solve(const boost::function<Float (Float)> &func,
+	Result solve(const std::function<Float (Float)> &func,
 			Float min, Float max, Float initial) const;
 
 	/**
@@ -127,7 +127,7 @@ public:
 	 * \param y2 function value at the bracket point.
 	 * \return the value where the function is zero
 	 */
-	Result solve(const boost::function<Float (Float)> &func,
+	Result solve(const std::function<Float (Float)> &func,
 				 Float x0, Float y0,
 				 Float x1, Float y1,
 				 Float x2, Float y2) const;

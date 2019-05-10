@@ -21,7 +21,6 @@
 #define __MITSUBA_CORE_MMAP_H_
 
 #include <mitsuba/core/fstream.h>
-#include <boost/scoped_ptr.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -32,10 +31,10 @@ MTS_NAMESPACE_BEGIN
 class MTS_EXPORT_CORE MemoryMappedFile : public Object {
 public:
 	/// Create a new memory-mapped file of the specified size
-	MemoryMappedFile(const fs::path &filename, size_t size);
+	MemoryMappedFile(fs::pathref filename, size_t size);
 
 	/// Map the specified file into memory
-	MemoryMappedFile(const fs::path &filename, bool readOnly = true);
+	MemoryMappedFile(fs::pathref filename, bool readOnly = true);
 
 	/// Return a pointer to the file contents in memory
 	void *getData();
@@ -55,7 +54,7 @@ public:
 	void resize(size_t size);
 
 	/// Return the associated filename
-	const fs::path &getFilename() const;
+	fs::pathref getFilename() const;
 
 	/// Return whether the mapped memory region is read-only
 	bool isReadOnly() const;
@@ -80,7 +79,7 @@ protected:
 	virtual ~MemoryMappedFile();
 private:
 	struct MemoryMappedFilePrivate;
-	boost::scoped_ptr<MemoryMappedFilePrivate> d;
+	std::unique_ptr<MemoryMappedFilePrivate> d;
 };
 
 MTS_NAMESPACE_END

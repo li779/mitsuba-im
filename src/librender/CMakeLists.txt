@@ -79,13 +79,16 @@ set(SRCS
   shape.cpp
   skdtree.cpp
   subsurface.cpp
-  testcase.cpp
   texture.cpp
   trimesh.cpp
   util.cpp
   volume.cpp
   vpl.cpp
 )
+
+if (BUILD_TESTS)
+  list(APPEND SRCS testcase.cpp)
+endif ()
 
 add_definitions(-DMTS_BUILD_MODULE=MTS_MODULE_RENDER)
 

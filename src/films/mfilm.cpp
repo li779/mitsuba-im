@@ -19,8 +19,7 @@
 #include <mitsuba/render/film.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem/fstream.hpp>
+//#include <boost/filesystem/fstream.hpp>
 #include <iomanip>
 #include "cnpy.h"
 
@@ -87,10 +86,10 @@ public:
 	};
 
 	MFilm(const Properties &props) : Film(props) {
-		std::string pixelFormat = boost::to_lower_copy(
+		std::string pixelFormat = to_lower_copy(
 			props.getString("pixelFormat", "luminance"));
 
-		std::string fileFormat = boost::to_lower_copy(
+		std::string fileFormat = to_lower_copy(
 			props.getString("fileFormat", "matlab"));
 
 		if (pixelFormat == "luminance") {
@@ -249,7 +248,7 @@ public:
 		Log(EDebug, "Developing film ..");
 
 		fs::path filename = m_destFile;
-		std::string extension = boost::to_lower_copy(filename.extension().string());
+		std::string extension = to_lower_copy(filename.extension().string());
 		std::string expectedExtension;
 		if (m_fileFormat == EMathematica || m_fileFormat == EMATLAB) {
 			expectedExtension = ".m";
@@ -358,7 +357,7 @@ public:
 		} else {
 			Log(EError, "Invalid file format!");
 		}
-		if (boost::to_lower_copy(filename.extension().string()) != expectedExtension)
+		if (to_lower_copy(filename.extension().string()) != expectedExtension)
 			filename.replace_extension(expectedExtension);
 		return fs::exists(filename);
 	}

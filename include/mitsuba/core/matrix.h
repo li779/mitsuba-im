@@ -21,7 +21,6 @@
 #define __MITSUBA_CORE_MATRIX_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/static_assert.hpp>
 
 MTS_NAMESPACE_BEGIN
 
