@@ -7,7 +7,7 @@ if (NOT DEFINED MTS_VERSION)
 endif()
 
 # Default initial compiler flags which may be modified by advanced users
-if (MTS_CMAKE_INIT)
+#if (MTS_CMAKE_INIT)
   set(MTS_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(MTS_CXX_FLAGS "-fvisibility=hidden -pipe -march=nocona -ffast-math -Wall -Winvalid-pch")
@@ -20,11 +20,10 @@ if (MTS_CMAKE_INIT)
     set(MTS_CXX_FLAGS "${MTS_CXX_FLAGS} -ftemplate-depth=512")
   endif()
   if (MTS_CXX_FLAGS)
-    set(CMAKE_CXX_FLAGS "${MTS_CXX_FLAGS} ${CMAKE_CXX_FLAGS}" CACHE
-      STRING "Flags used by the compiler during all build types." FORCE)
+    set(CMAKE_CXX_FLAGS "${MTS_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
     set(MTS_CXX_FLAGS)
   endif()
-endif()
+  #endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
