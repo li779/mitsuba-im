@@ -128,7 +128,7 @@ endif()
 # ===== Build the plugins =====
 
 # Utilities
-add_subdirectory(src/utils)
+#add_subdirectory(src/utils) #todo: convert to std c++
 # Surface scattering models
 add_subdirectory(src/bsdfs)
 # Phase functions
