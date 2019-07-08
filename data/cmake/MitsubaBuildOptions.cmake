@@ -8,7 +8,7 @@ endif()
 
 # Default initial compiler flags which may be modified by advanced users
 #if (MTS_CMAKE_INIT)
-  set(MTS_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  set(MTS_CXX_FLAGS "")
   if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(MTS_CXX_FLAGS "-fvisibility=hidden -pipe -march=nocona -ffast-math -Wall -Winvalid-pch")
     link_libraries(-lstdc++fs)
