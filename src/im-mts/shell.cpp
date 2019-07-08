@@ -804,10 +804,12 @@ int main(int argc, char** argv) {
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL2_Init();
 
+#if 0
 	// Warmup
 	Scene::availablePlugins("mitsuba_integrator_plugin", false);
 	Scene::availablePlugins("mitsuba_film_plugin", false);
 	Scene::availablePlugins("mitsuba_sensor_plugin", false);
+#endif
 
 	// Run
 	run(argc, argv, window, gl_context, ui_context);
