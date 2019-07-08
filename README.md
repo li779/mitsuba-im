@@ -1,6 +1,8 @@
 Mitsuba IM — Physically Based Renderer (Interactive Fork)
 =========================================================
 
+![Immediate-mode UI frontend for mitsuba with interactive preview](http://alphanew.net/refresh/portfolio/immitsuba.jpg)
+
 Mitsuba IM is a fork of the comprehensive physically-based renderer mitsuba (http://mitsuba-renderer.org/) by Wenzel Jakob (and other contributors), which has proven an invaluable framework for the scientific evaluation of both classic rendering algorithms and novel rendering research. This IM fork pursues the following additional goals:
 
 * Responsive interactive preview of rendering algorithms (with interactive camera & settings)
