@@ -28,9 +28,10 @@ static StatsCounter statsGenerated("Bidirectional mutation",
 		"Successful generation rate", EPercentage);
 
 BidirectionalMutator::BidirectionalMutator(const Scene *scene,
-	Sampler *sampler, MemoryPool &pool, int kmin, int kmax) :
+	Sampler *sampler, MemoryPool &pool, int kmin, int kmax, Float largeStepRate) :
 	m_scene(scene), m_sampler(sampler), m_pool(pool),
-	m_kmin(kmin), m_kmax(kmax) {
+	m_kmin(kmin), m_kmax(kmax),
+	m_largeStepRate(largeStepRate), m_largeStepTracker(NULL) {
 }
 
 BidirectionalMutator::~BidirectionalMutator() { }
@@ -68,6 +69,23 @@ bool BidirectionalMutator::sampleMutation(
 	deletionLength.configure(2, minDeletion, k);
 	int kd = deletionLength.sample(m_sampler->next1D());
 
+	/* Enforce large steps, if requested */
+	if (m_largeStepRate > 0.0f && kd != k && m_sampler->next1D() < m_largeStepRate) {
+		kd = k;
+	}
+
+	/* Always track large steps for online brightness estimation, even invalid / zero contributions! */
+	struct InformLargeStep {
+		LargeStepTracker* tracker; // non-null for large steps, only
+		Float weight;
+		Path& proposal;
+		~InformLargeStep() {
+			if (tracker) {
+				tracker->proposedLargeStep(weight, proposal);
+			}
+		}
+	} largeStep = { k == kd ? m_largeStepTracker : NULL, 0.0f, proposal };
+
 	/* Based on the desired length, this tells us how many
 	   edges need to be added (k' = k - kd + ka) */
 	int ka = kPrime-k+kd;
@@ -84,8 +102,8 @@ bool BidirectionalMutator::sampleMutation(
 	m_temp.clear();
 	for (int l=lMin; l<=lMax; ++l) {
 		int m = l+kd;
-		if (!source.vertex(l)->isDegenerate() &&
-			!source.vertex(m)->isDegenerate())
+		if ((!source.vertex(l)->isDegenerate() || l == 0 && ka >= 2) &&
+			(!source.vertex(m)->isDegenerate() || m == k && ka >= 2))
 			m_temp.push_back(l);
 	}
 	if (m_temp.size() == 0)
@@ -116,6 +134,8 @@ bool BidirectionalMutator::sampleMutation(
 	/* Construct a mutation record */
 	muRec = MutationRecord(EBidirectionalMutation, l, m, ka,
 		source.getPrefixSuffixWeight(l, m));
+	/* Used as pmf query flags, default to 0 */
+	memset(muRec.extra, 0, sizeof(muRec.extra));
 
 	/* Keep some statistics */
 	statsGenerated.incrementBase();
@@ -171,6 +191,13 @@ bool BidirectionalMutator::sampleMutation(
 		proposal.vertex(kPrime-1)->updateSamplePosition(
 			proposal.vertex(kPrime-2));
 
+	/* Compute non-zero large step contributions for valid paths */
+	if (largeStep.tracker) {
+		MutationRecord muQuery = muRec;
+		muQuery.extra[0] = 1; // ignore deletion pmf
+		largeStep.weight = 1.0f / Q(source, proposal, muQuery);
+	}
+
 	++statsGenerated;
 	return true;
 }
@@ -196,8 +223,8 @@ Float BidirectionalMutator::pmfMutation(const Path &source, const MutationRecord
 
 	for (int l=lMin; l<=lMax; ++l) {
 		int m = l+kd;
-		if (!source.vertex(l)->isDegenerate() &&
-			!source.vertex(m)->isDegenerate())
+		if ((!source.vertex(l)->isDegenerate() || l == 0 && ka >= 2) &&
+			(!source.vertex(m)->isDegenerate() || m == k && ka >= 2))
 			++ctr;
 	}
 	if (ctr == 0)
@@ -210,6 +237,16 @@ Float BidirectionalMutator::pmfMutation(const Path &source, const MutationRecord
 	Float factor2 = deletionLength.pmf(kd);
 	Float factor3 = 1 / (Float) ctr;
 	Float factor4 = (Float) 1 / (Float) (sMax-sMin+1);
+
+	if (muRec.extra[0]) {
+		factor2 = 1.0f;
+	}
+	else if (m_largeStepRate > 0.0f) {
+		if (kd != k)
+			factor2 *= (1.0f - m_largeStepRate);
+		else
+			factor2 += (1.0f - factor2) * m_largeStepRate;
+	}
 
 	return factor1 * factor2 * factor3 * factor4;
 }
@@ -273,6 +310,13 @@ Float BidirectionalMutator::Q(const Path &source, const Path &proposal,
 
 void BidirectionalMutator::accept(const MutationRecord &) {
 	++statsAccepted;
+}
+
+void BidirectionalMutator::setLargeStepTracker(LargeStepTracker* tracker, Float largeStepRate) {
+	m_largeStepTracker = tracker;
+	if (largeStepRate >= 0.0f) {
+		m_largeStepRate = largeStepRate;
+	}
 }
 
 MTS_IMPLEMENT_CLASS(BidirectionalMutator, false, Mutator)

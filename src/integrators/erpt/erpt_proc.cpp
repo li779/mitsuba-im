@@ -23,7 +23,9 @@
 #include <mitsuba/bidir/mut_manifold.h>
 #include <mitsuba/bidir/pathsampler.h>
 #include <mitsuba/bidir/util.h>
+#include <mitsuba/render/integrator2.h>
 #include <mitsuba/core/sfcurve.h>
+#include <mitsuba/core/plugin.h>
 #include <functional>
 #include "erpt_proc.h"
 
@@ -103,6 +105,20 @@ public:
 		m_scene->wakeup(NULL, m_resources);
 		m_scene->initializeBidirectional();
 
+		prepareAlways();
+	}
+
+	void prepareResponsive(Scene const* scene, Sensor const* sensor, Sampler* sampler, Sampler* independentSampler, ImageBlock* result) {
+		m_scene = const_cast<Scene*>(scene);
+		m_sampler = sampler;
+		m_indepSampler = independentSampler;
+		m_sensor = const_cast<Sensor *>(sensor);
+		m_result = result;
+
+		prepareAlways();
+	}
+
+	void prepareAlways() {
 		m_pathSampler = new PathSampler(PathSampler::EBidirectional, m_scene,
 			m_sampler, m_sampler, m_sampler, m_config.maxDepth, 10,
 			m_config.separateDirect, true, true);
@@ -148,14 +164,18 @@ public:
 		   usually safe to assume that these are handled well enough by BDPT */
 		int k = path.length();
 		if (path.vertex(k-2)->isDiffuseInteraction() && path.vertex(k-3)->isDiffuseInteraction()) {
-			Spectrum value = path.getRelativeWeight() * weight / m_sampler->getSampleCount();
+			Spectrum value = path.getRelativeWeight() * weight / m_config.sampleNormalization;
+#ifndef MTS_NO_ATOMIC_SPLAT
+			m_result->putAtomic(path.getSamplePosition(), &value[0]);
+#else
 			m_result->put(path.getSamplePosition(), &value[0]);
+#endif
 			return;
 		}
 #endif
 
 		Float meanChains = m_config.numChains * weight
-			/ (m_config.luminance * m_sampler->getSampleCount());
+			/ (m_config.luminance * m_config.sampleNormalization);
 
 		/* Optional: do not launch too many chains if this is desired by the user */
 		if (m_config.maxChains > 0 && meanChains > m_config.maxChains)
@@ -167,7 +187,7 @@ public:
 		if (numChains == 0)
 			return;
 
-		Float depositionEnergy = weight / (m_sampler->getSampleCount()
+		Float depositionEnergy = weight / (m_config.sampleNormalization
 				* meanChains * m_config.chainLength);
 
 		DiscreteDistribution suitabilities(m_mutators.size());
@@ -251,8 +271,11 @@ public:
 					/* Accept with probability 'a' */
 					if (a == 1 || m_indepSampler->next1D() < a) {
 						Spectrum value = relWeight * (accumulatedWeight * depositionEnergy);
+#ifndef MTS_NO_ATOMIC_SPLAT
+						m_result->putAtomic(current->getSamplePosition(), &value[0]);
+#else
 						m_result->put(current->getSamplePosition(), &value[0]);
-
+#endif
 						/* The mutation was accepted */
 						current->release(muRec.l, muRec.m+1, *m_pool);
 						std::swap(current, proposed);
@@ -265,7 +288,11 @@ public:
 					} else {
 						if (a > 0) {
 							Spectrum value = proposed->getRelativeWeight() * (a * depositionEnergy);
+#ifndef MTS_NO_ATOMIC_SPLAT
+							m_result->putAtomic(proposed->getSamplePosition(), &value[0]);
+#else
 							m_result->put(proposed->getSamplePosition(), &value[0]);
+#endif
 						}
 						/* The mutation was rejected */
 						proposed->release(muRec.l, muRec.l + muRec.ka + 1, *m_pool);
@@ -276,7 +303,11 @@ public:
 			}
 			if (accumulatedWeight > 0) {
 				Spectrum value = relWeight * (accumulatedWeight * depositionEnergy);
+#ifndef MTS_NO_ATOMIC_SPLAT
+				m_result->putAtomic(current->getSamplePosition(), &value[0]);
+#else
 				m_result->put(current->getSamplePosition(), &value[0]);
+#endif
 			}
 			current->release(*m_pool);
 		}
@@ -292,9 +323,10 @@ public:
 
 	void process(const WorkUnit *workUnit, WorkResult *workResult, const bool &stop) {
 		const RectangularWorkUnit *rect = static_cast<const RectangularWorkUnit *>(workUnit);
-		m_result = static_cast<ERPTWorkResult *>(workResult);
-		m_result->origOffset = rect->getOffset();
-		m_result->origSize = rect->getSize();
+		ERPTWorkResult *erptResult = static_cast<ERPTWorkResult *>(workResult);
+		erptResult->origOffset = rect->getOffset();
+		erptResult->origSize = rect->getSize();
+		m_result = erptResult;
 
 		m_hilbertCurve.initialize(TVector2<uint8_t>(rect->getSize()));
 		m_result->clear();
@@ -321,6 +353,114 @@ public:
 		m_result = NULL;
 	}
 
+	class ERPTResponsive : public ImageOrderIntegrator {
+		struct State {
+			PathSampler* m_pathSampler;
+			std::function<void (int, int, Float, Path &)> callback;
+			int stop;
+
+			void prepare(ERPTRenderer* renderer, int volatile const* stop) {
+				this->stop = false;
+				if (!stop)
+					stop = &this->stop;
+
+				this->m_pathSampler = renderer->m_pathSampler;
+				this->callback = std::bind(&ERPTRenderer::pathCallback, renderer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, (bool const*) stop);
+			}
+
+			void process(Point2i offset) {
+				m_pathSampler->samplePaths(offset, callback);
+			}
+		};
+		std::vector<State> m_state;
+
+		ref<Integrator> m_integrator;
+		ERPTConfiguration const* m_config;
+
+		ref<Sampler> m_independentSampler;
+
+		char statisticsBuffer[1024];
+
+	public:
+		ERPTResponsive(Integrator* bdpt, ERPTConfiguration const* config)
+			: ImageOrderIntegrator(bdpt->getProperties())
+			, m_integrator(bdpt)
+			, m_config(config) {
+			m_independentSampler = static_cast<Sampler *> (PluginManager::getInstance()->
+				createObject(MTS_CLASS(Sampler), Properties("independent")));
+			m_independentSampler->configure();
+		}
+
+		bool preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
+			return m_integrator->preprocess(scene, nullptr, nullptr, -1, -1, -1);
+		}
+
+		bool allocate(const Scene &scene, Sampler *const *samplers, ImageBlock *const *targets, int threadCount) override {
+			bool result = ImageOrderIntegrator::allocate(scene, samplers, targets, threadCount);
+
+			m_state.clear();
+			m_state.resize(threadCount);
+
+			for (int i = 0; i < threadCount; ++i)
+				m_integrator->configureSampler(&scene, samplers[i]);
+
+			return result;
+		}
+
+		char const* getRealtimeStatistics() override {
+			int chainLen = (int) m_config->chainLength;
+			sprintf(statisticsBuffer, "%.2f mpp (%.1f%% accept; len %d)"
+				, double(statsChainsPerPixel.getValue() * chainLen) / double(statsChainsPerPixel.getBase())
+				, double(100 * statsAccepted.getValue()) / double(statsAccepted.getBase())
+				, chainLen);
+			return statisticsBuffer;
+		}
+
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+			, Controls controls, int threadIdx, int threadCount) override {
+			if (threadIdx == 0) {
+				Vector2i pixels = target.getSize();
+				statsChainsPerPixel.incrementBase(pixels.x * pixels.y);
+			}
+
+#if defined(MTS_DEBUG_FP)
+			enableFPExceptions();
+#endif
+			int returnCode;
+			{
+				ERPTConfiguration config = *m_config;
+				config.luminance = 0.2f;
+				config.luminanceSamples = 0;
+				config.separateDirect = false;
+				config.directSamples = 0;
+				config.sampleNormalization = 1;
+				ref<Sampler> indepSampler = m_independentSampler->clone();
+				ref<ERPTRenderer> renderer = new ERPTRenderer(config);
+				renderer->prepareResponsive(&scene, &sensor, &sampler, indepSampler, &target);
+				m_state[threadIdx].prepare(renderer, controls.abort);
+
+				returnCode = ImageOrderIntegrator::render(scene, sensor, sampler, target, controls, threadIdx, threadCount);
+
+				/* Make sure that there were no memory leaks */
+				Assert(renderer->m_pool->unused());
+			}
+#if defined(MTS_DEBUG_FP)
+			disableFPExceptions();
+#endif
+
+			return returnCode;
+		}
+
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) override {
+			m_state[threadIdx].process(pixel);
+			return 0;
+		}
+
+		Float getLowerSampleBound() const override {
+			return 0.0f;
+		}
+	};
+
 	ref<WorkProcessor> clone() const {
 		return new ERPTRenderer(m_config);
 	}
@@ -334,7 +474,7 @@ private:
 	ref<PathSampler> m_pathSampler;
 	ref_vector<Mutator> m_mutators;
 	HilbertCurve2D<uint8_t> m_hilbertCurve;
-	ERPTWorkResult *m_result;
+	ImageBlock *m_result;
 	MemoryPool *m_pool;
 };
 
@@ -378,6 +518,10 @@ void ERPTProcess::bindResource(const std::string &name, int id) {
 		m_accum = new ImageBlock(Bitmap::ESpectrum, film->getCropSize());
 		m_accum->clear();
 	}
+}
+
+ref<ResponsiveIntegrator> ERPTProcess::makeResponsiveIntegrator(Integrator* bdpt, const ERPTConfiguration *config) {
+	return new ERPTRenderer::ERPTResponsive(bdpt, config);
 }
 
 MTS_IMPLEMENT_CLASS_S(ERPTRenderer, false, WorkProcessor)

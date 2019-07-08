@@ -114,6 +114,11 @@ public:
 	 */
 	virtual const Integrator *getSubIntegrator(int index) const;
 
+	/**
+	* \brief Return a responsive integrator (if supported, null by default)
+	*/
+	virtual ref<ResponsiveIntegrator> makeResponsiveIntegrator();
+
 	/// Serialize this integrator to a binary data stream
 	void serialize(Stream *stream, InstanceManager *manager) const;
 
@@ -416,6 +421,8 @@ public:
 	 */
 	virtual void wakeup(ConfigurableObject *parent,
 		std::map<std::string, SerializableObject *> &params);
+
+	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override;
 
 	/// Serialize this integrator to a binary data stream
 	void serialize(Stream *stream, InstanceManager *manager) const;

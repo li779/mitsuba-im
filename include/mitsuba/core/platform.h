@@ -82,10 +82,12 @@
 	#define MTS_EXPORT __declspec(dllexport)
 	#define MTS_IMPORT __declspec(dllimport)
 	#define MTS_MAY_ALIAS // not supported on Windows
+	#define MTS_PARTIALLY_EXPORTED
 #else
 	#define MTS_EXPORT __attribute__ ((visibility("default")))
 	#define MTS_IMPORT
 	#define MTS_MAY_ALIAS __attribute__ ((__may_alias__))
+	#define MTS_PARTIALLY_EXPORTED MTS_EXPORT
 
 	#include <stdint.h>
 

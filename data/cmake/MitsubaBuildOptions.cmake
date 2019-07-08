@@ -6,6 +6,19 @@ if (NOT DEFINED MTS_VERSION)
   message(FATAL_ERROR "This file has to be included from the main build file.")
 endif()
 
+# make config 'RelWithDebInfo' debuggable by disabling some inlining optimizations
+if(MSVC)
+  # /MD link against release libs, /Od disable optimizations, /Ob0
+  string(REGEX REPLACE "/Ob2($|[; ])" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "/Ob2($|[; ])" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "/GL($|[; ])" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "/GL($|[; ])" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /Ob1") # cant optimize: /RTC1
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Ob1") # cant optimize: /RTC1
+  list(REMOVE_DUPLICATES CMAKE_C_FLAGS_RELWITHDEBINFO)
+  list(REMOVE_DUPLICATES CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+endif()
+
 # Default initial compiler flags which may be modified by advanced users
 #if (MTS_CMAKE_INIT)
   set(MTS_CXX_FLAGS "")

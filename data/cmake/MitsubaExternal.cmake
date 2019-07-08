@@ -367,10 +367,14 @@ if (MTS_FFTW)
   add_definitions(-DMTS_HAS_FFTW=1)
 endif()
 
+# OpenGL
+find_package(OpenGL)
+CMAKE_DEPENDENT_OPTION(BUILD_IMGUI "Built the GL-based mitsuba GUI." ON
+  "OPENGL_FOUND" OFF)
+
 set (MTS_HAS_HW FALSE)
 if (MTS_ENABLE_HW_PREVIEW)
 
-find_package(OpenGL REQUIRED)
 set (GLEW_MX ON)
 find_package(GLEW)
 if (GLEW_FOUND)
@@ -401,6 +405,32 @@ int main (int argc, char **argv) {
 endif ()
 
 set (MTS_HAS_HW ${GLEW_FOUND})
+endif ()
+
+find_package(SDL 2.0)
+if (NOT SDL_FOUND)
+	set(MTS_SDL_DIR external/SDL)
+	set(MTS_SDL_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_SDL_DIR}/interface)
+	ExternalProject_Add(sdl
+		PREFIX ${MTS_SDL_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_SDL_DIR} INSTALL_DIR ${MTS_SDL_INSTALL_DIR}
+		CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${MTS_SDL_INSTALL_DIR}
+		-DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF # avoid linker nightmare
+		-DSDL_AUDIO=OFF
+		#-DSDL_HAPTIC=OFF -DSDL_JOYSTICK=OFF -DSDL_POWER=OFF -DSDL_SENSOR=OFF # these seem obligatory for now
+		)
+	set_property(TARGET sdl PROPERTY FOLDER external)
+	
+	set(SDL_FOUND TRUE)
+	set(SDL_INCLUDE_DIRS ${MTS_SDL_INSTALL_DIR}/include)
+	if (NOT MSVC)
+		set(SDL_BIN ${MTS_SDL_INSTALL_DIR}/lib/libSDL2.so)
+		set(SDL_LIBRARY ${MTS_SDL_INSTALL_DIR}/lib/libSDL2.so)
+		set(SDL_LIBRARIES ${SDL_LIBRARY} ${MTS_SDL_INSTALL_DIR}/lib/libSDL2main.a)
+	else ()
+		set(SDL_BIN ${MTS_SDL_INSTALL_DIR}/bin/SDL2.dll)
+		set(SDL_LIBRARY ${MTS_SDL_INSTALL_DIR}/lib/SDL2.lib)
+		set(SDL_LIBRARIES ${SDL_LIBRARY} ${MTS_SDL_INSTALL_DIR}/lib/SDL2main.lib)
+	endif ()
 endif ()
 
 # Try to get OpenMP support

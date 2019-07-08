@@ -37,3 +37,12 @@
 [submodule "external/CMakePCHCompiler"]
 	path = external/CMakePCHCompiler
 	url = https://github.com/nanoant/CMakePCHCompiler
+[submodule "external/SDL"]
+	path = external/SDL
+	url = https://github.com/spurious/SDL-mirror
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "external/tinyfiledialogs"]
+	path = external/tinyfiledialogs
+	url = https://git.code.sf.net/p/tinyfiledialogs/code

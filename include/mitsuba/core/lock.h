@@ -31,6 +31,7 @@ MTS_NAMESPACE_BEGIN
  */
 class MTS_EXPORT_CORE Mutex : public Object {
 	friend class ConditionVariable;
+	friend class Barrier;
 public:
 	/// Create a new mutex object
 	Mutex();
@@ -102,6 +103,7 @@ private:
  * \ingroup libcore
  */
 class MTS_EXPORT_CORE ConditionVariable : public Object {
+	friend class Barrier;
 public:
 	/**
 	 * \brief Create a new condition variable. Also takes a
@@ -189,8 +191,8 @@ private:
  */
 class UniqueLock {
 public:
-	explicit UniqueLock(Mutex * mutex, bool acquire_lock = true)
-	: m(mutex), is_locked(false) {
+	explicit UniqueLock(Mutex * mutex, bool acquire_lock = true, bool have_lock = false)
+	: m(mutex), is_locked(have_lock) {
 		if (acquire_lock)
 			lock();
 	}
@@ -233,6 +235,60 @@ private:
 
 	explicit UniqueLock(UniqueLock&);
 	UniqueLock& operator=(UniqueLock&);
+};
+
+// https://stackoverflow.com/questions/24465533/implementing-boostbarrier-in-c11
+class Barrier {
+public:
+	explicit Barrier(int iCount) :
+		mThreshold(0),
+		mCond(&mMutex) {
+		resize(iCount);
+	}
+
+	void resize(int iCount) {
+		SAssert(iCount > 0);
+		LockGuard lLock(&mMutex);
+		// only resize once
+		if (mThreshold != iCount) {
+			mThreshold = iCount;
+			mGeneration = 0;
+			mCount = mThreshold;
+		}
+	}
+
+	Mutex* waitKeep() {
+		UniqueLock lLock(&mMutex);
+		if (!--mCount) {
+			mGeneration++;
+			mCount = mThreshold;
+			mCond.broadcast();
+			return lLock.release();
+		}
+		else {
+			int lGen = mGeneration;
+			while (lGen == mGeneration)
+				mCond.wait();
+			return nullptr;
+		}
+	}
+
+	void wait() {
+		Mutex* m = waitKeep();
+		if (m)
+			m->unlock();
+	}
+
+	bool blocking() const {
+		return mCount != mThreshold;
+	}
+
+private:
+	int mThreshold;
+	int volatile mGeneration;
+	int mCount;
+	Mutex mMutex;
+	ConditionVariable mCond;
 };
 
 MTS_NAMESPACE_END

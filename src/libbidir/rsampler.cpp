@@ -20,8 +20,8 @@
 
 MTS_NAMESPACE_BEGIN
 
-ReplayableSampler::ReplayableSampler() : Sampler(Properties()) {
-	m_initial = new Random();
+ReplayableSampler::ReplayableSampler(Random* seeding) : Sampler(Properties()) {
+	m_initial = seeding ? new Random(seeding) : new Random();
 	m_random = new Random();
 	m_random->set(m_initial);
 	m_sampleCount = 0;

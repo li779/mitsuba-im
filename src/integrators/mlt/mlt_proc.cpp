@@ -22,6 +22,7 @@
 #include <mitsuba/bidir/mut_mchain.h>
 #include <mitsuba/bidir/mut_manifold.h>
 #include <mitsuba/bidir/util.h>
+#include <mitsuba/render/integrator2.h>
 #include "mlt_proc.h"
 
 MTS_NAMESPACE_BEGIN
@@ -78,6 +79,25 @@ public:
 		m_rplSampler = static_cast<ReplayableSampler*>(
 			static_cast<Sampler *>(getResource("rplSampler"))->clone().get());
 
+		m_currentImageWeight = nullptr;
+
+		prepareAlways();
+	}
+
+	void prepareResponsive(Scene const* scene, Sensor const* sensor, Sampler* sampler, ImageBlock* result, ReplayableSampler* seedSampler, Float *currentImageWeight) {
+		m_scene = const_cast<Scene*>(scene);
+		m_sampler = sampler;
+		m_sensor = const_cast<Sensor *>(sensor);
+		m_film = m_sensor->getFilm();
+		
+		m_rplSampler = seedSampler;
+
+		m_currentImageWeight = currentImageWeight;
+
+		prepareAlways();
+	}
+
+	void prepareAlways() {
 		m_pathSampler = new PathSampler(PathSampler::EBidirectional, m_scene,
 			m_rplSampler, m_rplSampler, m_rplSampler, m_config.maxDepth, 10,
 			m_config.separateDirect, true);
@@ -118,8 +138,12 @@ public:
 		const SeedWorkUnit *wu = static_cast<const SeedWorkUnit *>(workUnit);
 		Path *current = new Path(), *proposed = new Path();
 		Spectrum relWeight(0.0f);
+		Float* currentImageWeight = m_currentImageWeight;
 
-		result->clear();
+		// classic mitusba mode
+		if (m_config.luminanceSamples != 0) {
+			result->clear();
+		}
 
 		/// Reconstruct the seed path
 		m_pathSampler->reconstructPath(wu->getSeed(), m_config.importanceMap, *current);
@@ -256,8 +280,10 @@ public:
 				if (a == 1 || m_sampler->next1D() < a) {
 					current->release(muRec.l, muRec.m+1, *m_pool);
 					Spectrum value = relWeight * accumulatedWeight;
+					if (currentImageWeight)
+						value *= *currentImageWeight;
 					if (!value.isZero())
-						result->put(current->getSamplePosition(), &value[0]);
+						result->putAtomic(current->getSamplePosition(), &value[0]);
 
 					/* The mutation was accepted */
 					std::swap(current, proposed);
@@ -273,7 +299,9 @@ public:
 					consecRejections++;
 					if (a > 0) {
 						Spectrum value = proposed->getRelativeWeight() * a;
-						result->put(proposed->getSamplePosition(), &value[0]);
+						if (currentImageWeight)
+							value *= *currentImageWeight;
+						result->putAtomic(proposed->getSamplePosition(), &value[0]);
 					}
 				}
 			} else {
@@ -289,7 +317,9 @@ public:
 
 		if (accumulatedWeight > 0) {
 			Spectrum value = relWeight * accumulatedWeight;
-			result->put(current->getSamplePosition(), &value[0]);
+			if (currentImageWeight)
+				value *= *currentImageWeight;
+			result->putAtomic(current->getSamplePosition(), &value[0]);
 		}
 
 		#if defined(MTS_DEBUG_FP)
@@ -302,6 +332,163 @@ public:
 		if (!m_pool->unused())
 			Log(EError, "Internal error: detected a memory pool leak!");
 	}
+
+	class MLTResponsive : public ResponsiveIntegrator {
+		#define SeedSamplesPerChain 32
+
+		ref<Integrator> m_integrator;
+		MLTConfiguration const* m_config;
+
+		ref_vector<ReplayableSampler> m_seedSamplers;
+
+	public:
+		MLTResponsive(Integrator* mlt, MLTConfiguration const* config)
+			: ResponsiveIntegrator(mlt->getProperties())
+			, m_integrator(mlt)
+			, m_config(config) {
+		}
+
+		bool preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
+			return m_integrator->preprocess(scene, nullptr, nullptr, -1, -1, -1);
+		}
+
+		bool allocate(const Scene &scene, Sampler *const *samplers, ImageBlock *const *targets, int threadCount) override {
+			bool result = ResponsiveIntegrator::allocate(scene, samplers, targets, threadCount);
+
+			ref<Random> rnd = new Random();
+			m_seedSamplers.clear();
+			for (int i = 0; i < threadCount; ++i) {
+				m_seedSamplers.push_back(new ReplayableSampler(rnd));
+			}
+
+			for (int i = 0; i < threadCount; ++i) {
+				m_integrator->configureSampler(&scene, samplers[i]);
+			}
+
+			return result;
+		}
+
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+			, Controls controls, int threadIdx, int threadCount) override {
+			Vector2i pixels = target.getSize();
+			int planeSamples = pixels.x * pixels.y;
+
+			MLTConfiguration config = *m_config;
+			config.luminance = 0.2f;
+			config.luminanceSamples = 0;
+			config.separateDirect = false;
+			config.directSamples = 0;
+			config.twoStage = false;
+			config.firstStage = false;
+			config.importanceMap = NULL;
+			config.workUnits = 0;
+			config.nMutations = std::max(4 * pixels.x * pixels.y / threadCount, 300000);
+
+			struct MeanBrightness {
+				Float value = 0;
+				Float samples = 0;
+			} meanImage;
+
+			ref<MLTRenderer> renderer = new MLTRenderer(config);
+			renderer->prepareResponsive(&scene, &sensor, &sampler, &target, m_seedSamplers[threadIdx], &meanImage.value);
+
+			struct LargeStepEstimator : LargeStepTracker {
+				MeanBrightness &meanImage;
+
+				LargeStepEstimator(MeanBrightness &meanImage)
+					: meanImage(meanImage) { }
+
+				void proposedLargeStep(Float weight, Path const &path) override {
+					float const onlineWeight = .1f; // higher variance
+					meanImage.samples += onlineWeight;
+					meanImage.value += (weight - meanImage.value) * onlineWeight / meanImage.samples;
+				}
+			} largeStepEstimator = { meanImage };
+			for (Mutator* m : renderer->m_mutators)
+				m->setLargeStepTracker(&largeStepEstimator, .05f);
+
+			// todo: offset sampler per thread?
+			ReplayableSampler* seedSampler = renderer->m_rplSampler;
+			PathSampler* pathSampler = renderer->m_pathSampler;
+			std::vector<PathSeed> pathSeeds;
+
+			int currentSamples = 0, completedPlanes = 0;
+			double spp = 0.0f;
+
+			int returnCode = 0;
+			while (returnCode == 0) {
+				// update statistics and check control
+				{
+					spp = (double) completedPlanes + double(currentSamples + config.nMutations / 2) / double(planeSamples);
+
+					// external control
+					if (controls.abort && *controls.abort) {
+						returnCode = -1;
+					} else if (controls.continu && !*controls.continu) {
+						returnCode = -2;
+					} else if (controls.interrupt) {
+						// important: always called on new plane begin!
+						returnCode = controls.interrupt->progress(this, scene, sensor, sampler, target, spp, controls, threadIdx, threadCount);
+					}
+					if (returnCode != 0) {
+						break;
+					}
+				}
+
+				{
+					size_t sampleIndex;
+					Float totalSplat;
+					PathSampler::PathCallback callback = [&pathSeeds, &sampleIndex, &totalSplat](int s, int t, Float w, Path &p) {
+						if (w > 0.0f) {
+							pathSeeds.push_back(PathSeed(sampleIndex, w, s, t));
+							totalSplat += w;
+							// todo: insert into dbor
+						}
+					};
+					for (int i = 0; i < SeedSamplesPerChain; ) {
+						size_t seedIndex = pathSeeds.size();
+						sampleIndex = seedSampler->getSampleIndex();
+						totalSplat = 0.0f;
+						pathSampler->samplePaths(Point2i(-1), callback);
+						meanImage.samples += 1.f;
+						meanImage.value += (totalSplat - meanImage.value) / meanImage.samples;
+						i += int(pathSeeds.size() - seedIndex);
+					}
+				}
+
+				SeedWorkUnit swu;
+				swu.setTimeout(0);
+				Float totalSeedWeight = 0;
+				for (PathSeed& s : pathSeeds) {
+					Float seedWeight = s.luminance;
+					Float prevSeedWeight = totalSeedWeight;
+					totalSeedWeight += seedWeight;
+
+					Float u = sampler.next1D();
+					if (seedWeight < prevSeedWeight ? u < seedWeight / totalSeedWeight : u >= prevSeedWeight / totalSeedWeight) {
+						swu.setSeed(s);
+					}
+				}
+				bool stop = false;
+				renderer->process(&swu, &target, controls.abort ? *(bool const*) controls.abort : stop);
+				currentSamples += int(config.nMutations);
+
+				// precise sample tracking
+				while (currentSamples >= planeSamples) {
+					++completedPlanes;
+					currentSamples -= planeSamples;
+					spp = (double) completedPlanes;
+				}
+			}
+
+			return returnCode;
+		}
+
+		Float getLowerSampleBound() const override {
+			return 0.0f;
+		}
+	};
+
 
 	ref<WorkProcessor> clone() const {
 		return new MLTRenderer(m_config);
@@ -318,6 +505,7 @@ private:
 	ref<PathSampler> m_pathSampler;
 	ref_vector<Mutator> m_mutators;
 	MemoryPool *m_pool;
+	Float *m_currentImageWeight;
 };
 
 /* ==================================================================== */
@@ -421,6 +609,10 @@ void MLTProcess::bindResource(const std::string &name, int id) {
 		m_accum->clear();
 		m_developBuffer = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat, m_film->getCropSize());
 	}
+}
+
+ref<ResponsiveIntegrator> MLTProcess::makeResponsiveIntegrator(Integrator* mlt, const MLTConfiguration *config) {
+	return new MLTRenderer::MLTResponsive(mlt, config);
 }
 
 MTS_IMPLEMENT_CLASS_S(MLTRenderer, false, WorkProcessor)

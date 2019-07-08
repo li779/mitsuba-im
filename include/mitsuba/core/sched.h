@@ -474,6 +474,9 @@ public:
 	/// Has the scheduler been started?
 	inline bool isRunning() const { return m_running; }
 
+	/// Restrict the number of workers per newly scheduled process. -1 For no limit.
+	inline void limitWorkersPerProcess(int workers) { m_maxWorkersPerProcess = workers; }
+
 	/// Is the scheduler currently executing work?
 	bool isBusy() const;
 
@@ -504,10 +507,12 @@ public:
 		ref<WaitFlag> done;
 		/* Log level for events associated with this process */
 		ELogLevel logLevel;
+		/* worker range */
+		int workerOffset, workerCount;
 
 		inline ProcessRecord(int id, ELogLevel logLevel, Mutex *mutex)
-		 : id(id), inflight(0), morework(true), cancelled(false),
-		 	active(true), logLevel(logLevel) {
+			: id(id), inflight(0), morework(true), cancelled(false),
+			active(true), logLevel(logLevel), workerOffset(0), workerCount(-1) {
 			cond = new ConditionVariable(mutex);
 			done = new WaitFlag();
 		}
@@ -664,6 +669,8 @@ private:
 	std::vector<Worker *> m_workers;
 	int m_resourceCounter, m_processCounter;
 	bool m_running;
+	int m_nextWorkerOffset;
+	int m_maxWorkersPerProcess;
 };
 
 /**

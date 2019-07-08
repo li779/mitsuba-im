@@ -233,6 +233,7 @@ public:
 		m_config.luminance = pathSampler->computeAverageLuminance(
 				m_config.luminanceSamples);
 		m_config.blockSize = scene->getBlockSize();
+		m_config.sampleNormalization = Float(sampleCount);
 
 		m_config.dump();
 
@@ -270,6 +271,10 @@ public:
 		sched->unregisterResource(indepSamplerResID);
 
 		return process->getReturnStatus() == ParallelProcess::ESuccess;
+	}
+
+	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		return ERPTProcess::makeResponsiveIntegrator(this, &this->m_config);
 	}
 
 	MTS_DECLARE_CLASS()

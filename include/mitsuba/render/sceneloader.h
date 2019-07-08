@@ -47,7 +47,7 @@ public:
 	static void staticShutdown();
 
 private:
-	ref<SceneHandler> handler;
+	std::unique_ptr<SceneHandler> handler;
 	void* parser;
 };
 

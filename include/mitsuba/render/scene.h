@@ -1120,6 +1120,11 @@ public:
 	/// Return the block resolution used to split images into parallel workloads
 	inline uint32_t getBlockSize() const { return m_blockSize; }
 
+	/// Sets the scene pre-processed flag (scene preprocessing outside normal render job logic).
+	inline void setScenePreprocessed(bool preprocessed) { m_scenePreprocessed = preprocessed; }
+	/// Sets the integrator pre-processed flag (preprocessing outside normal scene/render job logic).
+	inline void setIntegratorPreprocessed(bool preprocessed) { m_integratorPreprocessed = preprocessed; }
+
 	/// Serialize the whole scene to a network/file stream
 	void serialize(Stream *stream, InstanceManager *manager) const;
 
@@ -1165,6 +1170,8 @@ private:
 	uint32_t m_blockSize;
 	bool m_degenerateSensor;
 	bool m_degenerateEmitters;
+	bool m_scenePreprocessed;
+	bool m_integratorPreprocessed;
 };
 
 MTS_NAMESPACE_END

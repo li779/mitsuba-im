@@ -24,6 +24,7 @@
 #include <mitsuba/core/cobject.h>
 #include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/version.h>
+#include <fstream>
 
 #if !defined(__WINDOWS__)
 # include <dlfcn.h>
@@ -220,13 +221,15 @@ std::vector<std::string> PluginManager::getLoadedPlugins() const {
 	return list;
 }
 
+static char const* pluginSearchDir = "plugins";
+
 void PluginManager::ensurePluginLoaded(const std::string &name) {
 	/* Plugin already loaded? */
 	if (m_plugins[name] != NULL)
 		return;
 
 	/* Build the full plugin file name */
-	fs::path shortName = fs::path("plugins") / name;
+	fs::path shortName = fs::decode_pathstr(fs::pathstr(pluginSearchDir)) / name;
 #if defined(__WINDOWS__)
 	shortName.replace_extension(".dll");
 #elif defined(__OSX__)
@@ -247,6 +250,54 @@ void PluginManager::ensurePluginLoaded(const std::string &name) {
 
 	/* Plugin not found! */
 	Log(EError, "Plugin \"%s\" not found!", name.c_str());
+}
+
+/// Returns a list of available plugins containing the given string or symbol.
+std::vector<std::string> PluginManager::getAvailablePlugins(char const* symbol) const {
+	/* Build the full plugin path */
+	const FileResolver *resolver = Thread::getThread()->getFileResolver();
+	fs::pathstr spath = resolver->resolve(fs::pathstr(pluginSearchDir));
+	fs::path searchPath = fs::decode_pathstr(spath);
+
+	std::vector<std::string> plugins;
+
+	int symbolLen = (int) std::strlen(symbol);
+	int blockSize = 1024 * 1024;
+	std::string textblock(blockSize + symbolLen + 1, 0);
+
+	/* Enumerate candidates */
+	for (auto& entry : fs::directory_iterator(searchPath))
+		if (is_regular_file(entry)) {
+			fs::path p = entry;
+			try {
+				std::fstream f(p, std::fstream::binary | std::fstream::in);
+				for (int blockOffset = 0, endOfBlock = 0; f; ) {
+					if (endOfBlock > blockOffset) {
+						int prefixLen = std::min(symbolLen, endOfBlock);
+						std::memmove(textblock.data(), textblock.data() + (endOfBlock - prefixLen), prefixLen);
+						blockOffset = prefixLen;
+					}
+					endOfBlock = blockOffset;
+					f.read(textblock.data() + blockOffset, blockSize);
+					endOfBlock += (int) f.gcount();
+					textblock[endOfBlock] = '\0'; // warning str str stops at 0, todo: avoid ...
+					char* textEnd = textblock.data() + endOfBlock;
+					char const* occurred = std::search(textblock.data(), textEnd, symbol, symbol + symbolLen);
+					if (occurred != textEnd) {
+						plugins.push_back(p.stem().string());
+						break;
+					}
+				}
+			}
+			catch (...) {
+				SLog(EWarn, "Cannot open plugin candidate file \"%s\"", p.string());
+			}
+		}
+
+	/* Clean in case of duplicates */
+	std::sort(plugins.begin(), plugins.end());
+	plugins.erase(std::unique(plugins.begin(), plugins.end()), plugins.end());
+	return plugins;
 }
 
 void PluginManager::staticInitialization() {

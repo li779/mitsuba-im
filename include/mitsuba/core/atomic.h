@@ -114,6 +114,25 @@ inline bool atomicCompareAndExchange(volatile int64_t *v, int64_t newValue, int6
 #endif
 }
 
+#if defined(_MSC_VER)
+struct alignas(16) atomic_int_128 {
+	long long ll[2];
+	atomic_int_128 volatile& operator =(atomic_int_128 volatile& r) volatile {
+		ll[0] = r.ll[0]; ll[1] = r.ll[1];
+		return *this;
+	}
+};
+#else
+typedef __int128 atomic_int_128;
+#endif
+inline bool atomicCompareAndExchange(volatile atomic_int_128* v, atomic_int_128 newValue, atomic_int_128 oldValue) {
+#if defined(_MSC_VER)
+	return 0 != _InterlockedCompareExchange128(v->ll, newValue.ll[1], newValue.ll[0], oldValue.ll);
+#else
+	return __sync_bool_compare_and_swap(v, oldValue, newValue);
+#endif
+}
+
 /**
  * \brief Atomically add \a delta to the floating point destination \a dst
  *

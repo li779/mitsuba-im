@@ -16,9 +16,10 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <mitsuba/core/statistics.h>
 #include <mitsuba/render/integrator.h>
+#include <mitsuba/render/integrator2.h>
 #include <mitsuba/render/renderproc.h>
+#include <mitsuba/core/sched.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -267,4 +268,210 @@ std::string RadianceQueryRecord::toString() const {
 MTS_IMPLEMENT_CLASS(Integrator, true, NetworkedObject)
 MTS_IMPLEMENT_CLASS(SamplingIntegrator, true, Integrator)
 MTS_IMPLEMENT_CLASS(MonteCarloIntegrator, true, SamplingIntegrator)
+MTS_NAMESPACE_END
+
+#include <mitsuba/render/integrator2.h>
+#include <random>
+#include <algorithm>
+
+MTS_NAMESPACE_BEGIN
+
+ref<ResponsiveIntegrator> Integrator::makeResponsiveIntegrator() {
+	return nullptr;
+}
+
+ref<ResponsiveIntegrator> SamplingIntegrator::makeResponsiveIntegrator() {
+	return new ClassicSamplingIntegrator(this, this->getProperties());
+}
+
+ResponsiveIntegrator::ResponsiveIntegrator(const Properties &props)
+	: ConfigurableObject(props) { }
+
+ResponsiveIntegrator::~ResponsiveIntegrator() { }
+
+bool ResponsiveIntegrator::preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
+	return true;
+}
+
+bool ResponsiveIntegrator::allocate(const Scene &scene, Sampler *const *samplers, ImageBlock*const * targets, int threadCount) {
+	return true;
+}
+
+Float ResponsiveIntegrator::getLowerSampleBound() const {
+	return 1.0f;
+}
+
+char const* ResponsiveIntegrator::getRealtimeStatistics() {
+	return nullptr;
+}
+
+ImageOrderIntegrator::ImageOrderIntegrator(const Properties &props)
+	: ResponsiveIntegrator(props) { }
+
+ImageOrderIntegrator::~ImageOrderIntegrator() { }
+
+bool ImageOrderIntegrator::allocate(const Scene &scene, Sampler *const *samplers, ImageBlock *const *targets, int threadCount) {
+	Vector2i resolution = targets[0]->getBitmap()->getSize();
+	int pixelCount = resolution.x * resolution.y;
+	if (this->m_pxPermutation.size() != pixelCount) {
+		this->m_pxPermutation.resize(pixelCount);
+		int* pixels = m_pxPermutation.data();
+		for (int i = 0; i < pixelCount; ++i) {
+			pixels[i] = i;
+		}
+		{
+			std::random_device rd;
+			std::mt19937 g(rd());
+			std::shuffle(pixels, pixels + pixelCount, g);
+		}
+	}
+	return true;
+}
+
+int ImageOrderIntegrator::render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+	, Controls controls, int threadIdx, int threadCount) {
+	Vector2i resolution = target.getBitmap()->getSize();
+	int planeSamples = resolution.x * resolution.y;
+	assert(planeSamples == this->m_pxPermutation.size());
+
+	int blockSize = (planeSamples + (threadCount - 1)) / threadCount;
+	int const* workBegin = 0, *workEnd = 0, *work = 0;
+	int completedBlocks = -1;
+
+	int currentSamples = 0, completedPlanes = 0;
+	double spp = 0.0f;
+
+	int returnCode = 0;
+	while (returnCode == 0) {
+		// work distribution
+		if (work == workEnd) {
+			++completedBlocks;
+			int wid = (threadIdx + 17 * completedBlocks) % threadCount;
+			workBegin = wid * blockSize + this->m_pxPermutation.data();
+			workEnd = std::min((wid+1) * blockSize, planeSamples) + this->m_pxPermutation.data();
+			work = workBegin;
+		}
+
+		if ((currentSamples & 0x3f) == 0 || currentSamples == 1) { // allow fast abort before and after first sample (in case of lazy init code)
+			// always update, for debugging purposes right now
+			spp = (double) completedPlanes + double(currentSamples) / double(planeSamples);
+
+			// external control
+			if (controls.abort && *controls.abort) {
+				returnCode = -1;
+			} else if (controls.continu && !*controls.continu) {
+				returnCode = -2;
+			} else if (controls.interrupt && (currentSamples & 0xff) == 0) {
+				// important: always called on new plane begin!
+				returnCode = controls.interrupt->progress(this, scene, sensor, sampler, target, spp, controls, threadIdx, threadCount);
+			}
+			if (returnCode != 0) {
+				break;
+			}
+		}
+
+		// one sample
+		int j = *work++;
+		mitsuba::Point2i offset(j % resolution.x, j / resolution.x);
+		sampler.generate(offset);
+
+		returnCode = this->render(scene, sensor, sampler, target, offset, threadIdx, threadCount);
+
+		sampler.advance();
+		++currentSamples;
+
+		// precise sample tracking
+		if (currentSamples == planeSamples) {
+			++completedPlanes;
+			currentSamples = 0;
+			spp = (double) completedPlanes;
+		}
+	}
+
+	return returnCode;
+}
+
+PixelDifferential::PixelDifferential(int sampleCount) {
+	scale = 1.0f / std::sqrt((Float) sampleCount);
+}
+
+Spectrum PixelDifferential::sample(PixelSample& sample, Sensor const& sensor, Point2i px, Sampler& sampler) {
+	Point2 samplePos(Point2(px) + Vector2(sampler.next2D()));
+
+	Point2 apertureSample(0.5f);
+	Float timeSample = 0.5f;
+	if (sensor.needsApertureSample())
+		apertureSample = sampler.next2D();
+	if (sensor.needsTimeSample())
+		timeSample = sampler.next1D();
+
+	Spectrum spec = sensor.sampleRayDifferential(
+		sample.ray, samplePos, apertureSample, timeSample);
+
+	sample.ray.scaleDifferential(scale);
+	sample.point = samplePos;
+	sample.time = timeSample;
+	return spec;
+}
+
+ClassicSamplingIntegrator::SchedulerResourceContext::SchedulerResourceContext(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
+	this->scheduler = Scheduler::getInstance();
+	this->sceneID = scheduler->registerResource((mitsuba::SerializableObject*) scene);
+	this->sensorID = scheduler->registerResource((mitsuba::SerializableObject*) sensor);
+	this->samplerID = scheduler->registerResource((mitsuba::SerializableObject*) sampler);
+
+}
+
+ClassicSamplingIntegrator::SchedulerResourceContext::~SchedulerResourceContext() {
+	scheduler->unregisterResource(samplerID);
+	scheduler->unregisterResource(sensorID);
+	scheduler->unregisterResource(sceneID);
+}
+
+ClassicSamplingIntegrator::ClassicSamplingIntegrator(SamplingIntegrator* classic, const Properties &props)
+	: ImageOrderIntegrator(props)
+	, classicIntegrator(classic)
+	, pixelDifferential(1) {
+}
+
+ClassicSamplingIntegrator::~ClassicSamplingIntegrator() {
+}
+
+bool ClassicSamplingIntegrator::allocate(const Scene &scene, Sampler *const *samplers, ImageBlock *const *targets, int threadCount) {
+	bool result = ImageOrderIntegrator::allocate(scene, samplers, targets, threadCount);
+
+	for (int i = 0; i < threadCount; ++i)
+		classicIntegrator->configureSampler(&scene, samplers[i]);
+
+	return result;
+}
+
+bool ClassicSamplingIntegrator::preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
+	this->pixelDifferential = PixelDifferential((int) sampler->getSampleCount());
+	SchedulerResourceContext ctx(scene, sensor, sampler);
+	return this->classicIntegrator->preprocess(scene, nullptr, nullptr, ctx.sceneID, ctx.sensorID, ctx.samplerID);
+}
+
+int  ClassicSamplingIntegrator::render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) {
+	PixelSample pxSample;
+	Spectrum spec = this->pixelDifferential.sample(pxSample, sensor, pixel, sampler);
+	
+	RadianceQueryRecord rRec(&scene, &sampler);
+	rRec.newQuery(RadianceQueryRecord::ESensorRay, sensor.getMedium());
+	spec *= this->classicIntegrator->Li(pxSample.ray, rRec);
+
+	if (rRec.alpha >= 0.0f) {
+#ifndef MTS_NO_ATOMIC_SPLAT
+		target.putAtomic(pxSample.point, spec, rRec.alpha);
+#else
+		target.put(pxSample.point, spec, rRec.alpha);
+#endif
+	}
+
+	return 0;
+}
+
+MTS_IMPLEMENT_CLASS(ResponsiveIntegrator, true, Object)
+MTS_IMPLEMENT_CLASS(ImageOrderIntegrator, true, ResponsiveIntegrator)
+MTS_IMPLEMENT_CLASS(ClassicSamplingIntegrator, false, ImageOrderIntegrator)
 MTS_NAMESPACE_END

@@ -126,6 +126,9 @@ public:
 	/// Return the list of loaded plugins
 	std::vector<std::string> getLoadedPlugins() const;
 
+	/// Returns a list of available plugins containing the given string or symbol.
+	std::vector<std::string> getAvailablePlugins(char const* symbol) const;
+
 	/**
 	 * \brief Instantiate a plugin, verify its type,
 	 * and return the newly created instance.

@@ -141,6 +141,13 @@ void Logger::log(ELogLevel level, const Class *theClass,
 			__debugbreak();
 #endif
 
+		try {
+			LockGuard lock(m_mutex);
+			for (size_t i=0; i<m_appenders.size(); ++i)
+				m_appenders[i]->append(level, text);
+		}
+		catch(...) { }
+
 		DefaultFormatter fmt;
 		fmt.setHaveDate(false);
 		fmt.setHaveLogLevel(false);

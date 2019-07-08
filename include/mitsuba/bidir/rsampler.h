@@ -38,7 +38,7 @@ MTS_NAMESPACE_BEGIN
 class MTS_EXPORT_BIDIR ReplayableSampler : public Sampler {
 public:
 	/// Construct a new sampler
-	ReplayableSampler();
+	ReplayableSampler(Random* seeding = nullptr);
 
 	/// Unserialize a sampler
 	ReplayableSampler(Stream *stream, InstanceManager *manager);

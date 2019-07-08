@@ -37,7 +37,7 @@ MTS_NAMESPACE_BEGIN
 class BDPTWorkResult : public WorkResult {
 public:
 	BDPTWorkResult(const BDPTConfiguration &conf, const ReconstructionFilter *filter,
-			Vector2i blockSize = Vector2i(-1, -1));
+			Vector2i blockSize = Vector2i(-1, -1), ImageBlock* atomicTarget = nullptr);
 
 	// Clear the contents of the work result
 	void clear();
@@ -64,10 +64,27 @@ public:
 #endif
 
 	inline void putSample(const Point2 &sample, const Spectrum &spec) {
+#ifndef MTS_NO_ATOMIC_SPLAT
+		if (m_block == m_lightImage) {
+			m_block->putAtomic(sample, spec, 1.0f);
+			return;
+		}
+#endif
 		m_block->put(sample, spec, 1.0f);
 	}
 
 	inline void putLightSample(const Point2 &sample, const Spectrum &spec) {
+		if (m_block == m_lightImage) {
+			alignas(16) Float temp[SPECTRUM_SAMPLES + 2] = { };
+			for (int i=0; i<SPECTRUM_SAMPLES; ++i)
+				temp[i] = spec[i];
+#ifndef MTS_NO_ATOMIC_SPLAT
+			m_lightImage->putAtomic(sample, temp);
+#else
+			m_lightImage->put(sample, temp);
+#endif
+			return;
+		}
 		m_lightImage->put(sample, spec, 1.0f);
 	}
 

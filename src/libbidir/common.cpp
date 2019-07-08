@@ -56,9 +56,14 @@ std::string MutationRecord::toString() const {
 	return oss.str();
 }
 
+void Mutator::setLargeStepTracker(LargeStepTracker* tracker, Float largeStepRate) { }
+Mutator::~Mutator() = default;
+
 MutatorBase::MutatorBase() {
 	m_mediumDensityMultiplier = 100.0f;
 }
+
+MutatorBase::~MutatorBase() = default;
 
 Float MutatorBase::perturbMediumDistance(Sampler *sampler, const PathVertex *vertex) {
 	if (vertex->isMediumInteraction()) {

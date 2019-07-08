@@ -51,6 +51,7 @@ struct ERPTConfiguration {
 	Float avgAngleChangeSurface;
 	Float avgAngleChangeMedium;
 	int maxChains;
+	Float sampleNormalization;
 
 	inline ERPTConfiguration() { }
 
@@ -100,6 +101,7 @@ struct ERPTConfiguration {
 		avgAngleChangeSurface = stream->readFloat();
 		avgAngleChangeMedium = stream->readFloat();
 		maxChains = stream->readInt();
+		sampleNormalization = stream->readFloat();
 	}
 
 	inline void serialize(Stream *stream) const {
@@ -120,6 +122,7 @@ struct ERPTConfiguration {
 		stream->writeFloat(avgAngleChangeSurface);
 		stream->writeFloat(avgAngleChangeMedium);
 		stream->writeInt(maxChains);
+		stream->writeFloat(sampleNormalization);
 	}
 };
 

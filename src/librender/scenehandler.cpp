@@ -31,6 +31,7 @@
 #include <mitsuba/render/scenehandler.h>
 #include <mitsuba/render/sceneloader.h>
 #include <mitsuba/core/fresolver.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/render/scene.h>
 #include <unordered_set>
 
@@ -880,7 +881,7 @@ ref<Scene> SceneHandler::loadSceneFromString(const std::string &content, const P
 }
 
 SceneLoader::SceneLoader(ParameterMap const& parameters, fs::pathstr const &schemaPathIn) {
-	this->handler = new SceneHandler(parameters);
+	this->handler.reset( new SceneHandler(parameters) );
 
 	fs::pathstr schemaPath = schemaPathIn;
 	if (schemaPath.s.empty())
@@ -898,8 +899,8 @@ SceneLoader::SceneLoader(ParameterMap const& parameters, fs::pathstr const &sche
 
 	/* Set the handler */
 	parser->setDoNamespaces(true);
-	parser->setDocumentHandler(handler);
-	parser->setErrorHandler(handler);
+	parser->setDocumentHandler(handler.get());
+	parser->setErrorHandler(handler.get());
 }
 
 SceneLoader::~SceneLoader() {
@@ -909,6 +910,21 @@ SceneLoader::~SceneLoader() {
 
 ref<Scene> SceneLoader::load(fs::pathstr const &file) {
 	SAXParser* parser = static_cast<SAXParser*>(this->parser);
+
+	struct DocResolver {
+		ref<FileResolver> resolver = Thread::getThread()->getFileResolver();
+		ref<FileResolver> docResolver = resolver->clone();
+
+		DocResolver(fs::pathstr const &file) {
+			fs::path docDir = fs::absolute(fs::decode_pathstr(file)).parent_path();
+			docResolver->appendPath(fs::encode_pathstr(docDir));
+			Thread::getThread()->setFileResolver(docResolver);
+		}
+		~DocResolver() {
+			Thread::getThread()->setFileResolver(resolver);
+		}
+	} docPathGuard(file);
+
 	parser->parse(file.s.c_str()); // todo: xerces might not handle arbirary special char paths in UTF-8 encoding?
 	return handler->getScene();
 }

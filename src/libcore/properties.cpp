@@ -32,21 +32,32 @@ typedef std::variant<
 
 struct PropertyElement {
 	ElementData data;
+	short lastWrite;
 	mutable bool queried;
 };
+
+#define MUTABLE_RECORD(setter, default) do { \
+		if (m_mutateToRecord) { \
+			const_cast<Properties*>(this)->setter(name, default); \
+		}  \
+		return default; \
+	} while (false)
 
 #define DEFINE_PROPERTY_ACCESSOR(Type, BaseType, TypeName, ReadableName) \
 	void Properties::set##TypeName(const std::string &name, const Type &value, bool warnDuplicates) { \
 		if (hasProperty(name) && warnDuplicates) \
 			SLog(EWarn, "Property \"%s\" was specified multiple times!", name.c_str()); \
 		(*m_elements)[name].data = (BaseType) value; \
+		(*m_elements)[name].lastWrite = m_setCounter++; \
 		(*m_elements)[name].queried = false; \
 	} \
 	\
 	Type Properties::get##TypeName(const std::string &name) const { \
 		std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name); \
-		if (it == m_elements->end()) \
-			SLog(EError, "Property \"%s\" has not been specified!", name.c_str()); \
+		if (it == m_elements->end()) { \
+			SLog(m_mutateToRecord ? EWarn : EError, "Property \"%s\" has not been specified!", name.c_str()); \
+			MUTABLE_RECORD(set##TypeName, Type()); \
+		} \
 		const BaseType *result = std::get_if<BaseType>(&it->second.data); \
 		if (!result) \
 			SLog(EError, "The property \"%s\" has the wrong type (expected <" #ReadableName ">). The " \
@@ -58,7 +69,7 @@ struct PropertyElement {
 	Type Properties::get##TypeName(const std::string &name, const Type &defVal) const { \
 		std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name); \
 		if (it == m_elements->end()) \
-			return defVal; \
+			MUTABLE_RECORD(set##TypeName, defVal); \
 		const BaseType *result = std::get_if<BaseType>(&it->second.data); \
 		if (!result) \
 			SLog(EError, "The property \"%s\" has the wrong type (expected <" #ReadableName ">). The " \
@@ -88,14 +99,18 @@ void Properties::setAnimatedTransform(const std::string &name, const AnimatedTra
 			SLog(EWarn, "Property \"%s\" was specified multiple times!", name.c_str());
 	}
 	(*m_elements)[name].data = (AnimatedTransform *) value;
+	(*m_elements)[name].lastWrite = m_setCounter++;
 	(*m_elements)[name].queried = false;
 	value->incRef();
 }
 
 ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string &name) const {
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
-	if (it == m_elements->end())
-		SLog(EError, "Property \"%s\" missing", name.c_str());
+	if (it == m_elements->end()) {
+		SLog(m_mutateToRecord ? EWarn : EError, "Property \"%s\" missing", name.c_str());
+		ref<const AnimatedTransform> defVal = new AnimatedTransform();
+		MUTABLE_RECORD(setAnimatedTransform, defVal);
+	}
 	const AnimatedTransform * const * result1 = std::get_if<AnimatedTransform *>(&it->second.data);
 	const Transform *result2 = std::get_if<Transform>(&it->second.data);
 
@@ -113,7 +128,7 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string &name, const AnimatedTransform *defVal) const {
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
 	if (it == m_elements->end())
-		return defVal;
+		MUTABLE_RECORD(setAnimatedTransform, defVal);
 	AnimatedTransform * const * result1 = std::get_if<AnimatedTransform *>(&it->second.data);
 	const Transform *result2 = std::get_if<Transform>(&it->second.data);
 
@@ -131,8 +146,10 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 
 ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string &name, const Transform &defVal) const {
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
-	if (it == m_elements->end())
-		return new AnimatedTransform(defVal);
+	if (it == m_elements->end()) {
+		ref<const AnimatedTransform> defValAT = new AnimatedTransform(defVal);
+		MUTABLE_RECORD(setAnimatedTransform, defValAT);
+	}
 
 	AnimatedTransform * const * result1 = std::get_if<AnimatedTransform *>(&it->second.data);
 	const Transform *result2 = std::get_if<Transform>(&it->second.data);
@@ -202,17 +219,17 @@ namespace {
 }
 
 Properties::Properties()
-: m_id("unnamed") {
+: m_id("unnamed"), m_setCounter(0), m_mutateToRecord(false) {
 	m_elements = new std::map<std::string, PropertyElement>();
 }
 
 Properties::Properties(const std::string &pluginName)
-: m_pluginName(pluginName), m_id("unnamed") {
+: m_pluginName(pluginName), m_id("unnamed"), m_setCounter(0), m_mutateToRecord(false) {
 	m_elements = new std::map<std::string, PropertyElement>();
 }
 
 Properties::Properties(const Properties &props)
-: m_pluginName(props.m_pluginName), m_id(props.m_id) {
+: m_pluginName(props.m_pluginName), m_id(props.m_id), m_setCounter(props.m_setCounter), m_mutateToRecord(props.m_mutateToRecord) {
 	m_elements = new std::map<std::string, PropertyElement>(*props.m_elements);
 
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
@@ -290,15 +307,21 @@ Properties::EPropertyType Properties::getType(const std::string &name) const {
 }
 
 std::string Properties::getAsString(const std::string &name, const std::string &defVal) const {
-	if (m_elements->find(name) == m_elements->end())
+	if (m_elements->find(name) == m_elements->end()) {
+		if (m_mutateToRecord)
+			SLog(EWarn, "Property \"%s\" not recorded because of untyped parameter query!", name.c_str());
 		return defVal;
+	}
 	return getAsString(name);
 }
 
 std::string Properties::getAsString(const std::string &name) const {
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
-	if (it == m_elements->end())
+	if (it == m_elements->end()) {
+		if (m_mutateToRecord)
+			SLog(EWarn, "Property \"%s\" not recorded because of untyped parameter query!", name.c_str());
 		SLog(EError, "Property \"%s\" has not been specified!", name.c_str());
+	}
 
 	std::ostringstream oss;
 	StringVisitor strVisitor(oss, false);
@@ -345,9 +368,14 @@ bool Properties::wasQueried(const std::string &name) const {
 }
 
 void Properties::putPropertyNames(std::vector<std::string> &results) const {
+	size_t numBefore = results.size();
 	for (std::map<std::string, PropertyElement>::const_iterator it = m_elements->begin();
 			it != m_elements->end(); ++it)
 		results.push_back((*it).first);
+	// add to the overall inefficiency of this class ;-)
+	std::sort(results.begin() + numBefore, results.end()
+		, [this](std::string const& a, std::string const& b) { return (*this->m_elements)[a].lastWrite < (*this->m_elements)[b].lastWrite; }
+	);
 }
 
 void Properties::copyAttribute(const Properties &properties,
@@ -374,10 +402,28 @@ bool Properties::operator==(const Properties &p) const {
 	return true;
 }
 
-void Properties::merge(const Properties &p) {
+void Properties::merge(const Properties &p, const Properties *defaults, bool existingOnly) {
 	std::map<std::string, PropertyElement>::const_iterator it = p.m_elements->begin();
-	for (; it != p.m_elements->end(); ++it)
-		(*m_elements)[it->first] = it->second;
+	for (; it != p.m_elements->end(); ++it) {
+		// not the default value
+		if (defaults && std::visit(EqualityVisitor(&it->second.data), (*defaults->m_elements)[it->first].data))
+			continue;
+		std::pair<std::map<std::string, PropertyElement>::iterator, bool> iit;
+		if (existingOnly) {
+			iit.first = m_elements->find(it->first);
+			iit.second = (iit.first == m_elements->end());
+		}
+		else
+			iit = m_elements->insert(*it);
+		// conflict
+		if (!iit.second) {
+			// same type
+			if (iit.first->second.data.index() == it->second.data.index()) {
+				// override
+				iit.first->second = it->second;
+			}
+		}
+	}
 }
 
 ConfigurableObject::ConfigurableObject(Stream *stream, InstanceManager *manager)

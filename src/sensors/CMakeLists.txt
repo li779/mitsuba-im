@@ -3,8 +3,9 @@ if (NOT MTS_VERSION)
   message(FATAL_ERROR "Use the top level configuration file")
 endif()
 
-macro(add_sensor)
-  add_mts_plugin(${ARGN} TYPE sensor)
+macro(add_sensor name)
+  add_mts_plugin(${name} ${ARGN} TYPE sensor)
+  target_sources(${name} PRIVATE mark_sensor.cpp)
 endmacro()
 
 add_sensor(radiancemeter      radiancemeter.cpp)

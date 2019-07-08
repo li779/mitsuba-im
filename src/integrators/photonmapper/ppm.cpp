@@ -402,6 +402,20 @@ public:
 		return oss.str();
 	}
 
+	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		mitsuba::Properties pmProps(getProperties());
+		pmProps.setPluginName("photonmapper");
+
+		mitsuba::ref<mitsuba::PluginManager> pluginMgr = mitsuba::PluginManager::getInstance();
+		mitsuba::ref<mitsuba::Integrator> newIntegrator = static_cast<mitsuba::Integrator *>(
+			pluginMgr->createObject(MTS_CLASS(mitsuba::Integrator), pmProps)
+			);
+
+		newIntegrator->setParent(this); // ok, not a sampling integrator so ignored in PM recursion
+		newIntegrator->configure();
+		return newIntegrator->makeResponsiveIntegrator();
+	}
+
 	MTS_DECLARE_CLASS()
 private:
 	std::vector<PPMWorkUnit *> m_workUnits;

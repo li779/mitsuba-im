@@ -34,6 +34,8 @@ Scene::Scene()
 	m_kdtree = new ShapeKDTree();
 	m_sourceFile = new fs::pathstr();
 	m_destinationFile = new fs::pathstr();
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 }
 
 Scene::Scene(const Properties &props)
@@ -78,6 +80,8 @@ Scene::Scene(const Properties &props)
 		m_kdtree->setMaxBadRefines(props.getInteger("kdMaxBadRefines"));
 	m_sourceFile = new fs::pathstr();
 	m_destinationFile = new fs::pathstr();
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 }
 
 Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
@@ -101,6 +105,8 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_specialShapes = scene->m_specialShapes;
 	m_degenerateSensor = scene->m_degenerateSensor;
 	m_degenerateEmitters = scene->m_degenerateEmitters;
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 }
 
 Scene::Scene(Stream *stream, InstanceManager *manager)
@@ -160,7 +166,9 @@ Scene::Scene(Stream *stream, InstanceManager *manager)
 	m_netObjects.reserve(count);
 	for (size_t i=0; i<count; ++i)
 		m_netObjects.push_back(static_cast<NetworkedObject *>(manager->getInstance(stream)));
-
+	
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 	initialize();
 }
 
@@ -419,24 +427,26 @@ bool Scene::preprocess(RenderQueue *queue, const RenderJob *job,
 	initialize();
 
 	/* Pre-process step for the main scene integrator */
-	if (!m_integrator->preprocess(this, queue, job,
+	if (!m_integratorPreprocessed && !m_integrator->preprocess(this, queue, job,
 		sceneResID, sensorResID, samplerResID))
 		return false;
 
-	/* Pre-process step for all sub-surface integrators (each one in independence) */
-	for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
-			it != m_ssIntegrators.end(); ++it)
-		(*it)->setActive(false);
+	if (!m_scenePreprocessed) {
+		/* Pre-process step for all sub-surface integrators (each one in independence) */
+		for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
+				it != m_ssIntegrators.end(); ++it)
+			(*it)->setActive(false);
 
-	for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
-		it != m_ssIntegrators.end(); ++it)
-		if (!(*it)->preprocess(this, queue, job,
-				sceneResID, sensorResID, samplerResID))
-			return false;
-
-	for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
+		for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
 			it != m_ssIntegrators.end(); ++it)
-		(*it)->setActive(true);
+			if (!(*it)->preprocess(this, queue, job,
+					sceneResID, sensorResID, samplerResID))
+				return false;
+
+		for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
+				it != m_ssIntegrators.end(); ++it)
+			(*it)->setActive(true);
+	}
 
 	return true;
 }
@@ -751,6 +761,7 @@ bool Scene::rayIntersectAll(const Ray &ray, Intersection &its) const {
 
 		if (shape->rayIntersect(ray, mint, maxt, tempT, buffer)) {
 			its.t = tempT;
+			maxt = tempT;
 			shape->fillIntersectionRecord(ray, buffer, its);
 			result = true;
 		}

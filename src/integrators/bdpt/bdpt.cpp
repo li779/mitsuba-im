@@ -179,6 +179,14 @@ public:
 			Log(EError, "Subsurface integrators are not supported "
 				"by the bidirectional path tracer!");
 
+		Sensor const* sensor = scene->getSensor();
+		const Film *film = sensor->getFilm();
+		size_t sampleCount = scene->getSampler()->getSampleCount();
+
+		m_config.blockSize = scene->getBlockSize();
+		m_config.cropSize = film->getCropSize();
+		m_config.sampleCount = sampleCount;
+
 		return true;
 	}
 
@@ -194,21 +202,15 @@ public:
 	bool render(Scene *scene, RenderQueue *queue, const RenderJob *job,
 			int sceneResID, int sensorResID, int samplerResID) {
 		ref<Scheduler> scheduler = Scheduler::getInstance();
-		ref<Sensor> sensor = scene->getSensor();
-		const Film *film = sensor->getFilm();
-		size_t sampleCount = scene->getSampler()->getSampleCount();
 		size_t nCores = scheduler->getCoreCount();
+		const Film *film = scene->getSensor()->getFilm();
 
 		Log(EDebug, "Size of data structures: PathVertex=%i bytes, PathEdge=%i bytes",
 			(int) sizeof(PathVertex), (int) sizeof(PathEdge));
 
 		Log(EInfo, "Starting render job (%ix%i, " SIZE_T_FMT " samples, " SIZE_T_FMT
 			" %s, " SSE_STR ") ..", film->getCropSize().x, film->getCropSize().y,
-			sampleCount, nCores, nCores == 1 ? "core" : "cores");
-
-		m_config.blockSize = scene->getBlockSize();
-		m_config.cropSize = film->getCropSize();
-		m_config.sampleCount = sampleCount;
+			m_config.sampleCount, nCores, nCores == 1 ? "core" : "cores");
 		m_config.dump();
 
 		ref<BDPTProcess> process = new BDPTProcess(job, queue, m_config);
@@ -230,6 +232,10 @@ public:
 		#endif
 
 		return process->getReturnStatus() == ParallelProcess::ESuccess;
+	}
+
+	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		return BDPTProcess::makeResponsiveIntegrator(this, &this->m_config);
 	}
 
 	MTS_DECLARE_CLASS()

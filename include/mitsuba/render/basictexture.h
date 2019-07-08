@@ -36,7 +36,7 @@ MTS_NAMESPACE_BEGIN
  * Includes a \ref Shader implementation for hardware rendering
  * \ingroup libhw
  */
-class ConstantSpectrumTexture : public Texture {
+class MTS_PARTIALLY_EXPORTED ConstantSpectrumTexture : public Texture {
 public:
 	inline ConstantSpectrumTexture(const Spectrum &value)
 		: Texture(Properties()), m_value(value) {
@@ -95,7 +95,7 @@ protected:
  * Includes a \ref Shader implementation for hardware rendering
  * \ingroup libhw
  */
-class ConstantFloatTexture : public Texture {
+class MTS_PARTIALLY_EXPORTED ConstantFloatTexture : public Texture {
 public:
 	inline ConstantFloatTexture(const Float &value)
 		: Texture(Properties()), m_value(value) {
@@ -156,7 +156,7 @@ protected:
  * Includes a \ref Shader implementation for hardware rendering
  * \ingroup libhw
  */
-class SpectrumAdditionTexture : public Texture {
+class MTS_PARTIALLY_EXPORTED SpectrumAdditionTexture : public Texture {
 public:
 	inline SpectrumAdditionTexture(const Texture *a, const Texture *b)
 		: Texture(Properties()), m_a(a), m_b(b) { }
@@ -221,7 +221,7 @@ protected:
  * Includes a \ref Shader implementation for hardware rendering
  * \ingroup libhw
  */
-class SpectrumSubtractionTexture : public Texture {
+class MTS_PARTIALLY_EXPORTED SpectrumSubtractionTexture : public Texture {
 public:
 	inline SpectrumSubtractionTexture(const Texture *a, const Texture *b)
 		: Texture(Properties()), m_a(a), m_b(b) { }
@@ -286,7 +286,7 @@ protected:
  * Includes a \ref Shader implementation for hardware rendering
  * \ingroup libhw
  */
-class SpectrumProductTexture : public Texture {
+class MTS_PARTIALLY_EXPORTED SpectrumProductTexture : public Texture {
 public:
 	inline SpectrumProductTexture(const Texture *a, const Texture *b)
 		: Texture(Properties()), m_a(a), m_b(b) { }
