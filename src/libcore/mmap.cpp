@@ -4,6 +4,7 @@
 #if defined(__LINUX__) || defined(__OSX__)
 # include <sys/mman.h>
 # include <fcntl.h>
+# include <unistd.h>
 #elif defined(__WINDOWS__)
 # include <windows.h>
 #endif
@@ -247,7 +248,7 @@ bool MemoryMappedFile::isReadOnly() const {
 }
 
 fs::pathstr MemoryMappedFile::getFilename() const {
-	return d->filename;
+	return fs::encode_pathstr(d->filename);
 }
 
 ref<MemoryMappedFile> MemoryMappedFile::createTemporary(size_t size) {

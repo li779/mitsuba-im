@@ -28,6 +28,7 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/emitter.h>
+#include <mitsuba/core/filesystem.h>
 #include <fstream>
 #include <unordered_map>
 
@@ -1005,7 +1006,7 @@ ref<TriMesh> TriMesh::fromBlender(const std::string &name,
 }
 
 void TriMesh::writeOBJ(const fs::pathstr &path) const {
-	std::ofstream os(std::wstring(path).c_str());
+	std::ofstream os(fs::path::string_type(path).c_str());
 	os << "o " << m_name << endl;
 	for (size_t i=0; i<m_vertexCount; ++i) {
 		os << "v "
@@ -1053,7 +1054,7 @@ void TriMesh::writeOBJ(const fs::pathstr &path) const {
 }
 
 void TriMesh::writePLY(const fs::pathstr &path) const {
-	std::ofstream os(std::wstring(path).c_str(), std::ios::out | std::ios::binary);
+	std::ofstream os(fs::path::string_type(path).c_str(), std::ios::out | std::ios::binary);
 
 	os << "ply\n";
 	if (Stream::getHostByteOrder() == Stream::ELittleEndian)

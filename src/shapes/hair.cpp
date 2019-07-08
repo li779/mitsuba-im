@@ -24,6 +24,7 @@
 #include <mitsuba/render/trimesh.h>
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/fresolver.h>
 #include <fstream>
 
@@ -719,7 +720,7 @@ HairShape::HairShape(const Properties &props) : Shape(props) {
 		std::string line;
 		bool newFiber = true;
 
-		std::ifstream is(std::wstring(path).c_str());
+		std::ifstream is(fs::path::string_type(path).c_str());
 		if (is.fail())
 			Log(EError, "Could not open \"%s\"!", path.s.c_str());
 		while (is.good()) {

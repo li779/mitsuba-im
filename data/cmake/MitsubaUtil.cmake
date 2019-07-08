@@ -3,7 +3,6 @@
 
 include (CMakeParseArguments)
 include (CMakeDependentOption)
-include (PCHTargets)
 
 # Function to check that the assumed configurations exist
 function (mts_check_configurations)
@@ -213,12 +212,10 @@ macro (add_mts_corelib _corelib_name)
       "lib${_corelib_name}" ".dll" "${_corelib_description}")
     list(APPEND _corelib_srcs "${_corelib_res}")
   endif()
-  
+ 
+  add_library (${_corelib_name} SHARED ${_corelib_srcs}) 
   if (MTS_USE_PCH)
-    pch_add_library (${_corelib_name} SHARED
-      PCH_HEADER "${MTS_DEFAULT_PCH}" ${_corelib_srcs})
-  else ()
-    add_library (${_corelib_name} SHARED ${_corelib_srcs})
+    target_precompiled_header(${_corelib_name} "${MTS_DEFAULT_PCH}")
   endif ()
   target_link_libraries (${_corelib_name} ${_corelib_LINK_LIBRARIES})
   if (WIN32)
@@ -302,13 +299,11 @@ macro (add_mts_plugin _plugin_name)
       math(EXPR _plugin_cxx_count "${_plugin_cxx_count} + 1")
     endif()
   endforeach()
-  
+ 
+  add_library (${_plugin_name} MODULE ${_plugin_srcs}) 
   if (NOT _plugin_NO_MTS_PCH AND MTS_USE_PCH AND
       (MTS_USE_PCH_ALL_PLUGINS OR _plugin_cxx_count GREATER 1))
-    pch_add_library (${_plugin_name} MODULE
-      PCH_HEADER "${MTS_DEFAULT_PCH}" ${_plugin_srcs})
-  else ()
-    add_library (${_plugin_name} MODULE ${_plugin_srcs})
+    target_precompiled_header(${_plugin_name} "${MTS_DEFAULT_PCH}")
   endif ()
   
   set(_plugin_core_libraries "mitsuba-core" "mitsuba-render")
@@ -419,7 +414,8 @@ macro (add_mts_exe _exe_name)
     mts_win_resource(${_exe_res_args})
     list(APPEND _exe_srcs "${_exe_res}")
   endif()
-  
+ 
+  add_executable (${_exe_name} ${_exe_TYPE} ${_exe_srcs}) 
   if (MTS_USE_PCH AND (NOT _exe_NO_MTS_PCH OR _exe_PCH))
     set (_exe_pch_header "${MTS_DEFAULT_PCH}")
     if (_exe_PCH)
@@ -429,10 +425,7 @@ macro (add_mts_exe _exe_name)
 	  "'NO_MTS_PCH' ignored due to 'PCH ${_exe_PCH}'.")
       endif ()
     endif ()
-    pch_add_executable (${_exe_name} ${_exe_TYPE}
-      PCH_HEADER "${_exe_pch_header}" ${_exe_srcs})
-  else ()
-    add_executable (${_exe_name} ${_exe_TYPE} ${_exe_srcs})
+    target_precompiled_header(${_exe_name} "${_exe_pch_header}")
   endif ()
 
   set(_exe_core_libraries "mitsuba-core" "mitsuba-render")

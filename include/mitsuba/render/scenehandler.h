@@ -57,7 +57,7 @@ public:
 	   that this class has a virtual member. This will ensure that its typeid
 	   structure is in librender, which is important for throwing exceptions
 	   across DLL boundaries */
-	virtual ~VersionException() throw ();
+	virtual ~VersionException() noexcept;
 
 	inline const Version &getVersion() const { return m_version; }
 private:

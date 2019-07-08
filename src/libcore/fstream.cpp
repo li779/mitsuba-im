@@ -59,7 +59,7 @@ FileStream::~FileStream() {
 }
 
 fs::pathstr FileStream::getPath() const {
-	return d->path;
+	return fs::encode_pathstr(d->path);
 }
 
 std::string FileStream::toString() const {

@@ -26,6 +26,7 @@
 #include <mitsuba/core/mmap.h>
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/statistics.h>
+#include <mitsuba/core/filesystem.h>
 #include <fstream>
 
 MTS_NAMESPACE_BEGIN
@@ -405,7 +406,7 @@ public:
 	static bool validateCacheFile(const fs::pathstr &path, uint64_t timestamp,
 			Bitmap::EPixelFormat pixelFormat, EBoundaryCondition bcu,
 			EBoundaryCondition bcv, EMIPFilterType filterType, Float gamma) {
-		std::ifstream is(std::wstring(path).c_str());
+		std::ifstream is(fs::path::string_type(path).c_str());
 		if (!is.good())
 			return false;
 

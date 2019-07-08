@@ -7,7 +7,8 @@ macro(add_film)
   add_mts_plugin(${ARGN} TYPE film)
 endmacro()
 
-add_film(mfilm   mfilm.cpp cnpy.h cnpy.cpp)
+include_directories(${ZLIB_INCLUDE_DIRS})
+add_film(mfilm   mfilm.cpp cnpy.h cnpy.cpp LINK_LIBRARIES ${ZLIB_LIBRARIES})
 add_film(ldrfilm ldrfilm.cpp annotations.h banner.h)
 add_film(hdrfilm hdrfilm.cpp annotations.h banner.h)
 

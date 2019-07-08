@@ -32,10 +32,10 @@ FileResolver::FileResolver() {
 	dladdr((const void *) &dummySymbol, &info);
 	if (info.dli_fname) {
 		/* Try to detect a few default setups */
-		if (boost::starts_with(info.dli_fname, "/usr/lib") ||
-			boost::starts_with(info.dli_fname, "/lib")) {
+		if (starts_with(info.dli_fname, "/usr/lib") ||
+			starts_with(info.dli_fname, "/lib")) {
 			basePath = fs::path("/usr/share/mitsuba");
-		} else if (boost::starts_with(info.dli_fname, "/usr/local/lib")) {
+		} else if (starts_with(info.dli_fname, "/usr/local/lib")) {
 			basePath = fs::path("/usr/local/share/mitsuba");
 		} else {
 			/* This is a locally-compiled repository */
@@ -47,7 +47,7 @@ FileResolver::FileResolver() {
 	uint32_t imageCount = _dyld_image_count();
 	for (uint32_t i=0; i<imageCount; ++i) {
 		const char *imageName = _dyld_get_image_name(i);
-		if (boost::ends_with(imageName, "libmitsuba-core.dylib")) {
+		if (ends_with(imageName, "libmitsuba-core.dylib")) {
 			basePath = fs::canonical(imageName).parent_path().parent_path().parent_path();
 			break;
 		}
@@ -128,13 +128,13 @@ fs::pathstr FileResolver::resolve(fs::pathstr const& spath) const {
 	for (size_t i=0; i<m_paths.size(); i++) {
 		fs::path newPath = m_paths[i] / path;
 		if (fs::exists(newPath))
-			return newPath;
+			return fs::encode_pathstr(newPath);
 	}
 
 	#if defined(__LINUX__)
 		/* On Linux, also try case-insensitive mode if the above failed */
-		fs::path parentPath = path.p.parent_path();
-		std::string filename = to_lower_copy(path.p.filename().string());
+		fs::path parentPath = path.parent_path();
+		std::string filename = to_lower_copy(path.filename().string());
 
 		for (size_t i=0; i<m_paths.size(); i++) {
 			fs::path path = m_paths[i] / parentPath;
@@ -145,7 +145,7 @@ fs::pathstr FileResolver::resolve(fs::pathstr const& spath) const {
 			fs::directory_iterator end, it(path);
 			for (; it != end; ++it) {
 				if (to_lower_copy(it->path().filename().string()) == filename)
-					return it->path();
+					return fs::encode_pathstr(it->path());
 			}
 		}
 	#endif
@@ -167,12 +167,12 @@ std::vector<fs::pathstr> FileResolver::resolveAll(fs::pathstr const& spath) cons
 }
 
 fs::pathstr FileResolver::resolveAbsolute(fs::pathstr const& path) const {
-	return fs::absolute(fs::decode_pathstr(resolve(path)));
+	return fs::encode_pathstr(fs::absolute(fs::decode_pathstr(resolve(path))));
 }
 
 size_t FileResolver::getPathCount() const { return m_paths.size(); }
 
-fs::pathstr FileResolver::getPath(size_t index) const { return m_paths[index].p; }
+fs::pathstr FileResolver::getPath(size_t index) const { return fs::encode_pathstr(m_paths[index].p); }
 
 std::string FileResolver::toString() const {
 	std::ostringstream oss;

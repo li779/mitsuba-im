@@ -145,7 +145,7 @@ std::string Plugin::getDescription() const {
 }
 
 fs::pathstr Plugin::getPath() const {
-	return d->path;
+	return fs::encode_pathstr(d->path);
 }
 
 const std::string& Plugin::getShortName() const {

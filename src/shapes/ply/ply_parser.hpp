@@ -27,6 +27,8 @@
 #include <ply/byte_order.hpp>
 #include <ply/io_operators.hpp>
 
+#include <mitsuba/core/filesystem.h>
+
 namespace ply {
 
 class ply_parser
@@ -295,7 +297,7 @@ inline ply::ply_parser::ply_parser(flags_type flags)
 
 inline bool ply::ply_parser::parse(const fs::pathstr& filename)
 {
-  std::ifstream ifstream(std::wstring(filename).c_str(), std::ios::in | std::ios::binary);
+  std::ifstream ifstream(fs::path::string_type(filename).c_str(), std::ios::in | std::ios::binary);
   return parse(ifstream);
 }
 

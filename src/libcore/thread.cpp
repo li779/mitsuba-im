@@ -29,6 +29,7 @@
 
 // Required for native thread functions
 #if defined(__LINUX__)
+# include <unistd.h>
 # include <sys/prctl.h>
 #elif defined(__OSX__)
 # include <pthread.h>

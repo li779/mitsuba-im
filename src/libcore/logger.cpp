@@ -25,6 +25,8 @@
 # include <sys/sysctl.h>
 #elif defined(__WINDOWS__)
 # include <windows.h>
+#else
+# include <unistd.h>
 #endif
 
 MTS_NAMESPACE_BEGIN

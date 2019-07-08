@@ -46,6 +46,7 @@
 #include <mitsuba/core/getopt.h>
 #include <winsock2.h>
 #else
+#include <unistd.h>
 #include <signal.h>
 #endif
 

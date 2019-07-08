@@ -930,6 +930,6 @@ void SceneHandler::staticShutdown() {
 	XMLPlatformUtils::Terminate();
 }
 
-VersionException::~VersionException() throw () {}
+VersionException::~VersionException() noexcept {}
 
 MTS_NAMESPACE_END

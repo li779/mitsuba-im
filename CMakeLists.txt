@@ -1,6 +1,6 @@
 # Experimental CMake file for Mitusba
 # Tested only on Windows and Linux (Ubuntu 10.10)
-cmake_minimum_required(VERSION 3.12.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
 
 # Internal variable to know whether this is the first time CMake runs
 if (NOT DEFINED MTS_CMAKE_INIT)
@@ -13,7 +13,9 @@ endif()
 if (NOT DEFINED MTS_PROJECT_NAME)
   set(MTS_PROJECT_NAME "mitsuba")
 endif()
-project(${MTS_PROJECT_NAME})
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/CMakePCHCompiler")
+project(${MTS_PROJECT_NAME} C CXX CXXPCH)
 
 # Tell cmake where to find the additional modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake")

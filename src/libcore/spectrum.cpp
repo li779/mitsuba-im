@@ -573,7 +573,7 @@ InterpolatedSpectrum::InterpolatedSpectrum(size_t size) {
 }
 
 InterpolatedSpectrum::InterpolatedSpectrum(fs::pathstr const& path) {
-	std::ifstream is(std::wstring(path).c_str());
+	std::ifstream is(fs::path::string_type(path).c_str());
 	if (is.bad() || is.fail())
 		SLog(EError, "InterpolatedSpectrum: could not open \"%s\"",
 			path.s.c_str());

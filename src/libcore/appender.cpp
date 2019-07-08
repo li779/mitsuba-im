@@ -21,6 +21,8 @@
 
 #if defined(__WINDOWS__)
 # include <io.h>
+#else
+# include <unistd.h>
 #endif
 
 MTS_NAMESPACE_BEGIN
