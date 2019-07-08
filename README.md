@@ -1,9 +1,32 @@
-Mitsuba — Physically Based Renderer
-===================================
+Mitsuba IM — Physically Based Renderer (Interactive Fork)
+=========================================================
+
+Mitsuba IM is a fork of the comprehensive physically-based renderer mitsuba (http://mitsuba-renderer.org/) by Wenzel Jakob (and other contributors), which has proven an invaluable framework for the scientific evaluation of both classic rendering algorithms and novel rendering research. This IM fork pursues the following additional goals:
+
+* Responsive interactive preview of rendering algorithms (with interactive camera & settings)
+* Easier implementation of new rendering algorithms
+	* New simplified interface for responsive integrators (see [include/mitsuba/render/integrator2.h](include/mitsuba/render/integrator2.h))
+	* Integrator parameters no longer need to be specified redundantly, they are automatically extracted from the integrator plugins (no modifications required)
+	* Comes with responsive wrappers for almost all rendering algorithms in classic mitsuba, which serve as examples
+* Responsive imgui frontend that is easily hackable for additional feautres and visualizations (+no more Qt dependencies)
+* Compile out of the box on modern C++ compilers (with one recursive git clone)
+	* Replace binary dependencies by git submodules
+	* Replace boost libraries by C++ standard library
+* Compatibility with previous mitsuba interfaces and thus rendering research (a render button still exists, if integrator is not automatically wrappable, interactive preview then falls back to path tracer)
+
+Note: This is a preview release
+===============================
+
+## Known Issues
+
+* Build order for submodules not specified yet, building for the first time might require multiple tries until all linker dependencies can be resolved!
+* Wrapper for responsive PSSMLT preview still missing (coming soon!)
+* Some utilities not ported to standard C++ w/o boost yet
+* Console tool support for new integrator interfaces still needs to be implemented (coming soon!)
+
+## About (Original official description)
 
 http://mitsuba-renderer.org/
-
-## About
 
 Mitsuba is a research-oriented rendering system in the style of PBRT, from which it derives much inspiration. It is written in portable C++, implements unbiased as well as biased techniques, and contains heavy optimizations targeted towards current CPU architectures. Mitsuba is extremely modular: it consists of a small set of core libraries and over 100 different plugins that implement functionality ranging from materials and light sources to complete rendering algorithms.
 
