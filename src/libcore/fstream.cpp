@@ -48,7 +48,7 @@ FileStream::FileStream()
  : d(new FileStreamPrivate) {
 }
 
-FileStream::FileStream(fs::pathref path, EFileMode mode)
+FileStream::FileStream(fs::pathstr const& path, EFileMode mode)
  : d(new FileStreamPrivate) {
 	open(path, mode);
 }
@@ -58,7 +58,7 @@ FileStream::~FileStream() {
 		close();
 }
 
-fs::pathref FileStream::getPath() const {
+fs::pathstr FileStream::getPath() const {
 	return d->path;
 }
 
@@ -70,12 +70,12 @@ std::string FileStream::toString() const {
 	return oss.str();
 }
 
-void FileStream::open(fs::pathref path, EFileMode mode) {
+void FileStream::open(fs::pathstr const& path, EFileMode mode) {
 	AssertEx(d->file == 0, "A file has already been opened using this stream");
 
-	Log(ETrace, "Opening \"%s\"", path.p.string().c_str());
+	Log(ETrace, "Opening \"%s\"", path.s.c_str());
 
-	d->path = path;
+	d->path = fs::decode_pathstr(path);
 	d->mode = mode;
 	d->write = true;
 	d->read = true;
@@ -438,7 +438,34 @@ void FileStream::staticShutdown() {
 	/* Can't delete __facet unfortunately, or we risk a crash .. oh well.. */
 #endif
 }
+#else
+void FileStream::staticInitialization() {}
+void FileStream::staticShutdown() {}
 #endif
 
 MTS_IMPLEMENT_CLASS(FileStream, false, Stream)
 MTS_NAMESPACE_END
+
+#include <mitsuba/core/filesystem.h>
+#include <codecvt>
+
+namespace fs {
+	pathstr::pathstr(pathdat const& dat)
+		: s(fs::encode_pathstr(dat.p)) {
+	}
+	pathstr::pathstr(std::wstring wide) {
+		std::wstring_convert< std::codecvt_utf8<wchar_t> > myconv;
+		s = myconv.to_bytes(wide);
+	}
+	pathstr::operator std::wstring() const {
+		std::wstring_convert< std::codecvt_utf8<wchar_t> > myconv;
+		return myconv.from_bytes(s);
+	}
+
+	path decode_pathstr(pathstr const& p) {
+		if (sizeof(path::value_type) > 1)
+			return u8path(p.s);
+		else
+			return path(p.s);
+	}
+}

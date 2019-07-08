@@ -19,7 +19,6 @@
 #include <mitsuba/core/quad.h>
 #include <mitsuba/core/filesystem.h>
 #include <fstream>
-//#include <boost/filesystem/fstream.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -573,11 +572,11 @@ InterpolatedSpectrum::InterpolatedSpectrum(size_t size) {
 	m_values.reserve(size);
 }
 
-InterpolatedSpectrum::InterpolatedSpectrum(fs::pathref path) {
-	std::ifstream is(path.p.native());
+InterpolatedSpectrum::InterpolatedSpectrum(fs::pathstr const& path) {
+	std::ifstream is(std::wstring(path).c_str());
 	if (is.bad() || is.fail())
 		SLog(EError, "InterpolatedSpectrum: could not open \"%s\"",
-			path.p.string().c_str());
+			path.s.c_str());
 
 	std::string line;
 	while (true) {
@@ -595,10 +594,10 @@ InterpolatedSpectrum::InterpolatedSpectrum(fs::pathref path) {
 
 	if (m_wavelengths.size() == 0)
 		SLog(EError, "\"%s\": unable to parse any entries!",
-				path.p.string().c_str());
+				path.s.c_str());
 
 	SLog(EInfo, "\"%s\": loaded a spectral power distribution with " SIZE_T_FMT
-			" entries (between %f and %f nm)", path.p.filename().string().c_str(), m_wavelengths.size(),
+			" entries (between %f and %f nm)", path.s.c_str(), m_wavelengths.size(),
 			m_wavelengths[0], m_wavelengths[m_wavelengths.size()-1]);
 }
 

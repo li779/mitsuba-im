@@ -90,8 +90,8 @@ public:
 		}
 
 		/* Resolve the precomputed data file */
-		fs::path sourceFile = Thread::getThread()->getFileResolver()->resolve(
-			formatString("data/microfacet/%s.dat", name.c_str()));
+		fs::pathstr sourceFile = Thread::getThread()->getFileResolver()->resolve(
+			fs::pathstr(formatString("data/microfacet/%s.dat", name.c_str())));
 
 		ref<FileStream> fstream = new FileStream(sourceFile,
 				FileStream::EReadOnly);
@@ -115,7 +115,7 @@ public:
 			" (%s) rough transmittance samples from \"%s\"", 2*m_etaSamples,
 			m_alphaSamples, m_thetaSamples,
 			memString((m_transSize + m_diffTransSize) * sizeof(float)).c_str(),
-			sourceFile.string().c_str());
+			sourceFile.s.c_str());
 
 		m_trans = new Float[m_transSize];
 		m_diffTrans = new Float[m_diffTransSize];

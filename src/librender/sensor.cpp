@@ -262,7 +262,7 @@ void PerspectiveCamera::configure() {
 				"to one of 'smaller', 'larger', 'diagonal', 'x', or 'y'!");
 	} else {
 		std::string f = m_properties.getString("focalLength", "50mm");
-		if (boost::ends_with(f, "mm"))
+		if (ends_with(f, "mm"))
 			f = f.substr(0, f.length()-2);
 
 		char *end_ptr = NULL;

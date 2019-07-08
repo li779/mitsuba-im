@@ -17,7 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include <mitsuba/core/warp.h>
 
 MTS_NAMESPACE_BEGIN
@@ -366,7 +369,9 @@ public:
 			return std::numeric_limits<Float>::infinity();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	std::string toString() const {
 		std::ostringstream oss;
@@ -400,6 +405,7 @@ private:
 	Float m_specularSamplingWeight;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 /**
@@ -487,6 +493,7 @@ Shader *Ward::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(WardShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(Ward, false, BSDF);
 MTS_EXPORT_PLUGIN(Ward, "Anisotropic Ward BRDF");
 MTS_NAMESPACE_END

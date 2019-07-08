@@ -26,7 +26,7 @@
 #include <mitsuba/core/mmap.h>
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/statistics.h>
-//#include <boost/filesystem/fstream.hpp>
+#include <fstream>
 
 MTS_NAMESPACE_BEGIN
 
@@ -160,7 +160,7 @@ public:
 			EBoundaryCondition bcv = ReconstructionFilter::ERepeat,
 			EMIPFilterType filterType = EEWA,
 			Float maxAnisotropy = 20.0f,
-			fs::path cacheFilename = fs::path(),
+			fs::pathstr cacheFilename = fs::pathstr(),
 			uint64_t timestamp = 0,
 			Float maxValue = 1.0f,
 			Spectrum::EConversionIntent intent = Spectrum::EReflectance)
@@ -195,14 +195,14 @@ public:
 
 		/* Potentially create a MIP map cache file */
 		uint8_t *mmapData = NULL, *mmapPtr = NULL;
-		if (!cacheFilename.empty()) {
-			Log(EInfo, "Generating MIP map cache file \"%s\" ..", cacheFilename.string().c_str());
+		if (!cacheFilename.s.empty()) {
+			Log(EInfo, "Generating MIP map cache file \"%s\" ..", cacheFilename.s.c_str());
 			try {
 				m_mmap = new MemoryMappedFile(cacheFilename, cacheSize);
 			} catch (std::runtime_error &e) {
 				Log(EWarn, "Unable to create MIP map cache file \"%s\" -- "
 					"retrying with a temporary file. Error message was: %s",
-					cacheFilename.string().c_str(), e.what());
+					cacheFilename.s.c_str(), e.what());
 				m_mmap = MemoryMappedFile::createTemporary(cacheSize);
 			}
 			mmapData = mmapPtr = (uint8_t *) m_mmap->getData();
@@ -316,11 +316,11 @@ public:
 	 *    cost of filtered lookups. This parameter is independent of the
 	 *    cache file that was previously created.
 	 */
-	TMIPMap(fs::path cacheFilename, Float maxAnisotropy = 20.0f)
+	TMIPMap(fs::pathstr cacheFilename, Float maxAnisotropy = 20.0f)
 			: m_weightLut(NULL), m_maxAnisotropy(maxAnisotropy) {
 		m_mmap = new MemoryMappedFile(cacheFilename);
 		uint8_t *mmapPtr = (uint8_t *) m_mmap->getData();
-		Log(EInfo, "Mapped MIP map cache file \"%s\" into memory (%s).", cacheFilename.string().c_str(),
+		Log(EInfo, "Mapped MIP map cache file \"%s\" into memory (%s).", cacheFilename.s.c_str(),
 			memString(m_mmap->getSize()).c_str());
 
 		stats::mipStorage += m_mmap->getSize();
@@ -402,10 +402,10 @@ public:
 	 *    matches that of the cache file.
 	 * \return \c true if the texture file is good for use
 	 */
-	static bool validateCacheFile(const fs::path &path, uint64_t timestamp,
+	static bool validateCacheFile(const fs::pathstr &path, uint64_t timestamp,
 			Bitmap::EPixelFormat pixelFormat, EBoundaryCondition bcu,
 			EBoundaryCondition bcv, EMIPFilterType filterType, Float gamma) {
-		fs::ifstream is(path);
+		std::ifstream is(std::wstring(path).c_str());
 		if (!is.good())
 			return false;
 
@@ -442,7 +442,7 @@ public:
 			}
 		}
 
-		return fs::file_size(path) == expectedFileSize;
+		return fs::file_size(fs::decode_pathstr(path)) == expectedFileSize;
 	}
 
 	/// Return the size of all buffers

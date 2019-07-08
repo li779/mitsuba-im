@@ -18,8 +18,10 @@
 
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/texture.h>
-#include <mitsuba/hw/gpuprogram.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 

@@ -28,7 +28,7 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/emitter.h>
-//#include <boost/filesystem/fstream.hpp>
+#include <fstream>
 #include <unordered_map>
 
 #define MTS_FILEFORMAT_HEADER     0x041C
@@ -430,8 +430,7 @@ struct Vertex {
 };
 
 /// For using vertices as keys in an associative structure
-struct vertex_key_order : public
-	std::binary_function<Vertex, Vertex, bool> {
+struct vertex_key_order {
 	static int compare(const Vertex &v1, const Vertex &v2) {
 		if (v1.p.x < v2.p.x) return -1;
 		else if (v1.p.x > v2.p.x) return 1;
@@ -889,8 +888,8 @@ ref<TriMesh> TriMesh::fromBlender(const std::string &name,
 	MCol *colPtr     = (MCol *)  _colPtr;
 	MTFace *uvPtr   = (MTFace *) _uvPtr;
 
-	boost::unordered_map<uint64_t, uint32_t> vertexMap;
-	boost::unordered_map<uint64_t, uint8_t> vertexFaceMap;
+	std::unordered_map<uint64_t, uint32_t> vertexMap;
+	std::unordered_map<uint64_t, uint8_t> vertexFaceMap;
 	uint32_t triangleCtr = 0, vertexCtr = 0;
 
 	for (uint32_t faceID=0; faceID<faceCount; ++faceID) {
@@ -965,7 +964,7 @@ ref<TriMesh> TriMesh::fromBlender(const std::string &name,
 	const uint64_t vertexMask = 0x00000000FFFFFFFFULL;
 	const uint64_t faceMask = 0xFFFFFFFF00000000ULL;
 
-	for (boost::unordered_map<uint64_t, uint32_t>::iterator it = vertexMap.begin();
+	for (std::unordered_map<uint64_t, uint32_t>::iterator it = vertexMap.begin();
 			it != vertexMap.end(); ++it) {
 		const MVert &vertex = vertexPtr[it->first & vertexMask];
 		bool isSmooth = (it->first & faceMask) == 0;
@@ -1005,8 +1004,8 @@ ref<TriMesh> TriMesh::fromBlender(const std::string &name,
 	return triMesh;
 }
 
-void TriMesh::writeOBJ(const fs::path &path) const {
-	fs::ofstream os(path);
+void TriMesh::writeOBJ(const fs::pathstr &path) const {
+	std::ofstream os(std::wstring(path).c_str());
 	os << "o " << m_name << endl;
 	for (size_t i=0; i<m_vertexCount; ++i) {
 		os << "v "
@@ -1053,8 +1052,8 @@ void TriMesh::writeOBJ(const fs::path &path) const {
 	os.close();
 }
 
-void TriMesh::writePLY(const fs::path &path) const {
-	fs::ofstream os(path, std::ios::out | std::ios::binary);
+void TriMesh::writePLY(const fs::pathstr &path) const {
+	std::ofstream os(std::wstring(path).c_str(), std::ios::out | std::ios::binary);
 
 	os << "ply\n";
 	if (Stream::getHostByteOrder() == Stream::ELittleEndian)

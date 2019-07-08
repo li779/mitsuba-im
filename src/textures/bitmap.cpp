@@ -25,9 +25,11 @@
 #include <mitsuba/core/sched.h>
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/mipmap.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/renderer.h>
 #include <mitsuba/hw/gputexture.h>
 #include <mitsuba/hw/gpuprogram.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -188,8 +190,8 @@ public:
 			/* Support initialization via raw data passed from another plugin */
 			bitmap = reinterpret_cast<Bitmap *>(props.getData("bitmap").ptr);
 		} else {
-			m_filename = Thread::getThread()->getFileResolver()->resolve(
-				props.getString("filename"));
+			m_filename = fs::decode_pathstr(Thread::getThread()->getFileResolver()->resolve(
+				fs::pathstr(props.getString("filename"))));
 
 			Log(EInfo, "Loading texture \"%s\"", m_filename.filename().string().c_str());
 			if (!fs::exists(m_filename))
@@ -234,23 +236,24 @@ public:
 		if (m_filterType != EEWA)
 			m_maxAnisotropy = 1.0f;
 
-		if (tryReuseCache && MIPMap3::validateCacheFile(cacheFile, timestamp,
+		fs::pathstr scacheFile = fs::encode_pathstr(cacheFile);
+		if (tryReuseCache && MIPMap3::validateCacheFile(scacheFile, timestamp,
 				Bitmap::ERGB, m_wrapModeU, m_wrapModeV, m_filterType, m_gamma)) {
 			/* Reuse an existing MIP map cache file */
-			m_mipmap3 = new MIPMap3(cacheFile, m_maxAnisotropy);
-		} else if (tryReuseCache && MIPMap1::validateCacheFile(cacheFile, timestamp,
+			m_mipmap3 = new MIPMap3(scacheFile, m_maxAnisotropy);
+		} else if (tryReuseCache && MIPMap1::validateCacheFile(scacheFile, timestamp,
 				Bitmap::ELuminance, m_wrapModeU, m_wrapModeV, m_filterType, m_gamma)) {
 			/* Reuse an existing MIP map cache file */
-			m_mipmap1 = new MIPMap1(cacheFile, m_maxAnisotropy);
+			m_mipmap1 = new MIPMap1(scacheFile, m_maxAnisotropy);
 		} else {
 			if (bitmap == NULL) {
 				/* Load the input image if necessary */
 				ref<Timer> timer = new Timer();
-				ref<FileStream> fs = new FileStream(m_filename, FileStream::EReadOnly);
+				ref<FileStream> fs = new FileStream(fs::encode_pathstr(m_filename), FileStream::EReadOnly);
 				bitmap = new Bitmap(Bitmap::EAuto, fs);
 				if (m_gamma != 0)
 					bitmap->setGamma(m_gamma);
-				Log(EDebug, "Loaded \"%s\" in %i ms", m_filename.filename().string().c_str(),
+				Log(EDebug, "Loaded \"%s\" in %i ms", m_filename.string().c_str(),
 					timer->getMilliseconds());
 			}
 
@@ -293,11 +296,11 @@ public:
 			if (pixelFormat == Bitmap::ELuminance)
 				m_mipmap1 = new MIPMap1(bitmap, pixelFormat, Bitmap::EFloat,
 					rfilter, m_wrapModeU, m_wrapModeV, m_filterType, m_maxAnisotropy,
-					createCache ? cacheFile : fs::path(), timestamp);
+					createCache ? scacheFile : fs::pathstr(), timestamp);
 			else
 				m_mipmap3 = new MIPMap3(bitmap, pixelFormat, Bitmap::EFloat,
 					rfilter, m_wrapModeU, m_wrapModeV, m_filterType, m_maxAnisotropy,
-					createCache ? cacheFile : fs::path(), timestamp);
+					createCache ? scacheFile : fs::pathstr(), timestamp);
 		}
 	}
 
@@ -340,7 +343,7 @@ public:
 
 	BitmapTexture(Stream *stream, InstanceManager *manager)
 	 : Texture2D(stream, manager) {
-		m_filename = stream->readString();
+		m_filename = fs::decode_pathstr(fs::pathstr(stream->readString()));
 		Log(EDebug, "Unserializing texture \"%s\"", m_filename.filename().string().c_str());
 		m_filterType = (EMIPFilterType) stream->readUInt();
 		m_wrapModeU = (ReconstructionFilter::EBoundaryCondition) stream->readUInt();
@@ -391,16 +394,16 @@ public:
 		if (pixelFormat == Bitmap::ELuminance)
 			m_mipmap1 = new MIPMap1(bitmap, pixelFormat, Bitmap::EFloat,
 				rfilter, m_wrapModeU, m_wrapModeV, m_filterType, m_maxAnisotropy,
-				fs::path(), 0);
+				fs::pathstr(), 0);
 		else
 			m_mipmap3 = new MIPMap3(bitmap, pixelFormat, Bitmap::EFloat,
 				rfilter, m_wrapModeU, m_wrapModeV, m_filterType, m_maxAnisotropy,
-				fs::path(), 0);
+				fs::pathstr(), 0);
 	}
 
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		Texture2D::serialize(stream, manager);
-		stream->writeString(m_filename.string());
+		stream->writeString(fs::encode_pathstr(m_filename).s);
 		stream->writeUInt(m_filterType);
 		stream->writeUInt(m_wrapModeU);
 		stream->writeUInt(m_wrapModeV);
@@ -410,7 +413,7 @@ public:
 		if (!m_filename.empty() && fs::exists(m_filename)) {
 			/* We still have access to the original image -- use that, since
 			   it is probably much smaller than the in-memory representation */
-			ref<Stream> is = new FileStream(m_filename, FileStream::EReadOnly);
+			ref<Stream> is = new FileStream(fs::encode_pathstr(m_filename), FileStream::EReadOnly);
 			stream->writeString(m_channel);
 			stream->writeSize(is->getSize());
 			is->copyTo(stream);
@@ -576,7 +579,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
@@ -590,6 +595,7 @@ protected:
 	fs::path m_filename;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 class BitmapTextureShader : public Shader {
 public:
@@ -694,7 +700,8 @@ Shader *BitmapTexture::createShader(Renderer *renderer) const {
 			m_wrapModeU, m_wrapModeV, m_maxAnisotropy);
 }
 
-MTS_IMPLEMENT_CLASS_S(BitmapTexture, false, Texture2D)
 MTS_IMPLEMENT_CLASS(BitmapTextureShader, false, Shader)
+#endif
+MTS_IMPLEMENT_CLASS_S(BitmapTexture, false, Texture2D)
 MTS_EXPORT_PLUGIN(BitmapTexture, "Bitmap texture");
 MTS_NAMESPACE_END

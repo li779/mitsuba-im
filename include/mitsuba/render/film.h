@@ -58,7 +58,7 @@ public:
 	virtual void addBitmap(const Bitmap *bitmap, Float multiplier = 1.0f) = 0;
 
 	/// Set the target filename (with or without extension)
-	virtual void setDestinationFile(const fs::path &filename, uint32_t blockSize) = 0;
+	virtual void setDestinationFile(const fs::pathstr &filename, uint32_t blockSize) = 0;
 
 	/// Develop the film and write the result to the previously specified filename
 	virtual void develop(const Scene *scene, Float renderTime) = 0;
@@ -79,7 +79,7 @@ public:
 		Bitmap *target) const = 0;
 
 	/// Does the destination file already exist?
-	virtual bool destinationExists(const fs::path &basename) const = 0;
+	virtual bool destinationExists(const fs::pathstr &basename) const = 0;
 
 	/**
 	 * Should regions slightly outside the image plane be sampled to improve

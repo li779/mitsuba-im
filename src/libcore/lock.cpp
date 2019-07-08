@@ -18,14 +18,14 @@
 
 #include <mitsuba/core/lock.h>
 
-#include <boost/thread/thread_time.hpp>
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
+#include <chrono>
+#include <mutex>
+#include <condition_variable>
 
 MTS_NAMESPACE_BEGIN
 
 struct Mutex::MutexPrivate {
-	boost::recursive_timed_mutex mutex;
+	std::recursive_timed_mutex mutex;
 };
 
 Mutex::Mutex() : d(new MutexPrivate) {
@@ -44,14 +44,14 @@ void Mutex::unlock() {
 
 struct ConditionVariable::ConditionVariablePrivate {
 	ref<Mutex> mutex;
-	boost::condition_variable_any cond;
+	std::condition_variable_any cond;
 
 	ConditionVariablePrivate(Mutex * m) : mutex(m) { }
 
 	// Helper to get the actual mutex implementation. This works only if
 	// the mutex is not null
 
-	inline boost::recursive_timed_mutex& mutexImpl() {
+	inline std::recursive_timed_mutex& mutexImpl() {
 		return mutex->d->mutex;
 	}
 };
@@ -81,16 +81,14 @@ bool ConditionVariable::wait(int ms) {
 		wait();
 		return true;
 	} else {
-		const boost::posix_time::ptime timeout =
-			boost::get_system_time() + boost::posix_time::milliseconds(ms);
-		return d->cond.timed_wait(d->mutexImpl(), timeout);
+		return d->cond.wait_for(d->mutexImpl(), std::chrono::milliseconds(ms)) != std::cv_status::timeout;
 	}
 }
 
 struct WaitFlag::WaitFlagPrivate {
 	bool flag;
-	boost::timed_mutex mutex;
-	boost::condition_variable_any cond;
+	std::timed_mutex mutex;
+	std::condition_variable_any cond;
 
 	WaitFlagPrivate(bool f) : flag(f) {}
 };
@@ -107,25 +105,23 @@ const bool & WaitFlag::get() const {
 }
 
 void WaitFlag::set(bool value) {
-	boost::timed_mutex::scoped_lock lock(d->mutex);
+	std::lock_guard<std::timed_mutex> lock(d->mutex);
 	d->flag = value;
 	if (d->flag)
 		d->cond.notify_all();
 }
 
 void WaitFlag::wait() {
-	boost::timed_mutex::scoped_lock lock(d->mutex);
+	std::lock_guard<std::timed_mutex> lock(d->mutex);
 	// Wait for a signal from the CV and release the mutex while waiting
 	while (!d->flag)
 		d->cond.wait(d->mutex);
 }
 
 bool WaitFlag::wait(int ms) {
-	boost::timed_mutex::scoped_lock lock(d->mutex);
+	std::unique_lock<std::timed_mutex> lock(d->mutex);
 	if (!d->flag) {
-		const boost::posix_time::ptime timeout =
-			boost::get_system_time() + boost::posix_time::milliseconds(ms);
-		return d->cond.timed_wait(lock, timeout);
+		return d->cond.wait_for(lock, std::chrono::milliseconds(ms)) != std::cv_status::timeout;
 	}
 	return true;
 }

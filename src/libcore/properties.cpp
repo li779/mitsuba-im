@@ -22,13 +22,13 @@
 
 /* Keep the boost::variant includes outside of properties.h,
    since they noticeably add to the overall compile times */
-#include <any>
+#include <variant>
 
 MTS_NAMESPACE_BEGIN
 
-typedef /*boost::variant<
+typedef std::variant<
 	bool, int64_t, Float, Point, Vector, Transform, AnimatedTransform *,
-	Spectrum, std::string, Properties::Data>*/ std::any ElementData;
+	Spectrum, std::string, Properties::Data> ElementData;
 
 struct PropertyElement {
 	ElementData data;
@@ -47,7 +47,7 @@ struct PropertyElement {
 		std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name); \
 		if (it == m_elements->end()) \
 			SLog(EError, "Property \"%s\" has not been specified!", name.c_str()); \
-		const BaseType *result = std::any_cast<BaseType>(&it->second.data); \
+		const BaseType *result = std::get_if<BaseType>(&it->second.data); \
 		if (!result) \
 			SLog(EError, "The property \"%s\" has the wrong type (expected <" #ReadableName ">). The " \
 					"complete property record is :\n%s", name.c_str(), toString().c_str()); \
@@ -59,7 +59,7 @@ struct PropertyElement {
 		std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name); \
 		if (it == m_elements->end()) \
 			return defVal; \
-		const BaseType *result = std::any_cast<BaseType>(&it->second.data); \
+		const BaseType *result = std::get_if<BaseType>(&it->second.data); \
 		if (!result) \
 			SLog(EError, "The property \"%s\" has the wrong type (expected <" #ReadableName ">). The " \
 					"complete property record is :\n%s", name.c_str(), toString().c_str()); \
@@ -81,7 +81,7 @@ DEFINE_PROPERTY_ACCESSOR(Properties::Data, Properties::Data, Data, data)
 
 void Properties::setAnimatedTransform(const std::string &name, const AnimatedTransform *value, bool warnDuplicates) {
 	if (hasProperty(name)) {
-		AnimatedTransform **old = std::any_cast<AnimatedTransform *>(&((*m_elements)[name].data));
+		AnimatedTransform **old = std::get_if<AnimatedTransform *>(&((*m_elements)[name].data));
 		if (old)
 			(*old)->decRef();
 		if (warnDuplicates)
@@ -96,8 +96,8 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
 	if (it == m_elements->end())
 		SLog(EError, "Property \"%s\" missing", name.c_str());
-	const AnimatedTransform * const * result1 = std::any_cast<AnimatedTransform *>(&it->second.data);
-	const Transform *result2 = std::any_cast<Transform>(&it->second.data);
+	const AnimatedTransform * const * result1 = std::get_if<AnimatedTransform *>(&it->second.data);
+	const Transform *result2 = std::get_if<Transform>(&it->second.data);
 
 	if (!result1 && !result2)
 		SLog(EError, "The property \"%s\" has the wrong type (expected <animation> or <transform>). The "
@@ -114,8 +114,8 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 	std::map<std::string, PropertyElement>::const_iterator it = m_elements->find(name);
 	if (it == m_elements->end())
 		return defVal;
-	AnimatedTransform * const * result1 = std::any_cast<AnimatedTransform *>(&it->second.data);
-	const Transform *result2 = std::any_cast<Transform>(&it->second.data);
+	AnimatedTransform * const * result1 = std::get_if<AnimatedTransform *>(&it->second.data);
+	const Transform *result2 = std::get_if<Transform>(&it->second.data);
 
 	if (!result1 && !result2)
 		SLog(EError, "The property \"%s\" has the wrong type (expected <animation> or <transform>). The "
@@ -134,8 +134,8 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 	if (it == m_elements->end())
 		return new AnimatedTransform(defVal);
 
-	AnimatedTransform * const * result1 = std::any_cast<AnimatedTransform *>(&it->second.data);
-	const Transform *result2 = std::any_cast<Transform>(&it->second.data);
+	AnimatedTransform * const * result1 = std::get_if<AnimatedTransform *>(&it->second.data);
+	const Transform *result2 = std::get_if<Transform>(&it->second.data);
 
 	if (!result1 && !result2)
 		SLog(EError, "The property \"%s\" has the wrong type (expected <animation> or <transform>). The "
@@ -149,7 +149,7 @@ ref<const AnimatedTransform> Properties::getAnimatedTransform(const std::string 
 }
 
 namespace {
-	class TypeVisitor : public boost::static_visitor<Properties::EPropertyType> {
+	class TypeVisitor {
 	public:
 		Properties::EPropertyType operator()(const bool &) const              { return Properties::EBoolean; }
 		Properties::EPropertyType operator()(const int64_t &) const           { return Properties::EInteger; }
@@ -163,25 +163,25 @@ namespace {
 		Properties::EPropertyType operator()(const Properties::Data &) const  { return Properties::EData; }
 	};
 
-	class EqualityVisitor : public boost::static_visitor<bool> {
+	class EqualityVisitor {
 	public:
 		EqualityVisitor(const ElementData *ref) : ref(ref) { }
 
-		bool operator()(const bool &v) const              { const bool *v2 = boost::get<bool>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const int64_t &v) const           { const int64_t *v2 = boost::get<int64_t>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const Float &v) const             { const Float *v2 = boost::get<Float>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const Point &v) const             { const Point *v2 = boost::get<Point>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const Vector &v) const            { const Vector *v2 = boost::get<Vector>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const Transform &v) const         { const Transform *v2 = boost::get<Transform>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const AnimatedTransform *v) const { AnimatedTransform * const *v2 = boost::get<AnimatedTransform*>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const Spectrum &v) const          { const Spectrum *v2 = boost::get<Spectrum>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const std::string &v) const       { const std::string *v2 = boost::get<std::string>(ref); return v2 ? (v == *v2) : false; }
-		bool operator()(const Properties::Data &v) const  { const Properties::Data *v2 = boost::get<Properties::Data>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const bool &v) const              { const bool *v2 = std::get_if<bool>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const int64_t &v) const           { const int64_t *v2 = std::get_if<int64_t>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const Float &v) const             { const Float *v2 = std::get_if<Float>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const Point &v) const             { const Point *v2 = std::get_if<Point>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const Vector &v) const            { const Vector *v2 = std::get_if<Vector>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const Transform &v) const         { const Transform *v2 = std::get_if<Transform>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const AnimatedTransform *v) const { AnimatedTransform * const *v2 = std::get_if<AnimatedTransform*>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const Spectrum &v) const          { const Spectrum *v2 = std::get_if<Spectrum>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const std::string &v) const       { const std::string *v2 = std::get_if<std::string>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const Properties::Data &v) const  { const Properties::Data *v2 = std::get_if<Properties::Data>(ref); return v2 ? (v == *v2) : false; }
 	private:
 		const ElementData *ref;
 	};
 
-	class StringVisitor : public boost::static_visitor<void> {
+	class StringVisitor {
 	public:
 		StringVisitor(std::ostringstream &oss, bool quote) : oss(oss), quote(quote) { }
 
@@ -217,7 +217,7 @@ Properties::Properties(const Properties &props)
 
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::get_if<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->incRef();
 	}
@@ -226,7 +226,7 @@ Properties::Properties(const Properties &props)
 Properties::~Properties() {
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::get_if<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->decRef();
 	}
@@ -237,7 +237,7 @@ Properties::~Properties() {
 void Properties::operator=(const Properties &props) {
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::get_if<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->decRef();
 	}
@@ -248,7 +248,7 @@ void Properties::operator=(const Properties &props) {
 
 	for (std::map<std::string, PropertyElement>::iterator it = m_elements->begin();
 			it != m_elements->end(); ++it) {
-		AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
+		AnimatedTransform **trafo = std::get_if<AnimatedTransform *>(&(*it).second.data);
 		if (trafo)
 			(*trafo)->incRef();
 	}
@@ -262,7 +262,7 @@ bool Properties::removeProperty(const std::string &name) {
 	std::map<std::string, PropertyElement>::iterator it = m_elements->find(name);
 	if (it == m_elements->end())
 		return false;
-	AnimatedTransform **trafo = std::any_cast<AnimatedTransform *>(&(*it).second.data);
+	AnimatedTransform **trafo = std::get_if<AnimatedTransform *>(&(*it).second.data);
 	if (trafo)
 		(*trafo)->decRef();
 	m_elements->erase(it);
@@ -286,7 +286,7 @@ Properties::EPropertyType Properties::getType(const std::string &name) const {
 	if (it == m_elements->end())
 		SLog(EError, "Property \"%s\" has not been specified!", name.c_str());
 
-	return boost::apply_visitor(TypeVisitor(), it->second.data);
+	return std::visit(TypeVisitor(), it->second.data);
 }
 
 std::string Properties::getAsString(const std::string &name, const std::string &defVal) const {
@@ -302,7 +302,7 @@ std::string Properties::getAsString(const std::string &name) const {
 
 	std::ostringstream oss;
 	StringVisitor strVisitor(oss, false);
-	boost::apply_visitor(strVisitor, it->second.data);
+	std::visit(strVisitor, it->second.data);
 	it->second.queried = true;
 
 	return oss.str();
@@ -320,7 +320,7 @@ std::string Properties::toString() const {
 	while (it != m_elements->end()) {
 		oss << "    \"" << (*it).first << "\" -> ";
 		const ElementData &data = (*it).second.data;
-		boost::apply_visitor(strVisitor, data);
+		std::visit(strVisitor, data);
 		if (++it != m_elements->end())
 			oss << ",";
 		oss << endl;
@@ -367,7 +367,7 @@ bool Properties::operator==(const Properties &p) const {
 		const PropertyElement &first = it->second;
 		const PropertyElement &second = (*p.m_elements)[it->first];
 
-		if (!boost::apply_visitor(EqualityVisitor(&first.data), second.data))
+		if (!std::visit(EqualityVisitor(&first.data), second.data))
 			return false;
 	}
 

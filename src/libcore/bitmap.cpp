@@ -20,7 +20,9 @@
 #include <mitsuba/core/version.h>
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/fstream.h>
-#include <boost/thread/mutex.hpp>
+#if defined(MTS_HAS_FFTW)
+#include <mutex>
+#endif
 #include <set>
 
 #if defined(__WINDOWS__)
@@ -49,6 +51,7 @@
 #endif
 
 #if defined(MTS_HAS_LIBPNG)
+#include <setjmp.h>
 #include <png.h>
 #endif
 
@@ -295,7 +298,7 @@ Bitmap::Bitmap(EFileFormat format, Stream *stream, const std::string &prefix) : 
 	readStream(format, stream, prefix);
 }
 
-Bitmap::Bitmap(const fs::path &path, const std::string &prefix) : m_data(NULL), m_ownsData(false) {
+Bitmap::Bitmap(const fs::pathstr &path, const std::string &prefix) : m_data(NULL), m_ownsData(false) {
 	ref<FileStream> fs = new FileStream(path, FileStream::EReadOnly);
 	readStream(EAuto, fs, prefix);
 }
@@ -352,29 +355,29 @@ void Bitmap::readStream(EFileFormat format, Stream *stream, const std::string &p
 	}
 }
 
-void Bitmap::write(const fs::path &path, int compression) const {
-	std::string s = to_lower_copy(path.string());
+void Bitmap::write(const fs::pathstr &path, int compression) const {
+	std::string s = to_lower_copy(path.s);
 	EFileFormat format;
-	if (boost::ends_with(s, "jpeg") || boost::ends_with(s, "jpg"))
+	if (ends_with(s, "jpeg") || ends_with(s, "jpg"))
 		format = EJPEG;
-	else if (boost::ends_with(s, "png"))
+	else if (ends_with(s, "png"))
 		format = EPNG;
-	else if (boost::ends_with(s, "exr"))
+	else if (ends_with(s, "exr"))
 		format = EOpenEXR;
-	else if (boost::ends_with(s, "hdr") || boost::ends_with(s, "rgbe"))
+	else if (ends_with(s, "hdr") || ends_with(s, "rgbe"))
 		format = ERGBE;
-	else if (boost::ends_with(s, "pfm"))
+	else if (ends_with(s, "pfm"))
 		format = EPFM;
-	else if (boost::ends_with(s, "ppm"))
+	else if (ends_with(s, "ppm"))
 		format = EPPM;
 	else {
-		Log(EError, "No supported bitmap file extension: \"%s\"", path.string().c_str());
+		Log(EError, "No supported bitmap file extension: \"%s\"", path.s.c_str());
 		return;
 	}
 	write(format, path, compression);
 }
 
-void Bitmap::write(EFileFormat format, const fs::path &path, int compression) const {
+void Bitmap::write(EFileFormat format, const fs::pathstr &path, int compression) const {
 	ref<FileStream> fs = new FileStream(path, FileStream::ETruncReadWrite);
 	write(format, fs, compression);
 }
@@ -757,7 +760,7 @@ Spectrum Bitmap::average() const {
 }
 
 #if defined(MTS_HAS_FFTW)
-static boost::mutex __fftw_lock;
+static std::mutex __fftw_lock;
 #endif
 
 void Bitmap::convolve(const Bitmap *_kernel) {
@@ -2702,7 +2705,7 @@ void Bitmap::readJPEG(Stream *stream) {
 	m_data = static_cast<uint8_t *>(allocAligned(getBufferSize()));
 	m_ownsData = true;
 
-	std::unique_ptr<uint8_t[]> scanlines(new uint8_t*[m_size.y]);
+	std::unique_ptr<uint8_t*[]> scanlines(new uint8_t*[m_size.y]);
 	for (int i=0; i<m_size.y; ++i)
 		scanlines.get()[i] = m_data + row_stride*i;
 
@@ -2796,38 +2799,38 @@ void Bitmap::readOpenEXR(Stream *stream, const std::string &_prefix) {
 		std::string name = to_lower_copy(std::string(it.name()));
 
 		/* Skip layers that have the wrong prefix */
-		if (!boost::starts_with(name, prefix) && prefix != "*")
+		if (!starts_with(name, prefix.c_str()) && prefix != "*")
 			continue;
 
 		if (!ch_r && (name == "r" || name == "red" ||
-				boost::ends_with(name, ".r") || boost::ends_with(name, ".red"))) {
+				ends_with(name, ".r") || ends_with(name, ".red"))) {
 			ch_r = it.name();
 		} else if (!ch_g && (name == "g" || name == "green" ||
-				boost::ends_with(name, ".g") || boost::ends_with(name, ".green"))) {
+				ends_with(name, ".g") || ends_with(name, ".green"))) {
 			ch_g = it.name();
 		} else if (!ch_b && (name == "b" || name == "blue" ||
-				boost::ends_with(name, ".b") || boost::ends_with(name, ".blue"))) {
+				ends_with(name, ".b") || ends_with(name, ".blue"))) {
 			ch_b = it.name();
 		} else if (!ch_a && (name == "a" || name == "alpha" ||
-				boost::ends_with(name, ".a") || boost::ends_with(name, ".alpha"))) {
+				ends_with(name, ".a") || ends_with(name, ".alpha"))) {
 			ch_a = it.name();
 		} else if (!ch_y && (name == "y" || name == "luminance" ||
-				boost::ends_with(name, ".y") || boost::ends_with(name, ".luminance"))) {
+				ends_with(name, ".y") || ends_with(name, ".luminance"))) {
 			ch_y = it.name();
-		} else if (!ch_x && (name == "x" || boost::ends_with(name, ".x"))) {
+		} else if (!ch_x && (name == "x" || ends_with(name, ".x"))) {
 			ch_x = it.name();
-		} else if (!ch_z && (name == "z" || boost::ends_with(name, ".z"))) {
+		} else if (!ch_z && (name == "z" || ends_with(name, ".z"))) {
 			ch_z = it.name();
-		} else if (!ch_ry && (name == "ry" || boost::ends_with(name, ".ry"))) {
+		} else if (!ch_ry && (name == "ry" || ends_with(name, ".ry"))) {
 			ch_ry = it.name();
-		} else if (!ch_by && (name == "by" || boost::ends_with(name, ".by"))) {
+		} else if (!ch_by && (name == "by" || ends_with(name, ".by"))) {
 			ch_by = it.name();
 		} else {
 			bool isSpectralChannel = false;
 			#if SPECTRUM_SAMPLES != 3
 				for (int i=0; i<SPECTRUM_SAMPLES; ++i) {
 					std::pair<Float, Float> coverage = Spectrum::getBinCoverage(i);
-					if (!ch_spec[i] && boost::ends_with(name, formatString("%.2f-%.2fnm", coverage.first, coverage.second))) {
+					if (!ch_spec[i] && ends_with(name, formatString("%.2f-%.2fnm", coverage.first, coverage.second))) {
 						isSpectralChannel = true;
 						ch_spec[i] = it.name();
 						break;
@@ -3594,9 +3597,9 @@ void Bitmap::readRGBE(Stream *stream) {
 	bool format_recognized = false;
 	while (true) {
 		line = stream->readLine();
-		if (boost::starts_with(line, "FORMAT=32-bit_rle_rgbe"))
+		if (starts_with(line, "FORMAT=32-bit_rle_rgbe"))
 			format_recognized = true;
-		if (boost::starts_with(line, "-Y ")) {
+		if (starts_with(line, "-Y ")) {
 			if (sscanf(line.c_str(), "-Y %i +X %i", &m_size.y, &m_size.x) < 2)
 				Log(EError, "readRGBE(): parser error!");
 			break;

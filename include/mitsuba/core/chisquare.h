@@ -147,7 +147,7 @@ public:
 	/**
 	 * \brief Dump the bin counts to a file using MATLAB format
 	 */
-	void dumpTables(fs::pathref filename);
+	void dumpTables(fs::pathstr const& filename);
 
 	/**
 	 * \brief Perform the actual chi-square test

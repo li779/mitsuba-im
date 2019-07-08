@@ -60,16 +60,16 @@ struct Plugin::PluginPrivate {
 	: shortName(sn), path(p) {}
 };
 
-Plugin::Plugin(const std::string &shortName, fs::pathref path)
- : d(new PluginPrivate(shortName, path)) {
+Plugin::Plugin(const std::string &shortName, fs::pathstr const& path)
+ : d(new PluginPrivate(shortName, fs::decode_pathstr(path))) {
 #if defined(__WINDOWS__)
-	d->handle = LoadLibraryW(path.p.c_str());
+	d->handle = LoadLibraryW(d->path.c_str());
 	if (!d->handle) {
 		SLog(EError, "Error while loading plugin \"%s\": %s",
 				d->path.string().c_str(), lastErrorText().c_str());
 	}
 #else
-	d->handle = dlopen(path.string().c_str(), RTLD_LAZY | RTLD_LOCAL);
+	d->handle = dlopen(d->path.string().c_str(), RTLD_LAZY | RTLD_LOCAL);
 	if (!d->handle) {
 		SLog(EError, "Error while loading plugin \"%s\": %s",
 			d->path.string().c_str(), dlerror());
@@ -144,7 +144,7 @@ std::string Plugin::getDescription() const {
 	return d->getDescription();
 }
 
-fs::pathref Plugin::getPath() const {
+fs::pathstr Plugin::getPath() const {
 	return d->path;
 }
 
@@ -236,11 +236,12 @@ void PluginManager::ensurePluginLoaded(const std::string &name) {
 #endif
 
 	const FileResolver *resolver = Thread::getThread()->getFileResolver();
-	fs::path path = resolver->resolve(shortName);
+	fs::pathstr spath = resolver->resolve(fs::encode_pathstr(shortName));
+	fs::path path = fs::decode_pathstr(spath);
 
 	if (fs::exists(path)) {
 		Log(EInfo, "Loading plugin \"%s\" ..", shortName.string().c_str());
-		m_plugins[name] = new Plugin(shortName.string(), path);
+		m_plugins[name] = new Plugin(shortName.string(), spath);
 		return;
 	}
 

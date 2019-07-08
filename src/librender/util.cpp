@@ -23,14 +23,13 @@
 #if defined(Assert)
 # undef Assert
 #endif
-#include <xercesc/parsers/SAXParser.hpp>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/render/util.h>
 #include <mitsuba/render/scenehandler.h>
 
 MTS_NAMESPACE_BEGIN
 
-ref<Scene> Utility::loadScene(const fs::path &filename,
+ref<Scene> Utility::loadScene(const fs::pathstr &filename,
 		const ParameterMap &params) {
 	return SceneHandler::loadScene(filename, params);
 }

@@ -17,7 +17,9 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -83,11 +85,14 @@ public:
 		return "Null[]";
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 /* Null shader-- render as a 'black box' */
@@ -116,6 +121,7 @@ Shader *Null::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(NullShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(Null, false, BSDF)
 MTS_EXPORT_PLUGIN(Null, "Null BSDF");
 MTS_NAMESPACE_END

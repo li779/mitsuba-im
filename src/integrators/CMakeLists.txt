@@ -25,7 +25,7 @@ add_integrator(ppm          photonmapper/ppm.cpp)
 add_integrator(sppm         photonmapper/sppm.cpp)
 
 # Miscellaneous
-add_integrator(vpl          vpl/vpl.cpp MTS_HW)
+#add_integrator(vpl          vpl/vpl.cpp MTS_HW)
 add_integrator(adaptive     misc/adaptive.cpp)
 add_integrator(irrcache     misc/irrcache.cpp
                             misc/irrcache_proc.h misc/irrcache_proc.cpp)

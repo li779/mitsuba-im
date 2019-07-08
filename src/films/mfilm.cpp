@@ -19,7 +19,8 @@
 #include <mitsuba/render/film.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/plugin.h>
-//#include <boost/filesystem/fstream.hpp>
+#include <mitsuba/core/filesystem.h>
+#include <fstream>
 #include <iomanip>
 #include "cnpy.h"
 
@@ -237,17 +238,17 @@ public:
 		return true;
 	}
 
-	void setDestinationFile(const fs::path &destFile, uint32_t blockSize) {
+	void setDestinationFile(const fs::pathstr &destFile, uint32_t blockSize) {
 		m_destFile = destFile;
 	}
 
 	void develop(const Scene *scene, Float renderTime) {
-		if (m_destFile.empty())
+		if (m_destFile.s.empty())
 			return;
 
 		Log(EDebug, "Developing film ..");
 
-		fs::path filename = m_destFile;
+		fs::path filename = fs::decode_pathstr(m_destFile);
 		std::string extension = to_lower_copy(filename.extension().string());
 		std::string expectedExtension;
 		if (m_fileFormat == EMathematica || m_fileFormat == EMATLAB) {
@@ -266,7 +267,7 @@ public:
 		Log(EInfo, "Writing image to \"%s\" ..", filename.filename().string().c_str());
 
 		if (m_fileFormat == EMathematica || m_fileFormat == EMATLAB) {
-			fs::ofstream os(filename);
+			std::ofstream os(filename.native().c_str());
 			if (!os.good() || os.fail())
 				Log(EError, "Output file cannot be created!");
 
@@ -302,7 +303,9 @@ public:
 							oss << std::setprecision(m_digits);
 							oss << *ptr;
 							std::string str = oss.str();
-							boost::replace_first(str, "e", "*^");
+							size_t epos = str.find_first_of("e");
+							if (epos != str.npos)
+								str.replace(epos, 1, "*^");
 							os << str;
 						}
 
@@ -347,8 +350,8 @@ public:
 		}
 	}
 
-	bool destinationExists(const fs::path &baseName) const {
-		fs::path filename = baseName;
+	bool destinationExists(const fs::pathstr &baseName) const {
+		fs::path filename = fs::decode_pathstr(baseName);
 		std::string expectedExtension;
 		if (m_fileFormat == EMathematica || m_fileFormat == EMATLAB) {
 			expectedExtension = ".m";
@@ -388,7 +391,7 @@ public:
 protected:
 	Bitmap::EPixelFormat m_pixelFormat;
 	EMode m_fileFormat;
-	fs::path m_destFile;
+	fs::pathstr m_destFile;
 	ref<ImageBlock> m_storage;
 	std::string m_variable;
 	int m_digits;

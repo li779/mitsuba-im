@@ -1,6 +1,6 @@
 # Experimental CMake file for Mitusba
 # Tested only on Windows and Linux (Ubuntu 10.10)
-cmake_minimum_required(VERSION 2.8.3 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12.0 FATAL_ERROR)
 
 # Internal variable to know whether this is the first time CMake runs
 if (NOT DEFINED MTS_CMAKE_INIT)
@@ -103,7 +103,9 @@ add_subdirectory(src/libcore)
 # Rendering-related APIs
 add_subdirectory(src/librender)
 # Hardware acceleration
-#add_subdirectory(src/libhw)
+if (MTS_HAS_HW)
+	add_subdirectory(src/libhw)
+endif ()
 # Bidirectional support library
 add_subdirectory(src/libbidir)
 # Python binding library

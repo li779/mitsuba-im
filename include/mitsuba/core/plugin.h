@@ -36,7 +36,7 @@ MTS_NAMESPACE_BEGIN
 class MTS_EXPORT_CORE Plugin {
 public:
 	/// Load a plugin from the supplied path
-	Plugin(const std::string &shortName, fs::pathref path);
+	Plugin(const std::string &shortName, fs::pathstr const& path);
 
 	/// Virtual destructor
 	virtual ~Plugin();
@@ -54,7 +54,7 @@ public:
 	std::string getDescription() const;
 
 	/// Return the path of this plugin
-	fs::pathref getPath() const;
+	fs::pathstr getPath() const;
 
 	/// Return a short name of this plugin
 	const std::string &getShortName() const;

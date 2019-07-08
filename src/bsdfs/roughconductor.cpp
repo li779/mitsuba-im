@@ -18,7 +18,10 @@
 
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include "microfacet.h"
 #include "ior.h"
 
@@ -174,14 +177,14 @@ public:
 		std::string materialName = props.getString("material", "Cu");
 
 		Spectrum intEta, intK;
-		if (boost::to_lower_copy(materialName) == "none") {
+		if (to_lower_copy(materialName) == "none") {
 			intEta = Spectrum(0.0f);
 			intK = Spectrum(1.0f);
 		} else {
 			intEta.fromContinuousSpectrum(InterpolatedSpectrum(
-				fResolver->resolve("data/ior/" + materialName + ".eta.spd")));
+				fResolver->resolve(fs::pathstr("data/ior/" + materialName + ".eta.spd"))));
 			intK.fromContinuousSpectrum(InterpolatedSpectrum(
-				fResolver->resolve("data/ior/" + materialName + ".k.spd")));
+				fResolver->resolve(fs::pathstr("data/ior/" + materialName + ".k.spd"))));
 		}
 
 		Float extEta = lookupIOR(props, "extEta", "air");
@@ -451,7 +454,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -462,6 +467,7 @@ private:
 	Spectrum m_eta, m_k;
 };
 
+#ifdef MTS_HAS_HW
 /**
  * GLSL port of the rough conductor shader. This version is much more
  * approximate -- it only supports the Ashikhmin-Shirley distribution,
@@ -576,6 +582,7 @@ Shader *RoughConductor::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(RoughConductorShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(RoughConductor, false, BSDF)
 MTS_EXPORT_PLUGIN(RoughConductor, "Rough conductor BRDF");
 MTS_NAMESPACE_END

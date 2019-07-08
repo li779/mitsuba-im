@@ -18,7 +18,6 @@
 
 #include <mitsuba/render/renderjob.h>
 #include <mitsuba/render/renderproc.h>
-#include <mitsuba/core/filesystem.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -96,21 +95,21 @@ void RenderJob::run() {
 		if (!m_scene->preprocess(m_queue, this, m_sceneResID, m_sensorResID, m_samplerResID)) {
 			m_cancelled = true;
 			Log(EWarn, "Preprocessing of scene \"%s\" did not complete successfully!",
-				m_scene->getSourceFile().filename().string().c_str());
+				m_scene->getSourceFile().s.c_str());
 		}
 
 		if (!m_cancelled) {
 			if (!m_scene->render(m_queue, this, m_sceneResID, m_sensorResID, m_samplerResID)) {
 				m_cancelled = true;
 				Log(EWarn, "Rendering of scene \"%s\" did not complete successfully!",
-					m_scene->getSourceFile().filename().string().c_str());
+					m_scene->getSourceFile().s.c_str());
 			}
 			Log(EInfo, "Render time: %s", timeString(m_queue->getRenderTime(this), true).c_str());
 			m_scene->postprocess(m_queue, this, m_sceneResID, m_sensorResID, m_samplerResID);
 		}
 	} catch (const std::exception &ex) {
 		Log(EWarn, "Rendering of scene \"%s\" did not complete successfully, caught exception: %s",
-			m_scene->getSourceFile().filename().string().c_str(), ex.what());
+			m_scene->getSourceFile().s.c_str(), ex.what());
 		m_cancelled = true;
 	}
 

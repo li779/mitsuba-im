@@ -18,7 +18,7 @@
 
 #include "bluenoise.h"
 #include <mitsuba/core/statistics.h>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 
 #if defined(MTS_OPENMP)
 # include <omp.h>
@@ -174,7 +174,7 @@ void blueNoisePointSet(const Scene *scene, const std::vector<Shape *> &shapes,
 	timer->reset();
 
 	SLog(EInfo, "  phase 4: establishing valid cells and phase groups ..");
-	typedef boost::unordered_map<int64_t, Cell> CellMap;
+	typedef std::unordered_map<int64_t, Cell> CellMap;
 
 	CellMap cells(samples.size());
 	std::vector<std::vector<int64_t> > phaseGroups(27);

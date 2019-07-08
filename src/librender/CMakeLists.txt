@@ -5,10 +5,12 @@ endif()
 
 set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include/mitsuba/render)
 set(HDRS
+  ${INCLUDE_DIR}/basictexture.h
   ${INCLUDE_DIR}/bsdf.h
   ${INCLUDE_DIR}/common.h
   ${INCLUDE_DIR}/emitter.h
   ${INCLUDE_DIR}/film.h
+  ${INCLUDE_DIR}/font.h
   ${INCLUDE_DIR}/fwd.h
   ${INCLUDE_DIR}/gatherproc.h
   ${INCLUDE_DIR}/gkdtree.h
@@ -34,6 +36,7 @@ set(HDRS
   ${INCLUDE_DIR}/sampler.h
   ${INCLUDE_DIR}/scene.h
   ${INCLUDE_DIR}/scenehandler.h
+  ${INCLUDE_DIR}/sceneloader.h
   ${INCLUDE_DIR}/sensor.h
   ${INCLUDE_DIR}/shader.h
   ${INCLUDE_DIR}/shape.h
@@ -51,10 +54,12 @@ set(HDRS
 )
 
 set(SRCS
+  basictexture.cpp
   bsdf.cpp
   common.cpp
   emitter.cpp
   film.cpp
+  font.cpp
   gatherproc.cpp
   imageblock.cpp
   imageproc.cpp
@@ -79,6 +84,7 @@ set(SRCS
   shape.cpp
   skdtree.cpp
   subsurface.cpp
+  testcase.cpp
   texture.cpp
   trimesh.cpp
   util.cpp

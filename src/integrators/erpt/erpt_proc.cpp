@@ -24,7 +24,7 @@
 #include <mitsuba/bidir/pathsampler.h>
 #include <mitsuba/bidir/util.h>
 #include <mitsuba/core/sfcurve.h>
-#include <boost/bind.hpp>
+#include <functional>
 #include "erpt_proc.h"
 
 //#define MTS_BD_DEBUG_HEAVY
@@ -298,8 +298,8 @@ public:
 
 		m_hilbertCurve.initialize(TVector2<uint8_t>(rect->getSize()));
 		m_result->clear();
-		boost::function<void (int, int, Float, Path &)> callback
-			= boost::bind(&ERPTRenderer::pathCallback, this, _1, _2, _3, _4, &stop);
+		std::function<void (int, int, Float, Path &)> callback
+			= std::bind(&ERPTRenderer::pathCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, &stop);
 
 		for (size_t i=0; i<m_hilbertCurve.getPointCount(); ++i) {
 			if (stop)

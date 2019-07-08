@@ -20,7 +20,7 @@
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/version.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/filesystem.h>
 
 #if defined(_MSC_VER)
 #pragma warning(disable : 4231) // nonstandard extension used : 'extern' before template explicit instantiation
@@ -101,11 +101,11 @@ MTS_NAMESPACE_BEGIN
 class TiledHDRFilm : public Film {
 public:
 	TiledHDRFilm(const Properties &props) : Film(props), m_output(NULL), m_frameBuffer(NULL) {
-		std::vector<std::string> pixelFormats = tokenize(boost::to_lower_copy(
+		std::vector<std::string> pixelFormats = tokenize(to_lower_copy(
 			props.getString("pixelFormat", "rgb")), " ,");
 		std::vector<std::string> channelNames = tokenize(
 			props.getString("channelNames", ""), ", ");
-		std::string componentFormat = boost::to_lower_copy(
+		std::string componentFormat = to_lower_copy(
 			props.getString("componentFormat", "float16"));
 
 		if (pixelFormats.empty())
@@ -216,12 +216,12 @@ public:
 		stream->writeUInt(m_componentFormat);
 	}
 
-	void setDestinationFile(const fs::path &destFile, uint32_t blockSize) {
+	void setDestinationFile(const fs::pathstr &destFile, uint32_t blockSize) {
 		if (m_output)
 			develop(NULL, 0);
 
-		fs::path filename = destFile;
-		std::string extension = boost::to_lower_copy(filename.extension().string());
+		fs::path filename = fs::decode_pathstr(destFile);
+		std::string extension = to_lower_copy(filename.extension().string());
 		if (extension != ".exr")
 			filename.replace_extension(".exr");
 
@@ -501,9 +501,9 @@ public:
 		return false;
 	}
 
-	bool destinationExists(const fs::path &baseName) const {
-		fs::path filename = baseName;
-		if (boost::to_lower_copy(filename.extension().string()) != ".exr")
+	bool destinationExists(const fs::pathstr &baseName) const {
+		fs::path filename = fs::decode_pathstr(baseName);
+		if (to_lower_copy(filename.extension().string()) != ".exr")
 			filename.replace_extension(".exr");
 		return fs::exists(filename);
 	}

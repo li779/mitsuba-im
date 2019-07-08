@@ -53,7 +53,7 @@ public:
 	FileStream();
 
 	/// Create a file stream class and open a file with a given EFileMode
-	explicit FileStream(fs::pathref path, EFileMode mode = EReadOnly);
+	explicit FileStream(fs::pathstr const& path, EFileMode mode = EReadOnly);
 
 	//! @}
 	// =============================================================
@@ -63,10 +63,10 @@ public:
 	// =============================================================
 
 	/// Return the file path
-	fs::pathref getPath() const;
+	fs::pathstr getPath() const;
 
 	/// Open a file with a given open mode
-	void open(fs::pathref filename, EFileMode mode = EReadOnly);
+	void open(fs::pathstr const& filename, EFileMode mode = EReadOnly);
 
 	/// Close the current file
 	void close();

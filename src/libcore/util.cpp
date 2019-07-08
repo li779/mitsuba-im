@@ -901,6 +901,17 @@ std::string memString(size_t size, bool precise) {
 	return os.str();
 }
 
+bool starts_with(std::string const& s, char const* c) {
+	return 0 == strncmp(s.c_str(), c, std::strlen(c));
+}
+
+bool ends_with(std::string const& s, char const* c) {
+	size_t len = s.size(), lenc = std::strlen(c);
+	if (len < lenc)
+		return false;
+	return 0 == strncmp(s.c_str() + (len - lenc), c, lenc);
+}
+
 std::string to_lower_copy(std::string const& s) {
 	size_t len = s.size();
 	std::string r(len, 0);

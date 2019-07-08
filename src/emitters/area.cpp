@@ -19,7 +19,9 @@
 #include <mitsuba/render/emitter.h>
 #include <mitsuba/render/shape.h>
 #include <mitsuba/render/medium.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/gpuprogram.h>
+#endif
 #include <mitsuba/core/warp.h>
 
 MTS_NAMESPACE_BEGIN
@@ -221,13 +223,16 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
 	Spectrum m_radiance, m_power;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class AreaLightShader : public Shader {
@@ -271,6 +276,7 @@ Shader *AreaLight::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(AreaLightShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(AreaLight, false, Emitter)
 MTS_EXPORT_PLUGIN(AreaLight, "Area light");
 MTS_NAMESPACE_END

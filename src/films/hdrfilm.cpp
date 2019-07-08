@@ -20,6 +20,7 @@
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/statistics.h>
+#include <mitsuba/core/filesystem.h>
 #include "banner.h"
 #include "annotations.h"
 
@@ -342,8 +343,8 @@ public:
 			std::string key = to_lower_copy(keys[i]);
 			key.erase(std::remove_if(key.begin(), key.end(), ::isspace), key.end());
 
-			if ((boost::starts_with(key, "metadata['") && boost::ends_with(key, "']")) ||
-			    (boost::starts_with(key, "label[") && boost::ends_with(key, "]")))
+			if ((starts_with(key, "metadata['") && ends_with(key, "']")) ||
+			    (starts_with(key, "label[") && ends_with(key, "]")))
 				props.markQueried(keys[i]);
 		}
 
@@ -473,12 +474,12 @@ public:
 		return true;
 	}
 
-	void setDestinationFile(const fs::path &destFile, uint32_t blockSize) {
+	void setDestinationFile(const fs::pathstr &destFile, uint32_t blockSize) {
 		m_destFile = destFile;
 	}
 
 	void develop(const Scene *scene, Float renderTime) {
-		if (m_destFile.empty())
+		if (m_destFile.s.empty())
 			return;
 
 		Log(EDebug, "Developing film ..");
@@ -504,7 +505,7 @@ public:
 			}
 		}
 
-		fs::path filename = m_destFile;
+		fs::path filename = fs::decode_pathstr(m_destFile);
 		std::string properExtension;
 		if (m_fileFormat == Bitmap::EOpenEXR)
 			properExtension = ".exr";
@@ -513,12 +514,12 @@ public:
 		else
 			properExtension = ".pfm";
 
-		std::string extension = boost::to_lower_copy(filename.extension().string());
+		std::string extension = to_lower_copy(filename.extension().string());
 		if (extension != properExtension)
 			filename.replace_extension(properExtension);
 
 		Log(EInfo, "Writing image to \"%s\" ..", filename.string().c_str());
-		ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);
+		ref<FileStream> stream = new FileStream(fs::encode_pathstr(filename), FileStream::ETruncWrite);
 
 		if (m_pixelFormats.size() == 1)
 			annotate(scene, m_properties, bitmap, renderTime, 1.0f);
@@ -546,7 +547,7 @@ public:
 		return false;
 	}
 
-	bool destinationExists(const fs::path &baseName) const {
+	bool destinationExists(const fs::pathstr &baseName) const {
 		std::string properExtension;
 		if (m_fileFormat == Bitmap::EOpenEXR)
 			properExtension = ".exr";
@@ -555,8 +556,8 @@ public:
 		else
 			properExtension = ".pfm";
 
-		fs::path filename = baseName;
-		if (boost::to_lower_copy(filename.extension().string()) != properExtension)
+		fs::path filename = fs::decode_pathstr(baseName);
+		if (to_lower_copy(filename.extension().string()) != properExtension)
 			filename.replace_extension(properExtension);
 		return fs::exists(filename);
 	}
@@ -591,7 +592,7 @@ protected:
 	Bitmap::EComponentFormat m_componentFormat;
 	bool m_banner;
 	bool m_attachLog;
-	fs::path m_destFile;
+	fs::pathstr m_destFile;
 	ref<ImageBlock> m_storage;
 };
 

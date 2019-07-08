@@ -19,7 +19,10 @@
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/trimesh.h>
 #include <mitsuba/core/properties.h>
+#include <mitsuba/core/lock.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -168,7 +171,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
@@ -179,6 +184,7 @@ protected:
 	Spectrum m_interiorColor;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class WireFrameShader : public Shader {
@@ -215,6 +221,7 @@ Shader *WireFrame::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(WireFrameShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(WireFrame, false, Texture)
 MTS_EXPORT_PLUGIN(WireFrame, "Wireframe texture");
 MTS_NAMESPACE_END

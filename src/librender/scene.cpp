@@ -32,8 +32,8 @@ MTS_NAMESPACE_BEGIN
 Scene::Scene()
  : NetworkedObject(Properties()), m_blockSize(DEFAULT_BLOCKSIZE) {
 	m_kdtree = new ShapeKDTree();
-	m_sourceFile = new fs::path();
-	m_destinationFile = new fs::path();
+	m_sourceFile = new fs::pathstr();
+	m_destinationFile = new fs::pathstr();
 }
 
 Scene::Scene(const Properties &props)
@@ -76,8 +76,8 @@ Scene::Scene(const Properties &props)
 	   in succession before a leaf node will be created.*/
 	if (props.hasProperty("kdMaxBadRefines"))
 		m_kdtree->setMaxBadRefines(props.getInteger("kdMaxBadRefines"));
-	m_sourceFile = new fs::path();
-	m_destinationFile = new fs::path();
+	m_sourceFile = new fs::pathstr();
+	m_destinationFile = new fs::pathstr();
 }
 
 Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
@@ -87,8 +87,8 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_environmentEmitter = scene->m_environmentEmitter;
 	m_sensor = scene->m_sensor;
 	m_integrator = scene->m_integrator;
-	m_sourceFile = new fs::path(*scene->m_sourceFile);
-	m_destinationFile = new fs::path(*scene->m_destinationFile);
+	m_sourceFile = new fs::pathstr(*scene->m_sourceFile);
+	m_destinationFile = new fs::pathstr(*scene->m_destinationFile);
 	m_emitterPDF = scene->m_emitterPDF;
 	m_shapes = scene->m_shapes;
 	m_sensors = scene->m_sensors;
@@ -121,8 +121,8 @@ Scene::Scene(Stream *stream, InstanceManager *manager)
 	m_degenerateEmitters = stream->readBool();
 	m_aabb = AABB(stream);
 	m_environmentEmitter = static_cast<Emitter *>(manager->getInstance(stream));
-	m_sourceFile = new fs::path(stream->readString());
-	m_destinationFile = new fs::path(stream->readString());
+	m_sourceFile = new fs::pathstr(stream->readString());
+	m_destinationFile = new fs::pathstr(stream->readString());
 
 	size_t count = stream->readSize();
 	m_shapes.reserve(count);
@@ -187,8 +187,8 @@ void Scene::serialize(Stream *stream, InstanceManager *manager) const {
 	stream->writeBool(m_degenerateEmitters);
 	m_aabb.serialize(stream);
 	manager->serialize(stream, m_environmentEmitter.get());
-	stream->writeString(m_sourceFile->string());
-	stream->writeString(m_destinationFile->string());
+	stream->writeString(m_sourceFile->s);
+	stream->writeString(m_destinationFile->s);
 
 	stream->writeSize(m_shapes.size());
 	for (size_t i=0; i<m_shapes.size(); ++i)
@@ -459,11 +459,11 @@ void Scene::flush(RenderQueue *queue, const RenderJob *job) {
 	m_sensor->getFilm()->develop(this, queue->getRenderTime(job));
 }
 
-void Scene::setDestinationFile(const fs::path &name) {
+void Scene::setDestinationFile(const fs::pathstr &name) {
 	*m_destinationFile = name;
 }
 
-void Scene::setSourceFile(const fs::path &name) {
+void Scene::setSourceFile(const fs::pathstr &name) {
 	*m_sourceFile = name;
 }
 

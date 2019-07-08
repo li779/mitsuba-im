@@ -48,7 +48,7 @@ protected:
 	virtual ~Utility() { }
 
 	/// Load a scene from an external file
-	ref<Scene> loadScene(const fs::path &fname,
+	ref<Scene> loadScene(const fs::pathstr &fname,
 		const ParameterMap &params= ParameterMap());
 
 	/// Load a scene from a string

@@ -20,7 +20,7 @@
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/mstream.h>
 
-#include <boost/thread/thread.hpp>
+#include <thread>
 
 MTS_NAMESPACE_BEGIN
 
@@ -491,7 +491,7 @@ Scheduler::EStatus Scheduler::acquireWork(Item &item,
 	else
 		lock.release(); /* Avoid the automatic unlocking upon destruction */
 
-	boost::this_thread::yield();
+	std::this_thread::yield();
 	return EOK;
 }
 

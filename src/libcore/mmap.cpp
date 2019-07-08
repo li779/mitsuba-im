@@ -190,20 +190,20 @@ struct MemoryMappedFile::MemoryMappedFilePrivate {
 MemoryMappedFile::MemoryMappedFile()
 	: d(new MemoryMappedFilePrivate()) { }
 
-MemoryMappedFile::MemoryMappedFile(fs::pathref filename, size_t size)
-	: d(new MemoryMappedFilePrivate(filename, size)) {
+MemoryMappedFile::MemoryMappedFile(fs::pathstr const& filename, size_t size)
+	: d(new MemoryMappedFilePrivate(fs::decode_pathstr(filename), size)) {
 	SLog(ETrace, "Creating memory-mapped file \"%s\" (%s)..",
-		filename.p.filename().string().c_str(), memString(d->size).c_str());
+		d->filename.filename().string().c_str(), memString(d->size).c_str());
 	d->create();
 }
 
 
-MemoryMappedFile::MemoryMappedFile(fs::pathref filename, bool readOnly)
-	: d(new MemoryMappedFilePrivate(filename)) {
+MemoryMappedFile::MemoryMappedFile(fs::pathstr const& filename, bool readOnly)
+	: d(new MemoryMappedFilePrivate(fs::decode_pathstr(filename))) {
 	d->readOnly = readOnly;
 	d->map();
 	Log(ETrace, "Mapped \"%s\" into memory (%s)..",
-		filename.p.filename().string().c_str(), memString(d->size).c_str());
+		d->filename.filename().string().c_str(), memString(d->size).c_str());
 }
 
 MemoryMappedFile::~MemoryMappedFile() {
@@ -246,7 +246,7 @@ bool MemoryMappedFile::isReadOnly() const {
 	return d->readOnly;
 }
 
-fs::pathref MemoryMappedFile::getFilename() const {
+fs::pathstr MemoryMappedFile::getFilename() const {
 	return d->filename;
 }
 

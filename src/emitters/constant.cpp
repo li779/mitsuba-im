@@ -19,7 +19,9 @@
 #include <mitsuba/render/scene.h>
 #include <mitsuba/core/bsphere.h>
 #include <mitsuba/core/plugin.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/gpuprogram.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -276,7 +278,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
@@ -285,6 +289,7 @@ protected:
 	Float m_invSurfaceArea;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class ConstantBackgroundEmitterShader : public Shader {
@@ -327,6 +332,7 @@ Shader *ConstantBackgroundEmitter::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(ConstantBackgroundEmitterShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(ConstantBackgroundEmitter, false, Emitter)
 MTS_EXPORT_PLUGIN(ConstantBackgroundEmitter, "Constant background emitter");
 MTS_NAMESPACE_END

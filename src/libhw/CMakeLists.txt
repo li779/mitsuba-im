@@ -7,7 +7,6 @@ set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include/mitsuba/hw)
 set(HDRS
   ${INCLUDE_DIR}/basicshader.h
   ${INCLUDE_DIR}/device.h
-  ${INCLUDE_DIR}/font.h
   ${INCLUDE_DIR}/glgeometry.h
   ${INCLUDE_DIR}/glprogram.h
   ${INCLUDE_DIR}/glrenderer.h

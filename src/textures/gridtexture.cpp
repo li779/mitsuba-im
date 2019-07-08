@@ -19,7 +19,9 @@
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/shape.h>
 #include <mitsuba/core/properties.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/gpuprogram.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -131,7 +133,9 @@ public:
 		return "GridTexture[]";
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
@@ -140,6 +144,7 @@ protected:
 	Float m_lineWidth;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class GridTextureShader : public Shader {
@@ -207,6 +212,7 @@ Shader *GridTexture::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(GridTextureShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(GridTexture, false, Texture2D)
 MTS_EXPORT_PLUGIN(GridTexture, "Grid texture");
 MTS_NAMESPACE_END

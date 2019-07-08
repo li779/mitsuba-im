@@ -225,7 +225,7 @@ public:
 	 * \endverbatim
 	 * Comments preceded by '#' are also valid.
 	 */
-	InterpolatedSpectrum(fs::pathref path);
+	InterpolatedSpectrum(fs::pathstr const& path);
 
 	/**
 	 * \brief Append an entry to the spectral power distribution.

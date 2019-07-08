@@ -18,6 +18,7 @@
 
 #include <mitsuba/render/film.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/statistics.h>
 #include "banner.h"
@@ -186,8 +187,8 @@ public:
 			std::string key = to_lower_copy(keys[i]);
 			key.erase(std::remove_if(key.begin(), key.end(), ::isspace), key.end());
 
-			if ((boost::starts_with(key, "metadata['") && boost::ends_with(key, "']")) ||
-			    (boost::starts_with(key, "label[") && boost::ends_with(key, "]")))
+			if ((starts_with(key, "metadata['") && ends_with(key, "']")) ||
+			    (starts_with(key, "label[") && ends_with(key, "]")))
 				props.markQueried(keys[i]);
 		}
 
@@ -292,12 +293,12 @@ public:
 		return true;
 	}
 
-	void setDestinationFile(const fs::path &destFile, uint32_t blockSize) {
+	void setDestinationFile(const fs::pathstr &destFile, uint32_t blockSize) {
 		m_destFile = destFile;
 	}
 
 	void develop(const Scene *scene, Float renderTime) {
-		if (m_destFile.empty())
+		if (m_destFile.s.empty())
 			return;
 
 		Log(EDebug, "Developing film ..");
@@ -331,7 +332,7 @@ public:
 			}
 		}
 
-		fs::path filename = m_destFile;
+		fs::path filename = fs::decode_pathstr(m_destFile);
 		std::string extension = to_lower_copy(filename.extension().string());
 		std::string expectedExtension;
 		switch (m_fileFormat) {
@@ -344,7 +345,7 @@ public:
 			filename.replace_extension(expectedExtension);
 
 		Log(EInfo, "Writing image to \"%s\" ..", filename.string().c_str());
-		ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);
+		ref<FileStream> stream = new FileStream(fs::encode_pathstr(filename), FileStream::ETruncWrite);
 
 		annotate(scene, m_properties, bitmap, renderTime, m_gamma);
 
@@ -357,8 +358,8 @@ public:
 			m_pixelFormat == Bitmap::ERGBA;
 	}
 
-	bool destinationExists(const fs::path &baseName) const {
-		fs::path filename = baseName;
+	bool destinationExists(const fs::pathstr &baseName) const {
+		fs::path filename = fs::decode_pathstr(baseName);
 		std::string extension;
 		switch (m_fileFormat) {
 			case Bitmap::EPNG: extension = ".png"; break;
@@ -396,7 +397,7 @@ protected:
 	Bitmap::EFileFormat m_fileFormat;
 	Bitmap::EPixelFormat m_pixelFormat;
 	bool m_hasBanner;
-	fs::path m_destFile;
+	fs::pathstr m_destFile;
 	Float m_gamma;
 	ref<ImageBlock> m_storage;
 	ETonemapMethod m_tonemapMethod;

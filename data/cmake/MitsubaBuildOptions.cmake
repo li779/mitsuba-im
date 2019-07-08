@@ -25,7 +25,12 @@ if (MTS_CMAKE_INIT)
   endif()
 endif()
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Top level configuration definitions
+option (MTS_ENABLE_HW_PREVIEW "Enable HW-accelerated prview rendering" OFF)
+option (MTS_ENABLE_COLLADA "Collada package search can be slow" OFF)
 option(MTS_DEBUG "Enable assertions etc. Usually a good idea." ON)
 if (MTS_DEBUG)
   add_definitions(-DMTS_DEBUG)

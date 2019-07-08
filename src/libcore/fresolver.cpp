@@ -56,7 +56,7 @@ FileResolver::FileResolver() {
 	if (basePath.empty())
 		Log(EError, "Could not detect the executable path!");
 #elif defined(__WINDOWS__)
-	std::vector<WCHAR> lpFilename(MAX_PATH);
+	std::wstring lpFilename(MAX_PATH, 0);
 
 	// Module handle to this DLL. If the function fails it sets handle to NULL.
 	// In that case GetModuleFileName will get the name of the executable which
@@ -90,6 +90,10 @@ FileResolver::FileResolver() {
 	m_paths.push_back(fs::current_path());
 }
 
+FileResolver::FileResolver(const FileResolver&) = default;
+
+FileResolver::~FileResolver() = default;
+
 FileResolver *FileResolver::clone() const {
 	FileResolver *cloned = new FileResolver();
 	cloned->m_paths = m_paths;
@@ -100,26 +104,29 @@ void FileResolver::clear() {
 	m_paths.clear();
 }
 
-void FileResolver::prependPath(fs::pathref path) {
+void FileResolver::prependPath(fs::pathstr const& spath) {
+	fs::path path = fs::decode_pathstr(spath);
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		if (m_paths[i].p == path.p)
+		if (m_paths[i].p == path)
 			return;
 	}
-	m_paths.push_front(path.p);
+	m_paths.insert(m_paths.begin(), path);
 }
 
-void FileResolver::appendPath(fs::pathref path) {
+void FileResolver::appendPath(fs::pathstr const& spath) {
+	fs::path path = fs::decode_pathstr(spath);
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		if (m_paths[i].p == path.p)
+		if (m_paths[i].p == path)
 			return;
 	}
-	m_paths.push_back(path.p);
+	m_paths.push_back(path);
 }
 
-fs::pathdat FileResolver::resolve(fs::pathref path) const {
+fs::pathstr FileResolver::resolve(fs::pathstr const& spath) const {
+	fs::path path = fs::decode_pathstr(spath);
 	/* First, try to resolve in case-sensitive mode */
 	for (size_t i=0; i<m_paths.size(); i++) {
-		fs::path newPath = m_paths[i] / path.p;
+		fs::path newPath = m_paths[i] / path;
 		if (fs::exists(newPath))
 			return newPath;
 	}
@@ -143,26 +150,29 @@ fs::pathdat FileResolver::resolve(fs::pathref path) const {
 		}
 	#endif
 
-	return path.p;
+	return spath;
 }
 
-std::vector<fs::pathdat> FileResolver::resolveAll(fs::pathref path) const {
-	std::vector<fs::path> results;
+std::vector<fs::pathstr> FileResolver::resolveAll(fs::pathstr const& spath) const {
+	fs::path path = fs::decode_pathstr(spath);
+	std::vector<fs::pathstr> results;
 
 	for (size_t i=0; i<m_paths.size(); i++) {
-		fs::path newPath = m_paths[i] / path.p;
+		fs::path newPath = m_paths[i] / path;
 		if (fs::exists(newPath))
-			results.push_back(newPath);
+			results.push_back(fs::encode_pathstr(newPath));
 	}
 
 	return results;
 }
 
-fs::pathdat FileResolver::resolveAbsolute(fs::pathref path) const {
-	return fs::absolute(resolve(path.p));
+fs::pathstr FileResolver::resolveAbsolute(fs::pathstr const& path) const {
+	return fs::absolute(fs::decode_pathstr(resolve(path)));
 }
 
-fs::pathref FileResolver::getPath(size_t index) const { return m_paths[index].p; }
+size_t FileResolver::getPathCount() const { return m_paths.size(); }
+
+fs::pathstr FileResolver::getPath(size_t index) const { return m_paths[index].p; }
 
 std::string FileResolver::toString() const {
 	std::ostringstream oss;

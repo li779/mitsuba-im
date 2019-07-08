@@ -177,6 +177,21 @@ typedef AnimationTrack<Point> PointTrack;
 
 MTS_NAMESPACE_END
 
-namespace fs { struct pathref; struct pathdat; }
+namespace fs {
+	//struct pathref;
+	struct pathdat;
+
+	// annoying
+	struct pathstr {
+		std::string s;
+		pathstr() { }
+		//MTS_EXPORT_CORE pathstr(pathref const& p);
+		MTS_EXPORT_CORE pathstr(pathdat const& p);
+		explicit pathstr(std::string s) : s((std::string&&) s) { }
+		MTS_EXPORT_CORE explicit pathstr(std::wstring s);
+		operator std::string const&() const { return s; }
+		MTS_EXPORT_CORE operator std::wstring() const;
+	};
+}
 
 #endif /* __MITSUBA_CORE_FWD_H_ */

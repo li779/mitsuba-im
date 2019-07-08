@@ -57,11 +57,12 @@ endif()
 
 
 # Qt4 (optional)
-#find_package(Qt4 4.7 COMPONENTS
-#  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
-#CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
-#  "QT4_FOUND" OFF)
-  
+find_package(Qt4 4.7 COMPONENTS
+  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
+CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
+  "QT4_FOUND" OFF)
+ 
+ 
 # System threading library, used for custom options
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
 find_package(Threads REQUIRED)
@@ -78,12 +79,12 @@ if (NOT Boost_FOUND)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-type_traits/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-assert/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-static_assert/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-exception/include)
+  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-exception/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-throw_exception/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-detail/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-iterator/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-range/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-algorithm/include)
+  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-range/include)
+  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-algorithm/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-concept_check/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-move/include)
   list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-tuple/include)
@@ -168,49 +169,189 @@ endif ()
 
 ###########################################################################
 
+include (ExternalProject)
+
 #find_package(Eigen 3.0 REQUIRED)
 
-#find_package(JPEG 6 REQUIRED)
-#find_package(ZLIB 1.2 REQUIRED)
-#find_package(PNG 1.2 REQUIRED)
+find_package(JPEG 6)
+if (NOT JPEG_FOUND)
+	set(MTS_LIBJPEG_DIR external/libjpeg-turbo)
+	set(MTS_LIBJPEG_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_LIBJPEG_DIR}/interface)
+	ExternalProject_Add(libjpeg
+		PREFIX ${MTS_LIBJPEG_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_LIBJPEG_DIR} INSTALL_DIR ${MTS_LIBJPEG_INSTALL_DIR}
+		CMAKE_ARGS -DENABLE_SHARED=OFF -DWITH_SIMD=OFF -DWITH_TURBOJPEG=OFF -DCMAKE_INSTALL_PREFIX=${MTS_LIBJPEG_INSTALL_DIR}
+		BUILD_COMMAND ${CMAKE_COMMAND} --build . --target jpeg-static --config $<CONFIG>
+		)
+	set_property(TARGET libjpeg PROPERTY FOLDER external)
+	
+	set(JPEG_FOUND TRUE)
+	set(JPEG_INCLUDE_DIR ${MTS_LIBJPEG_INSTALL_DIR}/include)
+	if (NOT MSVC)
+		set(JPEG_LIBRARY ${MTS_LIBJPEG_INSTALL_DIR}/lib/libjpeg)
+	else ()
+		set(JPEG_LIBRARY ${MTS_LIBJPEG_INSTALL_DIR}/lib/jpeg-static.lib)
+	endif ()
+	set(JPEG_LIBRARIES ${JPEG_LIBRARY})
+endif ()
+
+find_package(ZLIB 1.2)
+if (NOT ZLIB_FOUND)
+	set(MTS_ZLIB_DIR external/zlib)
+	set(MTS_ZLIB_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_ZLIB_DIR}/interface)
+	ExternalProject_Add(zlib
+		PREFIX ${MTS_ZLIB_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_ZLIB_DIR} INSTALL_DIR ${MTS_ZLIB_INSTALL_DIR}
+		CMAKE_ARGS -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=${MTS_ZLIB_INSTALL_DIR}
+		)
+	set_property(TARGET zlib PROPERTY FOLDER external)
+	
+	set(ZLIB_FOUND TRUE)
+	set(ZLIB_ROOT ${MTS_ZLIB_INSTALL_DIR})
+	set(ZLIB_INCLUDE_DIRS ${MTS_ZLIB_INSTALL_DIR}/include)
+	if (UNIX)
+		set(ZLIB_LIBRARY ${MTS_ZLIB_INSTALL_DIR}/lib/libz)
+	else ()
+		set(ZLIB_LIBRARY ${MTS_ZLIB_INSTALL_DIR}/lib/zlibstatic.lib)
+	endif ()
+	set(ZLIB_LIBRARIES ${ZLIB_LIBRARY})
+endif ()
+
+find_package(PNG 1.2)
+if (NOT PNG_FOUND)
+	set(MTS_PNG_DIR external/libpng)
+	set(MTS_PNG_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_PNG_DIR}/interface)
+	ExternalProject_Add(libpng
+		PREFIX ${MTS_PNG_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_PNG_DIR} INSTALL_DIR ${MTS_PNG_INSTALL_DIR}
+		CMAKE_ARGS -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${MTS_PNG_INSTALL_DIR}
+		-DZLIB_ROOT=${ZLIB_ROOT}
+		) # not working: CMAKE_CACHE_ARGS -DPNGLIB_NAME:string=libpng
+	set_property(TARGET libpng PROPERTY FOLDER external)
+	
+	set(PNG_FOUND TRUE)
+	set(PNG_INCLUDE_DIR ${MTS_PNG_INSTALL_DIR}/include)
+	if (NOT MSVC)
+		set(PNG_LIBRARY ${MTS_PNG_INSTALL_DIR}/lib/libpng16)
+	else ()
+		set(PNG_LIBRARY ${MTS_PNG_INSTALL_DIR}/lib/libpng16_static.lib)
+	endif ()
+	set(PNG_LIBRARIES ${PNG_LIBRARY})
+	set(PNG_DEFINITIONS -DPNG_STATIC)
+endif ()
+
 add_definitions(${PNG_DEFINITIONS})
 
-#find_package(IlmBase)
-#find_package(OpenEXR)
-if (OPENEXR_FOUND AND WIN32)
-  set(CMAKE_REQUIRED_INCLUDES ${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
-  set(CMAKE_REQUIRED_LIBRARIES ${ILMBASE_LIBRARIES} ${OPENEXR_LIBRARIES})
+find_package(IlmBase)
+if (NOT ILMBASE_FOUND)
+	set(MTS_ILMBASE_DIR external/openexr/IlmBase)
+	set(MTS_ILMBASE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/openexr)
+	set(MTS_ILMBASE_INSTALL_DIR ${MTS_ILMBASE_SOURCE_DIR}/interface)
+	ExternalProject_Add(ilmbase
+		PREFIX ${MTS_ILMBASE_DIR} SOURCE_DIR ${MTS_ILMBASE_SOURCE_DIR} INSTALL_DIR ${MTS_ILMBASE_INSTALL_DIR}
+		CMAKE_ARGS -DOPENEXR_BUILD_STATIC=ON -DOPENEXR_BUILD_SHARED=OFF
+		-DOPENEXR_BUILD_ILMBASE=ON -DOPENEXR_BUILD_OPENEXR=OFF
+		-DOPENEXR_BUILD_PYTHON_LIBS=OFF -DOPENEXR_BUILD_TESTS=OFF -DOPENEXR_BUILD_UTILS=OFF
+		-DOPENEXR_NAMESPACE_VERSIONING=OFF
+		-DCMAKE_INSTALL_PREFIX=${MTS_ILMBASE_INSTALL_DIR}
+		)
+	set_property(TARGET ilmbase PROPERTY FOLDER external)
+	
+	set(ILMBASE_FOUND TRUE)
+	set(ILMBASE_INCLUDE_DIRS ${MTS_ILMBASE_INSTALL_DIR}/include ${MTS_ILMBASE_INSTALL_DIR}/include/OpenEXR)
+	if (UNIX)
+		set(ILMBASE_LIBRARY ${MTS_ILMBASE_INSTALL_DIR}/lib/libHalf_s)
+	else ()
+		set(ILMBASE_LIBRARY ${MTS_ILMBASE_INSTALL_DIR}/lib/Half_s.lib)
+	endif ()
+	set(ILMBASE_LIBRARIES ${ILMBASE_LIBRARY})
+endif ()
 
-  CHECK_CXX_SOURCE_COMPILES("
-#define OPENEXR_DLL
-#include <OpenEXR/half.h>
-#include <OpenEXR/ImfRgbaFile.h>
-int main(int argc, char **argv) {
-    half x = 1.5f;
-    Imf::RgbaInputFile file(static_cast<const char*>(0));
-    file.readPixels(0,0);
-    return x > 0 ? 0 : 1;
-}
-" OPENEXR_IS_DLL)
+find_package(OpenEXR)
+if (NOT OPENEXR_FOUND)
+	set(MTS_OPENEXR_DIR external/openexr/OpenEXR)
+	set(MTS_OPENEXR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/openexr)
+	set(MTS_OPENEXR_INSTALL_DIR ${MTS_ILMBASE_SOURCE_DIR}/interface)
+	ExternalProject_Add(openexr
+		PREFIX ${MTS_OPENEXR_DIR} SOURCE_DIR ${MTS_OPENEXR_SOURCE_DIR} INSTALL_DIR ${MTS_OPENEXR_INSTALL_DIR}
+		CMAKE_ARGS -DOPENEXR_BUILD_STATIC=ON -DOPENEXR_BUILD_SHARED=OFF
+		-OPENEXR_BUILD_ILMBASE=OFF -DOPENEXR_BUILD_OPENEXR=ON
+		-DOPENEXR_BUILD_PYTHON_LIBS=OFF -DOPENEXR_BUILD_TESTS=OFF -DOPENEXR_BUILD_UTILS=OFF
+		-DOPENEXR_NAMESPACE_VERSIONING=OFF
+		-DZLIB_ROOT=${ZLIB_ROOT}
+		-DCMAKE_INSTALL_PREFIX=${MTS_OPENEXR_INSTALL_DIR}
+		)
+	set_property(TARGET openexr PROPERTY FOLDER external)
+	
+	set(OPENEXR_FOUND TRUE)
+	set(OPENEXR_INCLUDE_DIRS ${MTS_OPENEXR_INSTALL_DIR}/include)
+	if (UNIX)
+		set(OPENEXR_LIBRARY ${MTS_OPENEXR_INSTALL_DIR}/lib/libIlmImf_s)
+		set(OPENEXR_LIBRARIES ${OPENEXR_LIBRARY})
+		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/libIex_s)
+		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/libIlmThread_s)
+	else ()
+		set(OPENEXR_LIBRARY ${MTS_OPENEXR_INSTALL_DIR}/lib/IlmImf_s.lib)
+		set(OPENEXR_LIBRARIES ${OPENEXR_LIBRARY})
+		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/Iex_s.lib)
+		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/IlmThread_s.lib)
+	endif ()
+else ()
+	if (WIN32)
+	  set(CMAKE_REQUIRED_INCLUDES ${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
+	  set(CMAKE_REQUIRED_LIBRARIES ${ILMBASE_LIBRARIES} ${OPENEXR_LIBRARIES})
 
-  unset (CMAKE_REQUIRED_INCLUDES)
-  unset (CMAKE_REQUIRED_LIBRARIES)
-  
-  if (OPENEXR_IS_DLL)
-    add_definitions(-DOPENEXR_DLL)
-  endif()
+	  CHECK_CXX_SOURCE_COMPILES("
+	#define OPENEXR_DLL
+	#include <OpenEXR/half.h>
+	#include <OpenEXR/ImfRgbaFile.h>
+	int main(int argc, char **argv) {
+		half x = 1.5f;
+		Imf::RgbaInputFile file(static_cast<const char*>(0));
+		file.readPixels(0,0);
+		return x > 0 ? 0 : 1;
+	}
+	" OPENEXR_IS_DLL)
+
+	  unset (CMAKE_REQUIRED_INCLUDES)
+	  unset (CMAKE_REQUIRED_LIBRARIES)
+	  
+	  if (OPENEXR_IS_DLL)
+		add_definitions(-DOPENEXR_DLL)
+	  endif()
+	endif()
 endif()
 
 # XERCES_ROOT_DIR
-#find_package(Xerces 3.0 REQUIRED)
-
+find_package(Xerces 3.0)
+if (NOT XERCES_FOUND)
+	set(MTS_XERCES_DIR external/xerces-c)
+	set(MTS_XERCES_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_XERCES_DIR}/interface)
+	ExternalProject_Add(xerces
+		PREFIX ${MTS_XERCES_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_XERCES_DIR} INSTALL_DIR ${MTS_XERCES_INSTALL_DIR}
+		CMAKE_ARGS -DBUILD_SHARED_LIBS=FALSE -DCMAKE_INSTALL_PREFIX=${MTS_XERCES_INSTALL_DIR}
+		BUILD_COMMAND ${CMAKE_COMMAND} --build src --target xerces-c --config $<CONFIG>
+		INSTALL_COMMAND ${CMAKE_COMMAND} --build src --target install --config $<CONFIG>
+		)
+	set_property(TARGET xerces PROPERTY FOLDER external)
+	
+	set(XERCES_FOUND TRUE)
+	set(XERCES_INCLUDE_DIRS ${MTS_XERCES_INSTALL_DIR}/include)
+	if (NOT MSVC)
+		set(XERCES_LIBRARY ${MTS_XERCES_INSTALL_DIR}/lib/libxerces-c_3_2)
+	else ()
+		set(XERCES_LIBRARY ${MTS_XERCES_INSTALL_DIR}/lib/xerces-c_3.lib)
+	endif ()
+	set(XERCES_LIBRARIES ${XERCES_LIBRARY})
+	set(XERCES_DEFINITIONS -DXERCES_STATIC)
+endif ()
 
 # ColladaDOM (optional)
+if (MTS_ENABLE_COLLADA)
+
 find_package(COLLADA)
 if (COLLADA_FOUND)
   add_definitions(-DMTS_HAS_COLLADA=1)
 endif()
 
+endif()
 
 # FFTW3 (optional)
 find_package(FFTW3)
@@ -220,6 +361,8 @@ if (MTS_FFTW)
   add_definitions(-DMTS_HAS_FFTW=1)
 endif()
 
+set (MTS_HAS_HW FALSE)
+if (MTS_ENABLE_HW_PREVIEW)
 
 find_package(OpenGL REQUIRED)
 set (GLEW_MX ON)
@@ -249,6 +392,9 @@ int main (int argc, char **argv) {
   if (NOT GLEW_VERSION_IS_OK)
 	  #    message (SEND_ERROR "The version of GLEW seems to be outdated!") XXX
   endif ()
+endif ()
+
+set (MTS_HAS_HW ${GLEW_FOUND})
 endif ()
 
 # Try to get OpenMP support
@@ -305,7 +451,7 @@ endif ()
 include_directories(${Boost_INCLUDE_DIRS} ${Eigen_INCLUDE_DIR})
 
 # If we are using the system OpenEXR, add its headers which half.h requires
-if (OPENEXR_FOUND)
+if (ILMBASE_FOUND)
   include_directories(${ILMBASE_INCLUDE_DIRS})
 endif()
 
@@ -318,4 +464,7 @@ if (JPEG_FOUND)
 endif()
 if (OPENEXR_FOUND)
   add_definitions(-DMTS_HAS_OPENEXR=1)
+endif()
+if (MTS_HAS_HW)
+  add_definitions(-DMTS_HAS_HW=1)
 endif()

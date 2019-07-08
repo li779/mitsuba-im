@@ -25,6 +25,10 @@
 	#define BOOST_STATIC_ASSERT(x) static_assert((x), #x "static assertion failed (formerly boost)")
 #endif
 
+#if defined(__MSVC__)
+#	include <intrin.h> // _rdtsc
+#endif
+
 MTS_NAMESPACE_BEGIN
 
 /*! \addtogroup libcore
@@ -64,10 +68,9 @@ extern MTS_EXPORT_CORE std::string timeString(Float time, bool precise = false);
 /// Turn a memory size into a human-readable string
 extern MTS_EXPORT_CORE std::string memString(size_t size, bool precise = false);
 
-/// Converts string to lower chars
+extern MTS_EXPORT_CORE bool starts_with(std::string const& s, char const* c);
+extern MTS_EXPORT_CORE bool ends_with(std::string const& s, char const* c);
 extern MTS_EXPORT_CORE std::string to_lower_copy(std::string const& s);
-
-/// Converts string to upper chars
 extern MTS_EXPORT_CORE std::string to_upper_copy(std::string const& s);
 
 /// Return a string representation of a list of objects
@@ -218,7 +221,6 @@ static FINLINE uint64_t rdtsc(void) {
 }
 #endif
 #elif defined(__MSVC__)
-#include <intrin.h>
 static FINLINE __int64 rdtsc(void) {
 	return __rdtsc();
 }

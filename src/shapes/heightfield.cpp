@@ -132,8 +132,8 @@ public:
 		m_flipNormals = props.getBoolean("flipNormals", false);
 		m_scale = props.getFloat("scale", 1);
 
-		m_filename = props.getString("filename", "");
-		if (!m_filename.empty())
+		m_filename = fs::pathstr(props.getString("filename", ""));
+		if (!m_filename.s.empty())
 			m_filename = Thread::getThread()->getFileResolver()->resolve(m_filename);
 	}
 
@@ -144,7 +144,7 @@ public:
 		m_shadingNormals = stream->readBool();
 		m_flipNormals = stream->readBool();
 		m_scale = stream->readFloat();
-		m_filename = stream->readString();
+		m_filename = fs::pathstr(stream->readString());
 		m_dataSize = Vector2i(stream);
 		size_t size = (size_t) m_dataSize.x * (size_t) m_dataSize.y;
 		m_data = (Float *) allocAligned(size * sizeof(Float));
@@ -174,7 +174,7 @@ public:
 		stream->writeBool(m_shadingNormals);
 		stream->writeBool(m_flipNormals);
 		stream->writeFloat(m_scale);
-		stream->writeString(m_filename.string());
+		stream->writeString(m_filename.s);
 		m_dataSize.serialize(stream);
 		stream->writeFloatArray(m_data, (size_t) m_dataSize.x * (size_t) m_dataSize.y);
 	}
@@ -497,7 +497,7 @@ public:
 		if (m_minmax)
 			return;
 
-		if (!m_filename.empty()) {
+		if (!m_filename.s.empty()) {
 			if (m_bitmap.get())
 				Log(EError, "Cannot specify a file name and a nested texture at the same time!");
 			ref<FileStream> fs = new FileStream(m_filename, FileStream::EReadOnly);
@@ -753,7 +753,7 @@ private:
 	bool m_shadingNormals;
 	bool m_flipNormals;
 	Float m_scale;
-	fs::path m_filename;
+	fs::pathstr m_filename;
 
 	/* Height field data */
 	Float *m_data;

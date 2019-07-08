@@ -1,7 +1,10 @@
 #include <mitsuba/core/track.h>
 #include <mitsuba/core/aabb.h>
+
+#ifdef HAS_EIGEN
 #include <Eigen/SVD>
 #include <Eigen/Geometry>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -324,10 +327,6 @@ void AnimatedTransform::TransformFunctor::operator()(const Float &t, Transform &
 }
 
 void AnimatedTransform::appendTransform(Float time, const Transform &trafo) {
-	/* Compute the polar decomposition and insert into the animated transform;
-	   uh oh.. we have to get rid of the two separate matrix libraries at some point :) */
-	typedef Eigen::Matrix<Float, 3, 3> EMatrix;
-
 	if (m_tracks.size() == 0) {
 		ref<VectorTrack> translation = new VectorTrack(VectorTrack::ETranslationXYZ);
 		ref<QuatTrack> rotation = new QuatTrack(VectorTrack::ERotationQuat);
@@ -346,6 +345,11 @@ void AnimatedTransform::appendTransform(Float time, const Transform &trafo) {
 	}
 
 	const Matrix4x4 m = trafo.getMatrix();
+#ifdef HAS_EIGEN
+	/* Compute the polar decomposition and insert into the animated transform;
+	uh oh.. we have to get rid of the two separate matrix libraries at some point :) */
+	typedef Eigen::Matrix<Float, 3, 3> EMatrix;
+
 	EMatrix A;
 
 	A << m(0, 0), m(0, 1), m(0, 2),
@@ -361,6 +365,33 @@ void AnimatedTransform::appendTransform(Float time, const Transform &trafo) {
 	if (Q.determinant() < 0) {
 		Q = -Q; P = -P;
 	}
+#else
+	Vector3 look = Vector3(m(0, 2), m(1, 2), m(2, 2));
+	Vector3 up = Vector3(m(0, 1), m(1, 1), m(2, 1));
+	Vector3 right = Vector3(m(0, 0), m(1, 0), m(2, 0));
+
+	Vector3 nlook = normalize(look);
+	Vector3 nright = normalize(cross(up, nlook));
+	Vector3 nup = normalize(cross(nlook, nright));
+
+	Matrix3x3 Q(nright, nup, nlook);
+
+	Matrix3x3 A(m(0, 0), m(0, 1), m(0, 2),
+		m(1, 0), m(1, 1), m(1, 2),
+		m(2, 0), m(2, 1), m(2, 2));
+	Matrix3x3 P;
+	Q.transpose(P);
+	P = P * A;
+
+	for (int i = 0; i < 3; ++i) {
+		float s = 0;
+		for (int j = 0; j < 3; ++j) {
+			s += P(i, j);
+			P(i, j) = 0;
+		}
+		P(i, i) = s;
+	}
+#endif
 
 	VectorTrack *translation = (VectorTrack *) m_tracks[0];
 	QuatTrack *rotation = (QuatTrack *) m_tracks[1];

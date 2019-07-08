@@ -17,8 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
-#include <mitsuba/render/texture.h>
+#include <mitsuba/core/pmf.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/gpuprogram.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -311,7 +313,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -322,6 +326,7 @@ private:
 	DiscreteDistribution m_pdf;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class MixtureBSDFShader : public Shader {
@@ -437,6 +442,7 @@ Shader *MixtureBSDF::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(MixtureBSDFShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(MixtureBSDF, false, BSDF)
 MTS_EXPORT_PLUGIN(MixtureBSDF, "Mixture BSDF")
 MTS_NAMESPACE_END
