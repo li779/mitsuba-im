@@ -19,9 +19,25 @@ Mitsuba IM is a fork of the comprehensive physically-based renderer mitsuba (htt
 Note: This is a preview release
 ===============================
 
+## Building
+
+Requires git, CMake, and a compiler with C++17 support (sorry, but at least frees you from boost binaries).
+
+Tested on Ubuntu w/ GCC 7 and on Windows w/ MSVC 2017. You might need to install a GCC 7 package manually.
+
+````
+$ git clone https://github.com/tszirr/mitsuba-im --recursive
+$ mkdir mitsuba-im/projects
+$ cd mitsuba-im/projects
+$ cmake ..
+(On Windows replace by: $ cmake .. -Ax64)
+$ make
+$ cd ..
+$ ln -s projects/binaries/im-mts
+````
+
 ## Known Issues
 
-* Build order for submodules not specified yet, building for the first time might require multiple tries until all linker dependencies can be resolved!
 * Wrapper for responsive PSSMLT preview still missing (coming soon!)
 * Some utilities not ported to standard C++ w/o boost yet
 * Console tool support for new integrator interfaces still needs to be implemented (coming soon!)
