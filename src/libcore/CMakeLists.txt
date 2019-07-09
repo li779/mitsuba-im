@@ -164,6 +164,7 @@ endif()
 add_mts_corelib(mitsuba-core ${MTS_MAIN_HEADER} ${HDRS} ${SRCS}
   LINK_LIBRARIES ${LIBS})
 add_dependencies(mitsuba-core ior_database microfacet_data)
+add_dependencies(mitsuba-core xerces zlib libpng libjpeg ilmbase openexr)
 
 mts_install_headers (${MTS_MAIN_HEADER} FOLDER "mitsuba")
 mts_install_headers (${HDRS} FOLDER "mitsuba/core")

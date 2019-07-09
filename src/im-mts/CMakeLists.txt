@@ -30,6 +30,7 @@ include_directories(${SDL_INCLUDE_DIRS} ../../external/imgui ../../external/tiny
 add_mts_exe(im-mts  ${SRCS} ${HDRS} 
   RES_DESCRIPTION "Mitsuba immediate-mode UI"
   LINK_LIBRARIES ${SDL_LIBRARIES} ${OPENGL_LIBRARIES})
+add_dependencies(im-mts sdl)
 
 add_custom_command(
   TARGET im-mts

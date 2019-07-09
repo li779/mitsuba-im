@@ -104,5 +104,6 @@ add_mts_corelib(mitsuba-render ${HDRS} ${SRCS} LINK_LIBRARIES
   mitsuba-core ${XERCES_LIBRARIES})
 # Make sure the schema is where expected by the scene handler
 add_dependencies(mitsuba-render scene_schema)
+add_dependencies(mitsuba-render xerces zlib libpng libjpeg ilmbase openexr)
 
 mts_install_headers (${HDRS} FOLDER "mitsuba/render")
