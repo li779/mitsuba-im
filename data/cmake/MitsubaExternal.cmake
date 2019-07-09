@@ -171,7 +171,7 @@ endif ()
 
 include (ExternalProject)
 
-#find_package(Eigen 3.0 REQUIRED)
+find_package(Eigen 3.0)
 
 find_package(JPEG 6)
 if (NOT JPEG_FOUND)
@@ -486,7 +486,12 @@ endif ()
 
 
 # Includes for the common libraries
-include_directories(${Boost_INCLUDE_DIRS} ${Eigen_INCLUDE_DIR})
+include_directories(${Boost_INCLUDE_DIRS})
+
+if (EIGEN_FOUND)
+  add_definitions(-DHAS_EIGEN=1)
+  include_directories(${Eigen_INCLUDE_DIR})
+endif()
 
 # If we are using the system OpenEXR, add its headers which half.h requires
 if (ILMBASE_FOUND)
@@ -503,6 +508,7 @@ endif()
 if (OPENEXR_FOUND)
   add_definitions(-DMTS_HAS_OPENEXR=1)
 endif()
+
 if (MTS_HAS_HW)
   add_definitions(-DMTS_HAS_HW=1)
 endif()

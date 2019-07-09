@@ -16,6 +16,9 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// manifold mutation requires eigen for now ...
+#ifdef HAS_EIGEN
+
 #include <mitsuba/bidir/mut_manifold.h>
 #include <mitsuba/bidir/manifold.h>
 #include <mitsuba/core/statistics.h>
@@ -768,3 +771,5 @@ void ManifoldPerturbation::accept(const MutationRecord &muRec) {
 
 MTS_IMPLEMENT_CLASS(ManifoldPerturbation, false, Mutator)
 MTS_NAMESPACE_END
+
+#endif

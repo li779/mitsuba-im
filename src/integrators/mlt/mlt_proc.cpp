@@ -20,7 +20,10 @@
 #include <mitsuba/bidir/mut_lens.h>
 #include <mitsuba/bidir/mut_caustic.h>
 #include <mitsuba/bidir/mut_mchain.h>
+// manifold mutation requires eigen for now ...
+#ifdef HAS_EIGEN
 #include <mitsuba/bidir/mut_manifold.h>
+#endif
 #include <mitsuba/bidir/util.h>
 #include <mitsuba/render/integrator2.h>
 #include "mlt_proc.h"
@@ -126,8 +129,12 @@ public:
 				minJump, coveredArea));
 
 		if (m_config.manifoldPerturbation)
+#ifdef HAS_EIGEN
 			m_mutators.push_back(new ManifoldPerturbation(m_scene, m_sampler, *m_pool,
 				m_config.probFactor, true, true));
+#else
+			Log(EError, "Manifold mutation requires compilation with eigen math library.");
+#endif
 
 		if (m_mutators.size() == 0)
 			Log(EError, "There must be at least one mutator!");

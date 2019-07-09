@@ -16,16 +16,18 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// manifold mutation requires eigen for now ...
+#ifdef HAS_EIGEN
+
 #include <mitsuba/bidir/manifold.h>
 #include <mitsuba/bidir/path.h>
 #include <mitsuba/core/statistics.h>
 
-#ifdef HAS_EIGEN
+
 #define EIGEN_DONT_PARALLELIZE
 #define EIGEN_NO_DEBUG
 #include <Eigen/LU>
 #include <Eigen/Geometry>
-#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -822,7 +824,6 @@ Float SpecularManifold::det(const Path &path, int a, int b, int c) {
 
 		return std::abs(1 / det);
 	} else {
-#ifdef HAS_EIGEN
 		/* The chain contains both glossy and specular materials. Compute the
 		   determinant of A^-1, where rows corresponding to specular vertices
 		   have been crossed out. The performance of the following is probably
@@ -869,10 +870,6 @@ Float SpecularManifold::det(const Path &path, int a, int b, int c) {
 		}
 
 		return std::abs(Ai.determinant());
-#else
-		assert(false);
-		return 0; // only glossy supported for now ;)
-#endif
 	}
 }
 
@@ -1006,3 +1003,5 @@ std::string SpecularManifold::toString() const {
 
 MTS_IMPLEMENT_CLASS(SpecularManifold, false, Object)
 MTS_NAMESPACE_END
+
+#endif
