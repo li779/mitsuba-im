@@ -475,6 +475,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		session->run();
 	}
 
+	bool show_ui = true;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 	clear_color = ImVec4(0.09f, 0.11f, 0.12f, 1.00f);
 	float exposure = 1;
@@ -584,7 +585,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 
 		Session* selectedSession = nullptr;
 		std::unique_ptr<Document> addedDoc;
-		for (int sceneIdx = 0; sceneIdx < int(session && !session->scenes.empty() ? session->scenes.size() : 1); ++sceneIdx) {
+		for (int sceneIdx = 0; sceneIdx < int(session && !session->scenes.empty() ? session->scenes.size() : 1) && show_ui; ++sceneIdx) {
 			Document* document = session && sceneIdx < (int) session->scenes.size() ? session->scenes[sceneIdx].get() : nullptr;
 			
 			if (sceneIdx) {
@@ -724,6 +725,8 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 					document->configurator.reset();
 			}
 		}
+		if (!io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_PERIOD] && !io.KeysDownDuration[SDL_SCANCODE_PERIOD])
+			show_ui = !show_ui;
 
 		// Rendering
 		ImGui::Render();
