@@ -26,7 +26,7 @@
 #include <mitsuba/core/sched_remote.h>
 #include <mitsuba/core/sstream.h>
 #include <mitsuba/core/sshstream.h>
-#ifdef HAS_EIGEN
+#ifdef MTS_HAS_SHVECTOR
 #include <mitsuba/core/shvector.h>
 #endif
 #include <mitsuba/core/statistics.h>
@@ -401,7 +401,7 @@ int mts_main(int argc, char **argv) {
 	Spectrum::staticInitialization();
 	Bitmap::staticInitialization();
 	Scheduler::staticInitialization();
-#ifdef HAS_EIGEN
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticInitialization();
 #endif
 	SceneHandler::staticInitialization();
@@ -424,7 +424,7 @@ int mts_main(int argc, char **argv) {
 
 	/* Shutdown the core framework */
 	SceneHandler::staticShutdown();
-#ifdef HAS_EIGEN
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticShutdown();
 #endif
 	Scheduler::staticShutdown();

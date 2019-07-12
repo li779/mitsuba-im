@@ -46,3 +46,6 @@
 [submodule "external/tinyfiledialogs"]
 	path = external/tinyfiledialogs
 	url = https://git.code.sf.net/p/tinyfiledialogs/code
+[submodule "external/eigen"]
+	path = external/eigen
+	url = https://github.com/eigenteam/eigen-git-mirror

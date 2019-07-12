@@ -17,7 +17,7 @@
 */
 
 #include <mitsuba/core/platform.h>
-#ifdef HAS_EIGEN
+#ifdef MTS_HAS_SHVECTOR
 #include <mitsuba/core/shvector.h>
 #endif
 #include <mitsuba/core/sched.h>
@@ -125,7 +125,7 @@ int mitsuba_start(int argc, char *argv[]) {
 	Spectrum::staticInitialization();
 	Bitmap::staticInitialization();
 	Scheduler::staticInitialization();
-#ifdef HAS_EIGEN
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticInitialization();
 #endif
 	SceneLoader::staticInitialization();
@@ -234,8 +234,8 @@ void mitsuba_shutdown() {
 
 	/* Shutdown the core framework */
 	SceneLoader::staticShutdown();
-#ifdef HAS_EIGEN
-	SHVector::staticInitialization();
+#ifdef MTS_HAS_SHVECTOR
+	SHVector::staticShutdown();
 #endif
 	Scheduler::staticShutdown();
 	Bitmap::staticShutdown();
