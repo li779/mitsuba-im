@@ -55,13 +55,13 @@ else()
   unset(MTS_DEPS_DIR)
 endif()
 
-
-# Qt4 (optional)
-find_package(Qt4 4.7 COMPONENTS
-  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
-CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
-  "QT4_FOUND" OFF)
- 
+if (MTS_ENABLE_QT) # unsupported for now
+	# Qt4 (optional)
+	find_package(Qt4 4.7 COMPONENTS
+	  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
+	CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
+	  "QT4_FOUND" OFF)
+endif () 
  
 # System threading library, used for custom options
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
