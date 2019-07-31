@@ -73,7 +73,7 @@ namespace impl {
 				bool ui() {
 					// scalar
 					if (components > 0) {
-						return ImGui::DragScalarN(name.c_str(), type, &value, components, type == ImGuiDataType_Double ? .01f : .1f, nullptr, nullptr, nullptr, 3.f);
+						return ImGui::DragScalarN(name.c_str(), type, &value, components, type == ImGuiDataType_Double ? .01f : .1f);
 					}
 					// string
 					if (type == ImGuiDataType_S8) {
