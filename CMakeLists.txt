@@ -1,27 +1,20 @@
 # Experimental CMake file for Mitusba
-# Tested only on Windows and Linux (Ubuntu 10.10)
 cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
 
-# Internal variable to know whether this is the first time CMake runs
-if (NOT DEFINED MTS_CMAKE_INIT)
-  set(MTS_CMAKE_INIT ON CACHE INTERNAL "Is this the initial CMake run?")
-else()
-  set(MTS_CMAKE_INIT OFF CACHE INTERNAL "Is this the initial CMake run?")
-endif()
+# ===== Project setup =====
 
 # Allow to override the default project name "mitsuba"
 if (NOT DEFINED MTS_PROJECT_NAME)
   set(MTS_PROJECT_NAME "mitsuba")
 endif()
+if (NOT DEFINED MTS_TARGET_BINARIES_DIR)
+  set(MTS_TARGET_BINARIES_DIR ${CMAKE_CURRENT_BINARY_DIR}/binaries/$<CONFIG>)
+endif()
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/CMakePCHCompiler")
-project(${MTS_PROJECT_NAME} C CXX CXXPCH)
-
-# Tell cmake where to find the additional modules
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake")
-# Make sure the cmake-provided modules use the versions they expect
-if(NOT CMAKE_VERSION VERSION_LESS "2.8.4")
-  cmake_policy(SET CMP0017 NEW)
+# Set CMAKE_BUILD_TYPE to RelWithDebInfo by default
+if (DEFINED CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
+    "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
 endif()
 
 # Enable folders for projects in Visual Studio
@@ -29,36 +22,47 @@ if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endif()
 
-# Set CMAKE_BUILD_TYPE to RelWithDebInfo by default
-if (MTS_CMAKE_INIT AND DEFINED CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
-    "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
-endif()
+# Pre-compiled header support
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/CMakePCHCompiler")
 
-# Load the required modules
-include (MitsubaUtil)
-include (MtsGetVersionInfo)
-include (CheckCXXSourceCompiles)
+project(${MTS_PROJECT_NAME} C CXX CXXPCH)
+
+# ===== Build configuration =====
+
 include (CMakeDependentOption)
+include (CMakeParseArguments)
+include (CheckCXXSourceCompiles)
+ 
+# Tell cmake where to find the additional modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake")
+# Make sure the cmake-provided modules use the versions they expect
+cmake_policy(SET CMP0017 NEW)
+# Allow for quoted macro variable checks :-////
+cmake_policy(SET CMP0054 NEW)
 
+include (MtsGetVersionInfo)
 # Read the version information
 MTS_GET_VERSION_INFO()
 if (MTS_HAS_VALID_REV)
-  message(STATUS "mitsuba ${MTS_VERSION}-hg${MTS_REV_ID} (${MTS_DATE})")
+  message(STATUS "mitsuba ${MTS_VERSION}-git${MTS_REV_ID} (${MTS_DATE})")
 else()
   message(STATUS "mitsuba ${MTS_VERSION} (${MTS_DATE})")
 endif()
 
-# Setup the build options
+# By default, keep module code separate to simplify debugging
+cmake_policy(SET CMP0069 OLD)
+
+include (MitsubaUtil)
 include (MitsubaBuildOptions)
 
-# Find the external libraries and setup the paths
-include (MitsubaExternal)
+# ===== 3rd party dependencies =====
+
+include(MitsubaExternal)
+
+# ===== Prerequisite resources =====
 
 # Main mitsuba include directory
 include_directories("include")
-
-# ===== Prerequisite resources =====
 
 # Process the XML schemas
 add_subdirectory(data/schema)
@@ -66,7 +70,6 @@ add_subdirectory(data/schema)
 add_subdirectory(data/ior)
 # Microfacet precomputed data
 add_subdirectory(data/microfacet)
-
 
 # ===== Build the support libraries ====
 

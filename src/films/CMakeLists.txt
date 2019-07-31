@@ -14,5 +14,5 @@ add_film(hdrfilm hdrfilm.cpp annotations.h banner.h)
 
 if (OPENEXR_FOUND)
   include_directories(${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
-  add_film(tiledhdrfilm tiledhdrfilm.cpp)
+  add_film(tiledhdrfilm tiledhdrfilm.cpp LINK_LIBRARIES ${OPENEXR_LIBRARIES})
 endif()

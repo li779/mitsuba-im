@@ -86,7 +86,7 @@ namespace impl {
 		}
 
 		bool upToDate(double const volatile dataSamples[], int maxN) const override {
-			assert(maxN <= (int) dataSamples.size());
+			assert(maxN <= (int) samples.size());
 			for (int i = 0; i < maxN; ++i) {
 				double dataSpp = dataSamples[i];
 				if (dataSpp && (currentBasetime > (volatile unsigned long long&) stamps[i / workersPerTarget] || dataSpp != (volatile double&) samples[i]))
@@ -133,7 +133,7 @@ namespace impl {
 				this->glBindFramebuffer = (PFNGLBINDFRAMEBUFFEREXTPROC) SDL_GL_GetProcAddress("glBindFramebufferEXT");
 				if (glBindFramebuffer) {
 					PFNGLGENFRAMEBUFFERSPROC glGenFramebuffers = (PFNGLGENFRAMEBUFFERSEXTPROC) SDL_GL_GetProcAddress("glGenFramebuffersEXT");
-					assert(glGenFramebuffersEXT);
+					assert(glGenFramebuffers);
 					glGenFramebuffers(1, &fbo);
 					assert(glBindFramebuffer);
 					glBindFramebuffer(GL_FRAMEBUFFER_EXT, fbo);

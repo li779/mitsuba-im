@@ -34,20 +34,20 @@
 #if defined(_MSC_VER)
 #pragma warning(disable : 4231) // nonstandard extension used : 'extern' before template explicit instantiation
 #endif
-#include <ImfInputFile.h>
-#include <ImfStandardAttributes.h>
-#include <ImfRgbaYca.h>
-#include <ImfOutputFile.h>
-#include <ImfChannelList.h>
-#include <ImfStringAttribute.h>
-#include <ImfIntAttribute.h>
-#include <ImfFloatAttribute.h>
-#include <ImfDoubleAttribute.h>
-#include <ImfVecAttribute.h>
-#include <ImfMatrixAttribute.h>
-#include <ImfVersion.h>
-#include <ImfIO.h>
-#include <ImathBox.h>
+#include <OpenEXR/ImfInputFile.h>
+#include <OpenEXR/ImfStandardAttributes.h>
+#include <OpenEXR/ImfRgbaYca.h>
+#include <OpenEXR/ImfOutputFile.h>
+#include <OpenEXR/ImfChannelList.h>
+#include <OpenEXR/ImfStringAttribute.h>
+#include <OpenEXR/ImfIntAttribute.h>
+#include <OpenEXR/ImfFloatAttribute.h>
+#include <OpenEXR/ImfDoubleAttribute.h>
+#include <OpenEXR/ImfVecAttribute.h>
+#include <OpenEXR/ImfMatrixAttribute.h>
+#include <OpenEXR/ImfVersion.h>
+#include <OpenEXR/ImfIO.h>
+#include <OpenEXR/ImathBox.h>
 #endif
 
 #if defined(MTS_HAS_LIBPNG)

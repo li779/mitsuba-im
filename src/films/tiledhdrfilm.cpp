@@ -26,11 +26,11 @@
 #pragma warning(disable : 4231) // nonstandard extension used : 'extern' before template explicit instantiation
 #endif
 
-#include <ImfTiledOutputFile.h>
-#include <ImfChannelList.h>
-#include <ImfStringAttribute.h>
-#include <ImfFrameBuffer.h>
-#include <ImfStandardAttributes.h>
+#include <OpenEXR/ImfTiledOutputFile.h>
+#include <OpenEXR/ImfChannelList.h>
+#include <OpenEXR/ImfStringAttribute.h>
+#include <OpenEXR/ImfFrameBuffer.h>
+#include <OpenEXR/ImfStandardAttributes.h>
 
 MTS_NAMESPACE_BEGIN
 

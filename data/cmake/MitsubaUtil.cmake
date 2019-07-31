@@ -1,9 +1,6 @@
 # Macros to build the mitsuba targets. They are to be used by the CMake scripts
 # only, otherwise they don't make any sense at all.
 
-include (CMakeParseArguments)
-include (CMakeDependentOption)
-
 # Function to check that the assumed configurations exist
 function (mts_check_configurations)
   if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -38,13 +35,10 @@ function (mts_check_configurations)
   endforeach ()
 endfunction()
 
-# Check the standard configurations
-# NO Debug! Does not work under windows as dependencies do not include debug libraries
-mts_check_configurations (Release MinSizeRel RelWithDebInfo)
 
 
 # Option to enable interprocedural optimizations
-option(MTS_LTCG "Enable interprocedural optimizations on Release targets" ON)
+option(MTS_LTCG "Enable interprocedural optimizations on Release targets" OFF)
 mark_as_advanced (MTS_LTCG)
 
 # Macro to enable interprocedural optimizations on a target
@@ -81,27 +75,6 @@ CMAKE_DEPENDENT_OPTION (MTS_USE_PCH_ALL_PLUGINS
   
 # Default project-wide header to be precompiled
 set (MTS_DEFAULT_PCH "${PROJECT_SOURCE_DIR}/data/pch/mitsuba_precompiled.hpp")
-
-
-
-# Function to configure the output path according to the configurations
-# The output path configure expression, contained in "path_cfgstr" should
-# have the placeholder @CFGNAME@ for proper substitution
-function (SET_OUTPATH_CFG target_name property_suffix path_cfgstr)
-  if (CMAKE_CONFIGURATION_TYPES)
-    foreach (CFGNAME ${CMAKE_CONFIGURATION_TYPES})
-      string (TOUPPER ${CFGNAME} cfg_upper)
-      string (CONFIGURE "${path_cfgstr}" outpath @ONLY)
-      set_target_properties (${target_name} PROPERTIES
-        ${property_suffix}_${cfg_upper} "${outpath}")
-    endforeach ()
-  else ()
-    set (CFGNAME ".")
-    string (CONFIGURE "${path_cfgstr}" outpath @ONLY)
-    set_target_properties (${target_name} PROPERTIES
-        ${property_suffix} "${outpath}")
-  endif ()
-endfunction ()
 
 
 
@@ -217,7 +190,11 @@ macro (add_mts_corelib _corelib_name)
   if (MTS_USE_PCH)
     target_precompiled_header(${_corelib_name} "${MTS_DEFAULT_PCH}")
   endif ()
-  target_link_libraries (${_corelib_name} ${_corelib_LINK_LIBRARIES})
+  set (_corelib_link_propagation PUBLIC)
+  if (WIN32)
+    set (_corelib_link_propagation PRIVATE)
+  endif()
+  target_link_libraries (${_corelib_name} ${_corelib_link_propagation} ${_corelib_LINK_LIBRARIES})
   if (WIN32)
     set_target_properties (${_corelib_name} PROPERTIES 
       PREFIX "lib"
@@ -228,9 +205,8 @@ macro (add_mts_corelib _corelib_name)
   else ()
     set (_corelib_property_suffix "LIBRARY_OUTPUT_DIRECTORY")
   endif ()
-  SET_OUTPATH_CFG (${_corelib_name} ${_corelib_property_suffix}
-    "${PROJECT_BINARY_DIR}/binaries/@CFGNAME@/${MTS_LIB_DEST}"
-  )
+  set_target_properties (${_corelib_name} PROPERTIES
+        ${_corelib_property_suffix} "${MTS_TARGET_BINARIES_DIR}/${MTS_LIB_DEST}")
   mts_target_ltcg (${_corelib_name})
   mts_msvc_mp (${_corelib_name})
   install(TARGETS ${_corelib_name}
@@ -313,7 +289,7 @@ macro (add_mts_plugin _plugin_name)
   if (_plugin_MTS_BIDIR)
     list(APPEND _plugin_core_libraries "mitsuba-bidir")
   endif()
-  target_link_libraries (${_plugin_name} 
+  target_link_libraries (${_plugin_name} PRIVATE
     ${_plugin_core_libraries} ${_plugin_LINK_LIBRARIES})
   
   set_target_properties (${_plugin_name} PROPERTIES PREFIX "")
@@ -335,9 +311,8 @@ macro (add_mts_plugin _plugin_name)
   set_target_properties (${_plugin_name} PROPERTIES
     FOLDER ${_plugin_FOLDER})
   unset (_plugin_FOLDER)
-  SET_OUTPATH_CFG (${_plugin_name} LIBRARY_OUTPUT_DIRECTORY
-    "${PROJECT_BINARY_DIR}/binaries/@CFGNAME@/${MTS_PLUGIN_DEST}"
-  )
+  set_target_properties (${_plugin_name} PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY "${MTS_TARGET_BINARIES_DIR}/${MTS_PLUGIN_DEST}")
   mts_target_ltcg (${_plugin_name})
   mts_msvc_mp (${_plugin_name})
   install(TARGETS ${_plugin_name}
@@ -435,14 +410,13 @@ macro (add_mts_exe _exe_name)
   if (_exe_MTS_BIDIR)
     list(APPEND _exe_core_libraries "mitsuba-bidir")
   endif()
-  target_link_libraries (${_exe_name} ${_exe_core_libraries} ${_exe_LINK_LIBRARIES})
+  target_link_libraries (${_exe_name} PRIVATE ${_exe_core_libraries} ${_exe_LINK_LIBRARIES})
   if (WIN32)
     set_target_properties (${_exe_name} PROPERTIES VERSION "${MTS_VERSION}")
   endif()
   set_target_properties (${_exe_name} PROPERTIES FOLDER "apps")
-  SET_OUTPATH_CFG (${_exe_name} RUNTIME_OUTPUT_DIRECTORY
-    "${PROJECT_BINARY_DIR}/binaries/@CFGNAME@/${MTS_EXE_DEST}"
-  )
+  set_target_properties (${_exe_name} PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${MTS_TARGET_BINARIES_DIR}/${MTS_EXE_DEST}")
   mts_target_ltcg (${_exe_name})
   mts_msvc_mp (${_exe_name})
   if (NOT _exe_NO_INSTALL)

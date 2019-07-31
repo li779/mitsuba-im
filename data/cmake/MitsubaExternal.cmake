@@ -2,10 +2,6 @@
 #                EXTERNAL LIBRARIES DETECTION                                 #
 ###############################################################################
 
-if (NOT DEFINED MTS_VERSION)
-  message(FATAL_ERROR "This file has to be included from the main build file.")
-endif()
-
 # Set up CMake to use the Mitsuba bundled libraries. Set the variable
 # "MTS_NO_DEPENDENCIES" to a value which evaluates to TRUE to avoid
 # using the Mitsuba dependencies even if they are present.
@@ -50,274 +46,159 @@ export DYLD_FALLBACK_FRAMEWORK_PATH=\"${MTS_DEPS_DIR}/frameworks\":$DYLD_FALLBAC
 export DYLD_FALLBACK_LIBRARY_PATH=\"${MTS_DEPS_DIR}/lib\":$DYLD_FALLBACK_LIBRARY_PATH
 ")
   endif()
+  # Check the standard configurations
+  # NO Debug! Does not work under windows as dependencies do not include debug libraries
+  mts_check_configurations (Release MinSizeRel RelWithDebInfo)
 else()
   set(MTS_DEPENDENCIES OFF)
   unset(MTS_DEPS_DIR)
 endif()
 
-if (MTS_ENABLE_QT) # unsupported for now
-	# Qt4 (optional)
-	find_package(Qt4 4.7 COMPONENTS
-	  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
-	CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
-	  "QT4_FOUND" OFF)
-endif () 
- 
+###########################################################################
+# Embed external projects
+include (ExternalProject)
+set (MTS_EXTERNAL_PROJECT_VARS )
+
+function (build_externals EXTERNALS_NAME DEPENDEES)
+	set (MTS_EXTERNAL_PROJECT_VAR_EXPORT_LIST -DCMAKE_POLICY_DEFAULT_CMP0074=NEW) # don't warn about <Lib>_ROOT
+	file(TO_CMAKE_PATH "${MTS_TARGET_BINARIES_DIR}/${MTS_LIB_DEST}" MTS_TARGET_BINARIES_DIR)
+	foreach (external_var ${MTS_EXTERNAL_PROJECT_VARS} MTS_TARGET_BINARIES_DIR CMAKE_BUILD_TYPE)
+		if (${external_var})
+			list(APPEND MTS_EXTERNAL_PROJECT_VAR_EXPORT_LIST -D${external_var}=${${external_var}})
+		endif ()
+	endforeach ()
+	# installation (not used yet)
+	if (NOT CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+		list(APPEND MTS_EXTERNAL_PROJECT_VAR_EXPORT_LIST -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
+	endif ()
+	# include as part of the build process
+	ExternalProject_Add(${EXTERNALS_NAME} PREFIX external/${EXTERNALS_NAME}
+		SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external
+		CMAKE_ARGS ${MTS_EXTERNAL_PROJECT_VAR_EXPORT_LIST}
+		DEPENDS ${ARGN})
+	set_property(TARGET ${EXTERNALS_NAME} PROPERTY FOLDER external)
+	foreach (external_dependee ${DEPENDEES})
+		add_dependencies(${external_dependee} ${EXTERNALS_NAME})
+	endforeach ()
+	# flushed ...
+	set(MTS_EXTERNAL_PROJECT_VARS PARENT_SCOPE)
+endfunction ()
+
+###########################################################################
+# Required
+set (MTS_EXTERNAL_INTERFACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/interface) 
+
 # System threading library, used for custom options
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
 find_package(Threads REQUIRED)
 
+function (decorate_external_libraries OUT_VAR INSTALL_DIR)
+	set (DECORATED_TARGETS )
+	foreach (lib_target ${ARGN})
+		list(APPEND DECORATED_TARGETS "${INSTALL_DIR}/${lib_target}.alib")
+	endforeach ()
+	set (${OUT_VAR} ${DECORATED_TARGETS} PARENT_SCOPE)
+endfunction ()
 
-###########################################################################
-# Boost 
+macro (make_external_library PREFIX MAIN_TARGET)
+	string(TOUPPER ${PREFIX} upper_PREFIX)
+
+	set(MTS_${upper_PREFIX}_INSTALL_DIR ${MTS_EXTERNAL_INTERFACE_DIR}/${PREFIX})
+	list(APPEND MTS_EXTERNAL_PROJECT_VARS MTS_${upper_PREFIX}_INSTALL_DIR)
+
+	set(${PREFIX}_ROOT ${MTS_${upper_PREFIX}_INSTALL_DIR} CACHE PATH
+		"Preferred installation prefix for searching for ${PREFIX}.")
+	set(${PREFIX}_FOUND TRUE)
+	set(${upper_PREFIX}_FOUND TRUE)
+	set(${PREFIX}_INCLUDE_DIRS ${${PREFIX}_ROOT}/include)
+
+	set(${PREFIX}_LIBRARY ${MAIN_TARGET}-import)
+	add_library(${${PREFIX}_LIBRARY} INTERFACE)
+	if (NOT "${ARGN}" STREQUAL "HEADER_ONLY")
+		decorate_external_libraries(${PREFIX}_LIBRARIES ${${PREFIX}_ROOT}/lib  ${MAIN_TARGET} ${ARGN})
+		target_link_libraries(${${PREFIX}_LIBRARY} INTERFACE ${${PREFIX}_LIBRARIES})
+	endif ()
+	set(${PREFIX}_LIBRARIES ${${PREFIX}_LIBRARY})
+endmacro()
+
+# Boost
 if (MTS_ENABLE_SYSTEM_LIBS)
-	find_package(Boost 1.44) # REQUIRED COMPONENTS "filesystem" "system" "thread"
+	find_package(Boost 1.44)
+	mark_as_advanced(Boost_LIB_DIAGNOSTIC_DEFINITIONS)
 endif ()
-# As of CMake 2.8.2, FindBoost doesn't honor the "REQUIRED" flag
 if (NOT Boost_FOUND)
-  set(Boost_INCLUDE_DIRS )
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-config/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-core/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-type_traits/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-assert/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-static_assert/include)
-  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-exception/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-throw_exception/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-detail/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-iterator/include)
-  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-range/include)
-  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-algorithm/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-concept_check/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-move/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-tuple/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-integer/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-container_hash/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-foreach/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-bind/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-multi_index/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-bimap/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-preprocessor/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-utility/include)
-  list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-mpl/include)
-  #list(APPEND Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/boost-math/include)
-  set(BOOST_ROOT "" CACHE PATH
-    "Preferred installation prefix for searching for Boost.")
-#  message(FATAL_ERROR
-#    "Boost is missing. The required modules are math, filesystem and system.")
+	make_external_library(Boost boost HEADER_ONLY)
+	# can run in parallel
+	build_externals(boost "${Boost_LIBRARIES}")
 endif()
-mark_as_advanced(Boost_LIB_DIAGNOSTIC_DEFINITIONS)
+# boost python disabled for now (todo: replace by sth else)
+set (mts_boost_PYTHON_FOUND OFF)
 
-# Check if spirit works: the version of Clang in Ubuntu 11.04 does not support
-# the system version of Boost Spirit
-set(CMAKE_REQUIRED_INCLUDES ${Boost_INCLUDE_DIRS})
-set(CMAKE_REQUIRED_LIBRARIES ${Boost_LIBRARIES})
-CHECK_CXX_SOURCE_COMPILES("
-#include <boost/spirit/include/qi.hpp>
-int main (int argc, char **argv) {
-    return 0;
-}
-" BOOST_SPIRIT_WORKS)
-
-
-# Try to figure out if this boost distro has Boost::python. If we include
-# python in the main boost components list above, CMake will abort if it
-# is not found. So we resort to checking for the boost_python library's
-# existence to get a soft failure
-if ((APPLE OR WIN32) AND MTS_DEPENDENCIES)
-  set(mts_boost_python_names boost_python boost_python27
-    boost_python32 boost_python33 boost_python)
-else()
-  set(mts_boost_python_names boost_python)
-endif()
-find_library (mts_boost_python_lib NAMES ${mts_boost_python_names}
-              HINTS ${Boost_LIBRARY_DIRS} NO_DEFAULT_PATH)
-mark_as_advanced (mts_boost_python_lib)
-if (NOT mts_boost_python_lib AND Boost_SYSTEM_LIBRARY_RELEASE)
-    get_filename_component (mts_boost_SYSTEM_rel
-                            ${Boost_SYSTEM_LIBRARY_RELEASE} NAME)
-    set(mts_boost_PYTHON_rel_names "")
-    foreach (name ${mts_boost_python_names})
-      string (REGEX REPLACE "^(.*)boost_system(.+)$" "\\1${name}\\2"
-              mts_boost_PYTHON_rel ${mts_boost_SYSTEM_rel})
-      list(APPEND mts_boost_PYTHON_rel_names ${mts_boost_PYTHON_rel})
-    endforeach()
-    find_library (mts_boost_PYTHON_LIBRARY_RELEASE
-                  NAMES ${mts_boost_PYTHON_rel_names}
-                  HINTS ${Boost_LIBRARY_DIRS}
-                  NO_DEFAULT_PATH)
-    mark_as_advanced (mts_boost_PYTHON_LIBRARY_RELEASE)
-endif ()
-if (NOT mts_boost_python_lib AND Boost_SYSTEM_LIBRARY_DEBUG)
-    get_filename_component (mts_boost_SYSTEM_dbg
-                            ${Boost_SYSTEM_LIBRARY_DEBUG} NAME)
-    set(mts_boost_PYTHON_dbg_names "")
-    foreach (name ${mts_boost_python_names})
-      string (REGEX REPLACE "^(.*)boost_system(.+)$" "\\1${name}\\2"
-              mts_boost_PYTHON_dbg ${mts_boost_SYSTEM_dbg})
-      list(APPEND mts_boost_PYTHON_dbg_names ${mts_boost_PYTHON_dbg})
-    endforeach()
-    find_library (mts_boost_PYTHON_LIBRARY_DEBUG
-                  NAMES ${mts_boost_PYTHON_dbg_names}
-                  HINTS ${Boost_LIBRARY_DIRS}
-                  NO_DEFAULT_PATH)
-    mark_as_advanced (mts_boost_PYTHON_LIBRARY_DEBUG)
-endif ()
-if (mts_boost_python_lib OR
-    mts_boost_PYTHON_LIBRARY_RELEASE OR mts_boost_PYTHON_LIBRARY_DEBUG)
-    set (mts_boost_PYTHON_FOUND ON)
-else ()
-    set (mts_boost_PYTHON_FOUND OFF)
-endif ()
-
-###########################################################################
-
-include (ExternalProject)
-
+# Eigen
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(Eigen 3.0)
 endif ()
-if (NOT EIGEN_FOUND)
-	set(Eigen_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen)
-	set(EIGEN_FOUND TRUE)
+if (NOT Eigen_FOUND)
+	make_external_library(Eigen eigen HEADER_ONLY)
+	# can run in parallel
+	build_externals(eigen "${Eigen_LIBRARIES}")
 endif ()
 
+# JPEG
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(JPEG 6)
 endif ()
 if (NOT JPEG_FOUND)
-	set(MTS_LIBJPEG_DIR external/libjpeg-turbo)
-	set(MTS_LIBJPEG_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_LIBJPEG_DIR}/interface)
-	ExternalProject_Add(libjpeg
-		PREFIX ${MTS_LIBJPEG_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_LIBJPEG_DIR} INSTALL_DIR ${MTS_LIBJPEG_INSTALL_DIR}
-		CMAKE_ARGS -DENABLE_SHARED=OFF -DWITH_SIMD=OFF -DWITH_TURBOJPEG=OFF -DCMAKE_INSTALL_PREFIX=${MTS_LIBJPEG_INSTALL_DIR}
-		CMAKE_CACHE_ARGS -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-		BUILD_COMMAND ${CMAKE_COMMAND} --build . --target jpeg-static --config $<CONFIG>
-		)
-	set_property(TARGET libjpeg PROPERTY FOLDER external)
-	
-	set(JPEG_FOUND TRUE)
-	set(JPEG_INCLUDE_DIR ${MTS_LIBJPEG_INSTALL_DIR}/include)
-	if (NOT MSVC)
-		set(JPEG_LIBRARY ${MTS_LIBJPEG_INSTALL_DIR}/lib/libjpeg.a)
-	else ()
-		set(JPEG_LIBRARY ${MTS_LIBJPEG_INSTALL_DIR}/lib/jpeg-static.lib)
-	endif ()
-	set(JPEG_LIBRARIES ${JPEG_LIBRARY})
+	make_external_library(JPEG jpeg-static)
+	# can run in parallel
+	build_externals(libjpeg "${JPEG_LIBRARIES}")
+endif ()
+# legacy fixup
+if (JPEG_INCLUDE_DIR AND NOT JPEG_INCLUDE_DIRS)
+	set (JPEG_INCLUDE_DIRS ${JPEG_INCLUDE_DIR})
 endif ()
 
+# ZLIB
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(ZLIB 1.2)
 endif ()
 if (NOT ZLIB_FOUND)
-	set(MTS_ZLIB_DIR external/zlib)
-	set(MTS_ZLIB_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_ZLIB_DIR}/interface)
-	ExternalProject_Add(zlib
-		PREFIX ${MTS_ZLIB_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_ZLIB_DIR} INSTALL_DIR ${MTS_ZLIB_INSTALL_DIR}
-		CMAKE_ARGS -DBUILD_SHARED_LIBS=FALSE -DCMAKE_INSTALL_PREFIX=${MTS_ZLIB_INSTALL_DIR}
-		CMAKE_CACHE_ARGS -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-		)
-	set_property(TARGET zlib PROPERTY FOLDER external)
-	
-	set(ZLIB_FOUND TRUE)
-	set(ZLIB_ROOT ${MTS_ZLIB_INSTALL_DIR})
-	set(ZLIB_INCLUDE_DIRS ${MTS_ZLIB_INSTALL_DIR}/include)
-	if (UNIX)
-		set(ZLIB_LIBRARY ${MTS_ZLIB_INSTALL_DIR}/lib/libz.a)
-	else ()
-		set(ZLIB_LIBRARY ${MTS_ZLIB_INSTALL_DIR}/lib/zlibstatic.lib)
-	endif ()
-	set(ZLIB_LIBRARIES ${ZLIB_LIBRARY})
+	make_external_library(ZLIB zlibstatic)
+	# can run in parallel
+	build_externals(zlib "${ZLIB_LIBRARIES}")
 endif ()
-
+# PNG
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(PNG 1.2)
 endif ()
 if (NOT PNG_FOUND)
-	set(MTS_PNG_DIR external/libpng)
-	set(MTS_PNG_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_PNG_DIR}/interface)
-	ExternalProject_Add(libpng
-		PREFIX ${MTS_PNG_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_PNG_DIR} INSTALL_DIR ${MTS_PNG_INSTALL_DIR}
-		CMAKE_ARGS -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${MTS_PNG_INSTALL_DIR}
-		-DZLIB_ROOT=${ZLIB_ROOT}
-		CMAKE_CACHE_ARGS -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-		DEPENDS zlib
-		) # not working: CMAKE_CACHE_ARGS -DPNGLIB_NAME:string=libpng
-	set_property(TARGET libpng PROPERTY FOLDER external)
-	
-	set(PNG_FOUND TRUE)
-	set(PNG_INCLUDE_DIR ${MTS_PNG_INSTALL_DIR}/include)
-	if (NOT MSVC)
-		set(PNG_LIBRARY ${MTS_PNG_INSTALL_DIR}/lib/libpng16.a)
-	else ()
-		set(PNG_LIBRARY ${MTS_PNG_INSTALL_DIR}/lib/libpng16_static.lib)
-	endif ()
-	set(PNG_LIBRARIES ${PNG_LIBRARY})
+	make_external_library(PNG png_static)
 	set(PNG_DEFINITIONS -DPNG_STATIC)
+	# can run in parallel
+	list(APPEND MTS_EXTERNAL_PROJECT_VARS ZLIB_ROOT)
+	build_externals(libpng "${PNG_LIBRARIES}" zlib)
 endif ()
-
+# legacy fixup
+if (PNG_INCLUDE_DIR AND NOT PNG_INCLUDE_DIRS)
+	set (PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIR})
+endif ()
+list(APPEND PNG_LIBRARIES ${ZLIB_LIBRARIES})
 add_definitions(${PNG_DEFINITIONS})
-
+# OpenEXR
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(IlmBase)
-endif ()
-if (NOT ILMBASE_FOUND)
-	set(MTS_ILMBASE_DIR external/openexr/IlmBase)
-	set(MTS_ILMBASE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/openexr)
-	set(MTS_ILMBASE_INSTALL_DIR ${MTS_ILMBASE_SOURCE_DIR}/interface)
-	ExternalProject_Add(ilmbase
-		PREFIX ${MTS_ILMBASE_DIR} SOURCE_DIR ${MTS_ILMBASE_SOURCE_DIR} INSTALL_DIR ${MTS_ILMBASE_INSTALL_DIR}
-		CMAKE_ARGS -DOPENEXR_BUILD_STATIC=ON -DOPENEXR_BUILD_SHARED=OFF
-		-DOPENEXR_BUILD_ILMBASE=ON -DOPENEXR_BUILD_OPENEXR=OFF
-		-DOPENEXR_BUILD_PYTHON_LIBS=OFF -DOPENEXR_BUILD_TESTS=OFF -DOPENEXR_BUILD_UTILS=OFF
-		-DOPENEXR_NAMESPACE_VERSIONING=OFF
-		-DCMAKE_INSTALL_PREFIX=${MTS_ILMBASE_INSTALL_DIR}
-		CMAKE_CACHE_ARGS -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-		)
-	set_property(TARGET ilmbase PROPERTY FOLDER external)
-	
-	set(ILMBASE_FOUND TRUE)
-	set(ILMBASE_INCLUDE_DIRS ${MTS_ILMBASE_INSTALL_DIR}/include ${MTS_ILMBASE_INSTALL_DIR}/include/OpenEXR)
-	if (UNIX)
-		set(ILMBASE_LIBRARY ${MTS_ILMBASE_INSTALL_DIR}/lib/libHalf_s.a)
-	else ()
-		set(ILMBASE_LIBRARY ${MTS_ILMBASE_INSTALL_DIR}/lib/Half_s.lib)
-	endif ()
-	set(ILMBASE_LIBRARIES ${ILMBASE_LIBRARY})
-endif ()
-
-if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(OpenEXR)
 endif ()
-if (NOT OPENEXR_FOUND)
-	set(MTS_OPENEXR_DIR external/openexr/OpenEXR)
-	set(MTS_OPENEXR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/openexr)
-	set(MTS_OPENEXR_INSTALL_DIR ${MTS_ILMBASE_SOURCE_DIR}/interface)
-	ExternalProject_Add(openexr
-		PREFIX ${MTS_OPENEXR_DIR} SOURCE_DIR ${MTS_OPENEXR_SOURCE_DIR} INSTALL_DIR ${MTS_OPENEXR_INSTALL_DIR}
-		CMAKE_ARGS -DOPENEXR_BUILD_STATIC=ON -DOPENEXR_BUILD_SHARED=OFF
-		-OPENEXR_BUILD_ILMBASE=OFF -DOPENEXR_BUILD_OPENEXR=ON
-		-DOPENEXR_BUILD_PYTHON_LIBS=OFF -DOPENEXR_BUILD_TESTS=OFF -DOPENEXR_BUILD_UTILS=OFF
-		-DOPENEXR_NAMESPACE_VERSIONING=OFF
-		-DZLIB_ROOT=${ZLIB_ROOT}
-		-DCMAKE_INSTALL_PREFIX=${MTS_OPENEXR_INSTALL_DIR}
-		CMAKE_CACHE_ARGS -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-		DEPENDS ilmbase zlib
-		)
-	set_property(TARGET openexr PROPERTY FOLDER external)
-	
-	set(OPENEXR_FOUND TRUE)
-	set(OPENEXR_INCLUDE_DIRS ${MTS_OPENEXR_INSTALL_DIR}/include)
-	if (UNIX)
-		set(OPENEXR_LIBRARY ${MTS_OPENEXR_INSTALL_DIR}/lib/libIlmImf_s.a)
-		set(OPENEXR_LIBRARIES ${OPENEXR_LIBRARY})
-		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/libIex_s.a)
-		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/libIlmThread_s.a)
-	else ()
-		set(OPENEXR_LIBRARY ${MTS_OPENEXR_INSTALL_DIR}/lib/IlmImf_s.lib)
-		set(OPENEXR_LIBRARIES ${OPENEXR_LIBRARY})
-		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/Iex_s.lib)
-		list(APPEND OPENEXR_LIBRARIES ${MTS_OPENEXR_INSTALL_DIR}/lib/IlmThread_s.lib)
+if (NOT ILMBASE_FOUND OR NOT OPENEXR_FOUND)
+	if (NOT ILMBASE_FOUND)
+		make_external_library(ILMBASE Half_static)
 	endif ()
+	if (NOT OPENEXR_FOUND)
+		make_external_library(OPENEXR IlmImf_static Iex_static IlmThread_static)
+	endif ()
+	# can run in parallel
+	list(APPEND MTS_EXTERNAL_PROJECT_VARS ZLIB_ROOT)
+	build_externals(openexr "${ILMBASE_LIBRARIES};${OPENEXR_LIBRARIES}" zlib)
 else ()
 	if (WIN32)
 	  set(CMAKE_REQUIRED_INCLUDES ${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
@@ -343,36 +224,31 @@ else ()
 	  endif()
 	endif()
 endif()
+list(APPEND OPENEXR_LIBRARIES ${ZLIB_LIBRARIES})
 
-# XERCES_ROOT_DIR
+# XercesC
 if (MTS_ENABLE_SYSTEM_LIBS)
-	find_package(Xerces 3.0)
+	find_package(XercesC 3.0)
 endif ()
-if (NOT XERCES_FOUND)
-	set(MTS_XERCES_DIR external/xerces-c)
-	set(MTS_XERCES_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_XERCES_DIR}/interface)
-	ExternalProject_Add(xerces
-		PREFIX ${MTS_XERCES_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_XERCES_DIR} INSTALL_DIR ${MTS_XERCES_INSTALL_DIR}
-		CMAKE_ARGS -DBUILD_SHARED_LIBS=FALSE -DCMAKE_INSTALL_PREFIX=${MTS_XERCES_INSTALL_DIR}
-		BUILD_COMMAND ${CMAKE_COMMAND} --build src --target xerces-c --config $<CONFIG>
-		INSTALL_COMMAND ${CMAKE_COMMAND} --build src --target install --config $<CONFIG>
-		CMAKE_CACHE_ARGS -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-		)
-	set_property(TARGET xerces PROPERTY FOLDER external)
-	
-	set(XERCES_FOUND TRUE)
-	set(XERCES_INCLUDE_DIRS ${MTS_XERCES_INSTALL_DIR}/include)
-	if (NOT MSVC)
-		set(XERCES_LIBRARY ${MTS_XERCES_INSTALL_DIR}/lib/libxerces-c-3.2.a)
-	else ()
-		set(XERCES_LIBRARY ${MTS_XERCES_INSTALL_DIR}/lib/xerces-c_3.lib)
-	endif ()
-	set(XERCES_LIBRARIES ${XERCES_LIBRARY})
+if (NOT XercesC_FOUND)
+	make_external_library(XercesC xerces-c)
+	# can run in parallel
+	build_externals(xerces-c "${XercesC_LIBRARIES}")
+
+	set(XercesC_DEFINITIONS -DXERCES_STATIC)
 	if (NOT WIN32)
-		set(XERCES_LIBRARIES ${XERCES_LIBRARIES} icuuc)
+		set(XercesC_LIBRARIES ${XercesC_LIBRARIES} icuuc icudata)
 	endif ()
-	set(XERCES_DEFINITIONS -DXERCES_STATIC)
+
+	set(XERCES_DEFINITIONS ${XercesC_DEFINITIONS})
+	set(XERCES_INCLUDE_DIR ${XercesC_INCLUDE_DIR})
+	set(XERCES_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
+	set(XERCES_LIBRARY ${XercesC_LIBRARY})
+	set(XERCES_LIBRARIES ${XercesC_LIBRARIES})
 endif ()
+
+###########################################################################
+# Optional
 
 # ColladaDOM (optional)
 if (MTS_ENABLE_COLLADA)
@@ -392,12 +268,44 @@ if (MTS_FFTW)
   add_definitions(-DMTS_HAS_FFTW=1)
 endif()
 
+# todo: python bindings disabled, depend on boost python right now
+if (mts_boost_PYTHON_FOUND)
+# The Python libraries. When using the built-in dependencies we need
+# to specify the include directory, otherwise CMake finds the one
+# from the local installation using the Windows registry / OSX Frameworks
+if (MTS_DEPENDENCIES AND NOT PYTHON_INCLUDE_DIR AND
+    EXISTS "${MTS_DEPS_DIR}/include/python27")
+  set(PYTHON_INCLUDE_DIR "${MTS_DEPS_DIR}/include/python27"
+      CACHE STRING "Path to the Python include directory.")
+endif()
+find_package (PythonLibs "2.6")
+CMAKE_DEPENDENT_OPTION(BUILD_PYTHON "Build the Python bindings." ON
+  "PYTHONLIBS_FOUND;mts_boost_PYTHON_FOUND" OFF)
+if (PYTHONLIBS_FOUND AND mts_boost_PYTHON_FOUND)
+  set (PYTHON_FOUND TRUE)
+endif ()
+endif ()
+
+###########################################################################
+# Frontends & HW-accelerated rendering
+
+# Qt frontend unsupported for now
+if (MTS_ENABLE_QT)
+	# Qt4 (optional)
+	find_package(Qt4 4.7 COMPONENTS
+	  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
+	CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
+	  "QT4_FOUND" OFF)
+endif () 
+
 # OpenGL
 find_package(OpenGL)
-CMAKE_DEPENDENT_OPTION(BUILD_IMGUI "Built the GL-based mitsuba GUI." ON
+CMAKE_DEPENDENT_OPTION(BUILD_IMGUI "Build the GL-based mitsuba GUI." ON
   "OPENGL_FOUND" OFF)
 
 set (MTS_HAS_HW FALSE)
+
+# disable HW-accelerated VPL preview for now
 if (MTS_ENABLE_HW_PREVIEW)
 
 set (GLEW_MX ON)
@@ -430,35 +338,21 @@ int main (int argc, char **argv) {
 endif ()
 
 set (MTS_HAS_HW ${GLEW_FOUND})
+
 endif ()
 
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(SDL 2.0)
 endif ()
 if (NOT SDL_FOUND)
-	set(MTS_SDL_DIR external/SDL)
-	set(MTS_SDL_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_SDL_DIR}/interface)
-	ExternalProject_Add(sdl
-		PREFIX ${MTS_SDL_DIR} SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${MTS_SDL_DIR} INSTALL_DIR ${MTS_SDL_INSTALL_DIR}
-		CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${MTS_SDL_INSTALL_DIR}
-		-DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF # avoid linker nightmare
-		-DSDL_AUDIO=OFF
-		#-DSDL_HAPTIC=OFF -DSDL_JOYSTICK=OFF -DSDL_POWER=OFF -DSDL_SENSOR=OFF # these seem obligatory for now
-		)
-	set_property(TARGET sdl PROPERTY FOLDER external)
-	
-	set(SDL_FOUND TRUE)
-	set(SDL_INCLUDE_DIRS ${MTS_SDL_INSTALL_DIR}/include)
-	if (NOT MSVC)
-		set(SDL_BIN ${MTS_SDL_INSTALL_DIR}/lib/libSDL2.so)
-		set(SDL_LIBRARY ${MTS_SDL_INSTALL_DIR}/lib/libSDL2.so)
-		set(SDL_LIBRARIES ${SDL_LIBRARY} ${MTS_SDL_INSTALL_DIR}/lib/libSDL2main.a)
-	else ()
-		set(SDL_BIN ${MTS_SDL_INSTALL_DIR}/bin/SDL2.dll)
-		set(SDL_LIBRARY ${MTS_SDL_INSTALL_DIR}/lib/SDL2.lib)
-		set(SDL_LIBRARIES ${SDL_LIBRARY} ${MTS_SDL_INSTALL_DIR}/lib/SDL2main.lib)
-	endif ()
+	make_external_library(SDL SDL2 SDL2main)
 endif ()
+
+# can run in parallel
+build_externals(sdl "${SDL_LIBRARIES}")
+
+###########################################################################
+# System libraries
 
 # Try to get OpenMP support
 find_package(OpenMP)
@@ -493,29 +387,17 @@ if (APPLE)
   mark_as_advanced (SECURITY_LIBRARY  SECURITY_INCLUDE_DIR)
 endif()
 
-
-# The Python libraries. When using the built-in dependencies we need
-# to specify the include directory, otherwise CMake finds the one
-# from the local installation using the Windows registry / OSX Frameworks
-if (MTS_DEPENDENCIES AND NOT PYTHON_INCLUDE_DIR AND
-    EXISTS "${MTS_DEPS_DIR}/include/python27")
-  set(PYTHON_INCLUDE_DIR "${MTS_DEPS_DIR}/include/python27"
-      CACHE STRING "Path to the Python include directory.")
-endif()
-find_package (PythonLibs "2.6")
-CMAKE_DEPENDENT_OPTION(BUILD_PYTHON "Build the Python bindings." ON
-  "PYTHONLIBS_FOUND;mts_boost_PYTHON_FOUND" OFF)
-if (PYTHONLIBS_FOUND AND mts_boost_PYTHON_FOUND)
-  set (PYTHON_FOUND TRUE)
-endif ()
-
+###########################################################################
+# Global configuration
 
 # Includes for the common libraries
 include_directories(${Boost_INCLUDE_DIRS})
+link_libraries(${Boost_LIBRARIES}) # for build order only
 
 if (EIGEN_FOUND)
   add_definitions(-DHAS_EIGEN=1)
-  include_directories(${Eigen_INCLUDE_DIR})
+  include_directories(${Eigen_INCLUDE_DIRS})
+  link_libraries(${Eigen_LIBRARIES}) # for build order only
 endif()
 
 # If we are using the system OpenEXR, add its headers which half.h requires
@@ -534,6 +416,7 @@ if (OPENEXR_FOUND)
   add_definitions(-DMTS_HAS_OPENEXR=1)
 endif()
 
+# Features
 if (MTS_HAS_HW)
   add_definitions(-DMTS_HAS_HW=1)
 endif()
