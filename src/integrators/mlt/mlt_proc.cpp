@@ -290,7 +290,7 @@ public:
 					if (currentImageWeight)
 						value *= *currentImageWeight;
 					if (!value.isZero())
-						result->putAtomic(current->getSamplePosition(), &value[0]);
+						result->putAtomic(current->getSamplePosition(), value, 1.0f);
 
 					/* The mutation was accepted */
 					std::swap(current, proposed);
@@ -308,7 +308,7 @@ public:
 						Spectrum value = proposed->getRelativeWeight() * a;
 						if (currentImageWeight)
 							value *= *currentImageWeight;
-						result->putAtomic(proposed->getSamplePosition(), &value[0]);
+						result->putAtomic(proposed->getSamplePosition(), value, 1.0f);
 					}
 				}
 			} else {
@@ -326,7 +326,7 @@ public:
 			Spectrum value = relWeight * accumulatedWeight;
 			if (currentImageWeight)
 				value *= *currentImageWeight;
-			result->putAtomic(current->getSamplePosition(), &value[0]);
+			result->putAtomic(current->getSamplePosition(), value, 1.0f);
 		}
 
 		#if defined(MTS_DEBUG_FP)

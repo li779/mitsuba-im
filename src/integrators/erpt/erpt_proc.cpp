@@ -172,9 +172,9 @@ public:
 		if (path.vertex(k-2)->isDiffuseInteraction() && path.vertex(k-3)->isDiffuseInteraction()) {
 			Spectrum value = path.getRelativeWeight() * weight / m_config.sampleNormalization;
 #ifndef MTS_NO_ATOMIC_SPLAT
-			m_result->putAtomic(path.getSamplePosition(), &value[0]);
+			m_result->putAtomic(path.getSamplePosition(), value, 1.0f);
 #else
-			m_result->put(path.getSamplePosition(), &value[0]);
+			m_result->put(path.getSamplePosition(), value, 1.0f);
 #endif
 			return;
 		}
@@ -278,9 +278,9 @@ public:
 					if (a == 1 || m_indepSampler->next1D() < a) {
 						Spectrum value = relWeight * (accumulatedWeight * depositionEnergy);
 #ifndef MTS_NO_ATOMIC_SPLAT
-						m_result->putAtomic(current->getSamplePosition(), &value[0]);
+						m_result->putAtomic(current->getSamplePosition(), value, 1.0f);
 #else
-						m_result->put(current->getSamplePosition(), &value[0]);
+						m_result->put(current->getSamplePosition(), value, 1.0f);
 #endif
 						/* The mutation was accepted */
 						current->release(muRec.l, muRec.m+1, *m_pool);
@@ -295,9 +295,9 @@ public:
 						if (a > 0) {
 							Spectrum value = proposed->getRelativeWeight() * (a * depositionEnergy);
 #ifndef MTS_NO_ATOMIC_SPLAT
-							m_result->putAtomic(proposed->getSamplePosition(), &value[0]);
+							m_result->putAtomic(proposed->getSamplePosition(), value, 1.0f);
 #else
-							m_result->put(proposed->getSamplePosition(), &value[0]);
+							m_result->put(proposed->getSamplePosition(), value, 1.0f);
 #endif
 						}
 						/* The mutation was rejected */
@@ -310,9 +310,9 @@ public:
 			if (accumulatedWeight > 0) {
 				Spectrum value = relWeight * (accumulatedWeight * depositionEnergy);
 #ifndef MTS_NO_ATOMIC_SPLAT
-				m_result->putAtomic(current->getSamplePosition(), &value[0]);
+				m_result->putAtomic(current->getSamplePosition(), value, 1.0f);
 #else
-				m_result->put(current->getSamplePosition(), &value[0]);
+				m_result->put(current->getSamplePosition(), value, 1.0f);
 #endif
 			}
 			current->release(*m_pool);
