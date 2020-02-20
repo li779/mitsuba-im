@@ -12,7 +12,7 @@ if (NOT DEFINED MTS_TARGET_BINARIES_DIR)
 endif()
 
 # Set CMAKE_BUILD_TYPE to RelWithDebInfo by default
-if (DEFINED CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE)
+if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
     "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
 endif()

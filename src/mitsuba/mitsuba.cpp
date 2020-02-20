@@ -33,7 +33,10 @@
 #include <mitsuba/render/renderjob.h>
 #include <mitsuba/render/sceneloader.h>
 #include <fstream>
+#include <memory>
 #include <stdexcept>
+
+#include "im_render.h"
 
 #if defined(__WINDOWS__)
 #include <mitsuba/core/getopt.h>
@@ -370,11 +373,21 @@ int mitsuba_app(int argc, char*const* argv) {
 			if (scene->destinationExists() && skipExisting)
 				continue;
 
-			ref<RenderJob> thr = new RenderJob(formatString("ren%i", jobIdx++),
-				scene, renderQueue, -1, -1, -1, true, flushTimer > 0);
-			thr->start();
+			std::unique_ptr<InteractiveSceneProcess> ithr(
+				InteractiveSceneProcess::create(scene, scene->getSampler(), scene->getIntegrator(), ProcessConfig())
+			);
+			if (ithr) {
+				SLog(EInfo, "Using responsive integrator interface");
+				ithr->render();
+			}
+			else {
+				ref<RenderJob> thr = new RenderJob(formatString("ren%i", jobIdx++),
+					scene, renderQueue, -1, -1, -1, true, flushTimer > 0);
+				thr->start();
 
-			renderQueue->waitLeft(numParallelScenes-1);
+				renderQueue->waitLeft(numParallelScenes-1);
+			}
+
 			if (i+1 < argc && numParallelScenes == 1)
 				Statistics::getInstance()->resetAll();
 		}
