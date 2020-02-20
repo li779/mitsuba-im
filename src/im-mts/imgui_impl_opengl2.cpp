@@ -36,6 +36,7 @@
 #else
 #include <stdint.h>	 // intptr_t
 #endif
+#include <cmath>
 
 #include <SDL2/SDL_video.h>
 #include <SDL2/SDL_opengl.h>
@@ -45,6 +46,7 @@
 // OpenGL Data
 static GLuint              g_FontTexture = 0;
 static PFNGLCLAMPCOLORPROC glClampColor = 0;
+static PFNGLBLENDEQUATIONPROC glBlendEquationEXT = 0;
 
 // Functions
 bool	ImGui_ImplOpenGL2_Init()
@@ -52,6 +54,7 @@ bool	ImGui_ImplOpenGL2_Init()
 	ImGuiIO& io = ImGui::GetIO();
 	io.BackendRendererName = "imgui_impl_opengl2";
 	glClampColor = (PFNGLCLAMPCOLORARBPROC) SDL_GL_GetProcAddress("glClampColorARB");
+	glBlendEquationEXT = (PFNGLBLENDEQUATIONEXTPROC) SDL_GL_GetProcAddress("glBlendEquationEXT");
 	return true;
 }
 
@@ -71,6 +74,8 @@ static void ImGui_ImplOpenGL2_SetupRenderState(ImDrawData* draw_data, int fb_wid
 	// Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, vertex/texcoord/color pointers, polygon fill.
 	glEnable(GL_BLEND);
 	glDisable(GL_FRAMEBUFFER_SRGB_EXT);
+	if (glBlendEquationEXT)
+		glBlendEquationEXT(GL_FUNC_ADD);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
@@ -171,14 +176,32 @@ void ImGui_ImplOpenGL2_RenderDrawData(ImDrawData* draw_data)
 				else if (pcmd->UserCallback == ImDrawCallback_Exposure) {
 					assert(sizeof(ImGui_ImplOpenGL2_ScratchMemory) >= sizeof(float) * 4 * pcmd->ElemCount);
 					float const* value = (float const*) pcmd->UserCallbackData;
+					bool alpha_blend = value[3] != 0.0f;
+					bool subtract = value[0] < 0.0f;
 					for (int i = 0, j = 0, ie = cmd_list->VtxBuffer.Size; i < ie; ++i) {
-						ImGui_ImplOpenGL2_ScratchMemory[j++] = value[0];
-						ImGui_ImplOpenGL2_ScratchMemory[j++] = value[1];
-						ImGui_ImplOpenGL2_ScratchMemory[j++] = value[2];
-						ImGui_ImplOpenGL2_ScratchMemory[j++] = value[3];
+						ImGui_ImplOpenGL2_ScratchMemory[j++] = std::abs(value[0]);
+						ImGui_ImplOpenGL2_ScratchMemory[j++] = std::abs(value[1]);
+						ImGui_ImplOpenGL2_ScratchMemory[j++] = std::abs(value[2]);
+						ImGui_ImplOpenGL2_ScratchMemory[j++] = std::abs(value[3]);
 					}
 					glColorPointer(4, GL_FLOAT, 0, (const GLvoid*) ImGui_ImplOpenGL2_ScratchMemory);
 					glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+					if (subtract) {
+						if (glBlendEquationEXT)
+							glBlendEquationEXT(GL_FUNC_REVERSE_SUBTRACT);
+						if (alpha_blend)
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+						else
+							glBlendFunc(GL_ONE, GL_ONE);
+					}
+					else {
+						if (glBlendEquationEXT)
+							glBlendEquationEXT(GL_FUNC_ADD);
+						if (alpha_blend)
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						else
+							glBlendFunc(GL_ONE, GL_ZERO);
+					}
 				}
 				else
 					pcmd->UserCallback(cmd_list, pcmd);

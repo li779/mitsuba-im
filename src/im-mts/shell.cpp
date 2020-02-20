@@ -109,6 +109,7 @@ struct Document {
 			std::vector<double> samples;
 			std::unique_ptr<StackedPreview> preview;
 			float exposureMultiplier[4];
+			unsigned long long baseTime = ~0;
 
 			Integration() { }
 
@@ -124,16 +125,24 @@ struct Document {
 			}
 
 			void runFrame(mitsuba::Sensor* sensor, InteractiveSceneProcess::Controls controls) {
-				preview->runGeneration( SDL_GetTicks() );
+				baseTime = SDL_GetTicks();
+				preview->runGeneration( baseTime );
 				process->render(sensor, samples.data(), controls);
 
 				int waitCounter = 0;
-				while (!preview->upToDate(samples.data(), (int) samples.size()) && waitCounter < 160)
+				while (!preview->upToDate((float const* const*) process->imageData, samples.data(), (int) samples.size()) && waitCounter < 160)
 					SDL_Delay(waitCounter += std::min(std::max(waitCounter, 5), 16));
 			}
 
 			void updatePreview() {
 				preview->update(SDL_GetTicks(), (float const* const*) process->imageData, samples.data(), (int) samples.size());
+			}
+
+			double timeSeconds() const {
+				unsigned long long ticks = SDL_GetTicks();
+				if (ticks > baseTime)
+					return double(ticks - baseTime) / 1000.0f;
+				return 0.0f;
 			}
 		};
 
@@ -204,9 +213,9 @@ struct Document {
 			bool isRestart = restart;
 			restart = false;
 
-			do {
+			while (needsSync()) {
 				lane->synchronize();
-			} while (needsSync());
+			}
 
 			sensor->apply(scene->getSensor());
 
@@ -351,7 +360,7 @@ struct Document {
 	}
 
 	void prepareFrame() {
-		if (this->workLane && this->renderer.needsSync()) {
+		if (this->workLane) {
 			this->workLane->synchronized(this->renderer);
 		}
 	}
@@ -436,6 +445,9 @@ std::unique_ptr<Document> tryOpenScene(fs::pathstr path, Config const& config) {
 	try {
 		doc.reset( new Document(path, config) );
 	}
+	catch (std::exception const& e) {
+		tinyfd_messageBox("Could not load scene file!", e.what(), "ok", "error", 1);
+	}
 	catch (...) {
 		tinyfd_messageBox("Error", "Could not load scene file!", "ok", "error", 1);
 	}
@@ -479,13 +491,22 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 	clear_color = ImVec4(0.09f, 0.11f, 0.12f, 1.00f);
 	float exposure = 1;
+	float comparison_factor = 1;
+	bool show_diff = false, diff_flip = false;
+	int scene_rotation_offset = 0;
 	bool alpha_transparent = false;
 	int subres_levels = 3;
 	bool show_final_render = false;
 	bool sync_cams = true;
-	
-	float sppLast = 0;
-	float sppPerS = 0;
+
+	bool window_hidden = false;
+	bool was_window_hidden = window_hidden;
+	auto updateWindowVisibility = [window, &was_window_hidden, &window_hidden]() {
+		window_hidden = !(SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN) || (SDL_GetWindowFlags(window) & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED));
+		if (window_hidden != was_window_hidden)
+			std::cout << "Window visibility was " << !was_window_hidden << ", now " << !window_hidden << std::endl;
+		was_window_hidden = window_hidden;
+	};
 
 	// Main loop
 	while (true) {
@@ -497,12 +518,35 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		// - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
 		// - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
 		// Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-		SDL_Event event = { };
-		while (SDL_PollEvent(&event))
-		{
+		if (window_hidden)
+			updateWindowVisibility();
+		bool null_render = false;
+		SDL_Event event = { }, nextEvent = { };
+		bool had_localized_event = false;
+		while (window_hidden ? SDL_WaitEvent(&event) : SDL_PollEvent(&event)) {
 			ImGui_ImplSDL2_ProcessEvent(&event);
 			if (event.type == SDL_QUIT)
 				break;
+			// always make sure window not silently revealed, react to events to see if hidden
+			if (window_hidden || event.type == SDL_DISPLAYEVENT || event.type == SDL_WINDOWEVENT) {
+				updateWindowVisibility();
+			}
+			// things that can depend on mouse position or state
+			had_localized_event |= (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP || event.type == SDL_MOUSEWHEEL);
+			had_localized_event |= (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP);
+			if (had_localized_event) {
+				if (1 == SDL_PeepEvents(&nextEvent, 1, SDL_PEEKEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT)) {
+					// things that change meaning of previous state
+					if (nextEvent.type == SDL_MOUSEMOTION || nextEvent.type == SDL_MOUSEBUTTONDOWN || nextEvent.type == SDL_MOUSEBUTTONUP) {
+						null_render = true; // fast round
+						break;
+					}
+					// todo: maybe record any key changes?
+				}
+				// no more events (that we were able to analyze), handle events so far
+				else
+					break;
+			}
 		}
 		if (event.type == SDL_QUIT)
 			break;
@@ -521,18 +565,23 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		}
 
 		// Start the Dear ImGui frame
-		ImGui_ImplOpenGL2_NewFrame();
+		if (!null_render)
+			ImGui_ImplOpenGL2_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
-		if (session) {
+		if (session && !null_render) {
 			int cols = (int) std::ceil( std::sqrt( (float) session->scenes.size() ) );
 			int rows = ((int) session->scenes.size() + (cols - 1)) / cols;
+			if (show_diff) {
+				cols = rows = 1;
+			}
 
-			int i = 0;
-			for (auto& s : session->scenes) {
+			for (int i = 0, ie = (int) session->scenes.size(); i < ie; ++i) {
+				int sceneIdx = (i + scene_rotation_offset) % ie;
+				auto& s = session->scenes[sceneIdx];
 				int col = i % cols;
-				int row = i / cols;
+				int row = (i / cols) % rows;
 
 				int cx = col * int(io.DisplaySize.x) / cols + 1, cy = row * int(io.DisplaySize.y) / rows + 1;
 				int cxe = (col+1) * int(io.DisplaySize.x) / cols - 1, cye = (row+1) * int(io.DisplaySize.y) / rows - 1;
@@ -541,15 +590,31 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 				Preview& preview = finalPreview ? (Preview&) *s->classic.preview : (Preview&) *s->renderer.integration.preview;
 
 				// Normalize
-				if (!finalPreview) {
+				if (finalPreview) {
+					for (int j = 0; j < 3; ++j)
+						s->renderer.integration.exposureMultiplier[j] = exposure;
+					s->renderer.integration.exposureMultiplier[3] = (alpha_transparent) ? 1.0f : 0.0f;
+				}
+				else {
 					float clampedSpp = std::max(preview.avgSamples
 						, std::min(s->renderer.integration.preview->minSppClamp, (float) s->renderer.integration.process->integrator->getLowerSampleBound()));
 					for (int j = 0; j < 3; ++j)
 						s->renderer.integration.exposureMultiplier[j] = exposure / clampedSpp;
-					s->renderer.integration.exposureMultiplier[3] = 1.0f / clampedSpp;
+					s->renderer.integration.exposureMultiplier[3] = (alpha_transparent) ? 1.0f / clampedSpp : 0.0f;
+
+					if (show_diff && (i & 1)) {
+						for (int j = 0; j < 3; ++j)
+							s->renderer.integration.exposureMultiplier[j] *= -1.0f;
+						s->renderer.integration.exposureMultiplier[3] *= -1.0f;
+					}
+
+					if (sceneIdx & 1) {
+						for (int j = 0; j < 3; ++j)
+							s->renderer.integration.exposureMultiplier[j] *= comparison_factor;
+					}
 				}
 				ImGui::GetBackgroundDrawList()->AddCallback(ImDrawCallback_Exposure, s->renderer.integration.exposureMultiplier);
-				if (!alpha_transparent)
+				if (!alpha_transparent && !show_diff)
 					ImGui::GetBackgroundDrawList()->AddCallback(ImDrawCallback_NoBlending, 0);
 
 				ImVec2 uv = ImVec2(0, 0), uve = ImVec2(1, 1);
@@ -578,8 +643,6 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 				ImGui::GetBackgroundDrawList()->AddImage((ImTextureID) preview.previewImg, ImVec2((float) ix, (float) iy), ImVec2((float) ixe, (float) iye), uv, uve);
 				// Reset
 				ImGui::GetBackgroundDrawList()->AddCallback(ImDrawCallback_ResetRenderState, 0);
-
-				++i;
 			}
 		}
 
@@ -622,19 +685,11 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 			}
 
 			if (document) {
-				float spp = 0;
+				double spp = 0;
 				for (int i = 0; i < document->renderer.integration.process->numActiveThreads; ++i) {
 					spp += float(document->renderer.integration.samples[i]);
 				}
-
-				float sppDelta = spp - sppLast;
-				if (sppDelta > 0) sppDelta /= io.DeltaTime;
-				else sppDelta = 0;
-				float avgAcc = 100;
-				float newWeight = .1f * avgAcc * io.DeltaTime;
-				if (spp > 1 / avgAcc) newWeight /= avgAcc * spp;
-				sppPerS = newWeight * sppDelta + (1-newWeight) * sppPerS;
-				sppLast = spp;
+				double sppPerS = spp / document->renderer.integration.timeSeconds();
 
 				ImGui::Text("%dx%d @ %.1f spp (%.2f spp/s)", document->renderer.integration.preview->resX, document->renderer.integration.preview->resY, spp, sppPerS);
 				if (mitsuba::ResponsiveIntegrator* igr = document->renderer.integration.process->integrator) {
@@ -694,8 +749,13 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 			}
 
 			if (!sceneIdx) {
-				ImGui::SliderFloat("Exposure", &exposure, 0, 1000, "%.2f", 4);
-				ImGui::SliderInt("Subres", &subres_levels, 0, 5);	
+				ImGui::SliderFloat("Exposure", &exposure, 0, 20, "%.2f", 4);
+				ImGui::SameLine();
+				ImGui::Checkbox("Flipping", &diff_flip);
+				ImGui::Checkbox("Diff", &show_diff);
+				ImGui::SameLine();
+				ImGui::SliderFloat("Factor", &comparison_factor, 0, 10, "%.2f", 4);
+				ImGui::SliderInt("Subres", &subres_levels, 0, 5);
 				ImGui::SameLine();
 				ImGui::Checkbox("Alpha", &alpha_transparent);
 				ImGui::ColorEdit3("background", (float*)&clear_color);
@@ -727,17 +787,27 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		}
 		if (!io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_PERIOD] && !io.KeysDownDuration[SDL_SCANCODE_PERIOD])
 			show_ui = !show_ui;
+		if (!io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_COMMA] && !io.KeysDownDuration[SDL_SCANCODE_COMMA])
+			show_diff = !show_diff;
+		if (!io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_BACKSLASH] && !io.KeysDownDuration[SDL_SCANCODE_BACKSLASH])
+			diff_flip = !diff_flip;
+		if (diff_flip || !io.WantCaptureKeyboard && (io.KeysDown[SDL_SCANCODE_SLASH] && !io.KeysDownDuration[SDL_SCANCODE_SLASH] || io.KeysDown[SDL_SCANCODE_SEMICOLON]))
+			++scene_rotation_offset;
 
 		// Rendering
-		ImGui::Render();
-		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-		glScissor(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-		glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-		glClear(GL_COLOR_BUFFER_BIT);
+		if (!null_render) {
+			ImGui::Render();
+			glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+			glScissor(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+			glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+			glClear(GL_COLOR_BUFFER_BIT);
 
-		ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-		SDL_GL_SwapWindow(window);
-
+			ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+			SDL_GL_SwapWindow(window);
+		}
+		else
+			ImGui::EndFrame();
+		
 		if (session) {
 			bool changes = false;
 			for (auto& s : session->scenes)
@@ -806,6 +876,7 @@ int main(int argc, char** argv) {
 	// Setup Platform/Renderer bindings
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL2_Init();
+	ImGui_ImplOpenGL2_NewFrame(); // init fonts
 
 #if 0
 	// Warmup

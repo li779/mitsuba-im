@@ -21,7 +21,7 @@ struct Scene {
 
 	static mitsuba::ref<mitsuba::Sensor> cloneSensor(mitsuba::Sensor& sensor, mitsuba::Sampler* sampler = nullptr, mitsuba::Film* film = nullptr);
 	static mitsuba::ref<mitsuba::Integrator> cloneIntegrator(mitsuba::Integrator const& sensor);
-	static mitsuba::ref<mitsuba::Sampler> cloneSampler(mitsuba::Sampler const& sampler);
+	static mitsuba::ref<mitsuba::Sampler> cloneSampler(mitsuba::Sampler const& sampler, int scramble = 0, float sampleMultiplier = 1.0f);
 	static mitsuba::ref<mitsuba::Scene> clonePreprocessed(mitsuba::Scene& scene);
 
 	static std::vector<std::string> availablePlugins(char const* symbol, bool refresh);
@@ -78,7 +78,7 @@ struct InteractiveSceneProcess {
 	int maxThreads;
 	int uniqueTargets;
 
-	float volatile *volatile *imageData;
+	float volatile* *volatile imageData;
 	int numActiveThreads;
 	int volatile paused;
 
@@ -117,7 +117,6 @@ struct StackedPreview : Preview {
 	float subresBias = 0.f;
 	// out
 	float minSppClamp = 1.f;
-	int workersPerTarget = 1;
 
 	static StackedPreview* create(int resX, int resY, int maxWorkers, int maxImages);
 	virtual ~StackedPreview();
@@ -125,7 +124,7 @@ struct StackedPreview : Preview {
 	virtual void update(unsigned long long timeStamp, float const* const* data, double const volatile dataSamples[], int maxN) = 0;
 	virtual void nextGeneration() = 0;
 	virtual void runGeneration(unsigned long long timestamp) = 0;
-	virtual bool upToDate(double const volatile dataRevisions[], int maxN) const = 0;
+	virtual bool upToDate(float const* const* data, double const volatile dataRevisions[], int maxN) const = 0;
 	virtual bool ready(unsigned long long timestamp) const = 0;
 };
 

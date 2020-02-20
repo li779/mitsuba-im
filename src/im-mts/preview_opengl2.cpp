@@ -85,11 +85,19 @@ namespace impl {
 			currentBasetime = timestamp;
 		}
 
-		bool upToDate(double const volatile dataSamples[], int maxN) const override {
+		bool upToDate(float const* const* data, double const volatile dataSamples[], int maxN) const override {
 			assert(maxN <= (int) samples.size());
-			for (int i = 0; i < maxN; ++i) {
+
+			float const* fbid = data[0];
+			for (int i = 0, j = 0; i < maxN; ++i) {
+				if (data[i] != fbid) {
+					fbid = data[i];
+					++j;
+				}
+				assert(j < (int) stamps.size());
+
 				double dataSpp = dataSamples[i];
-				if (dataSpp && (currentBasetime > (volatile unsigned long long&) stamps[i / workersPerTarget] || dataSpp != (volatile double&) samples[i]))
+				if (dataSpp && (currentBasetime > (volatile unsigned long long&) stamps[j] || dataSpp != (volatile double&) samples[i]))
 					return false;
 			}
 			return true;
@@ -108,8 +116,6 @@ namespace impl {
 		StackedPreview(int x, int y, int maxN, int maxT) {
 			this->resX = x;
 			this->resY = y;
-			this->workersPerTarget = maxN / maxT;
-			assert(workersPerTarget >= 1 && workersPerTarget * maxT == maxN);
 
 			{
 				this->stamps.resize(maxT, 0);
@@ -183,16 +189,18 @@ namespace impl {
 				return; // generation not ready to be run
 
 			assert(maxN <= (int) this->samples.size());
-			int maxT = (maxN + (this->workersPerTarget - 1)) / this->workersPerTarget;
-			assert(maxT <= (int) this->stamps.size());
 			bool multiData = !this->textures.empty();
 
 			float const* lastDataPtr = nullptr;
-			for (int i = 0; i < maxT; ++i) {
+
+			for (int j = 0, i = 0; j < maxN; ++i) {
+				float const* fbid = data[j];
+				assert(i <= (int) this->stamps.size());
+
 				unsigned long long reftime = basetime > stamps[i] ? basetime + this->readyMS : stamps[i] + this->updateMS;
 				if (timeStamp >= reftime) {
 					bool targetUpdates = false;
-					for (int j = i * workersPerTarget, je = std::min(j + workersPerTarget, maxN); j < je; ++j) {
+					for (; j < maxN && data[j] == fbid; ++j) {
 						double dataSpp = dataSamples[j];
 						float const* dataPtr = data[j];
 						if (dataSpp) {
@@ -210,12 +218,21 @@ namespace impl {
 					if (targetUpdates)
 						(volatile unsigned long long&) stamps[i] = timeStamp;
 				}
+
+				while (j < maxN && data[j] == fbid)
+					++j;
 			}
 			if (!lastDataPtr)
 				return;
 			float avgSamples = 0;
-			for (int i = 0; i < maxN; ++i) {
-				if (basetime <= stamps[i / workersPerTarget])
+			float const* fbid = data[0];
+			for (int i = 0, j = 0; i < maxN; ++i) {
+				if (data[i] != fbid) {
+					fbid = data[i];
+					++j;
+				}
+				assert(j < (int) stamps.size());
+				if (basetime <= stamps[j])
 					avgSamples += float(samples[i]);
 			}
 			this->avgSamples = avgSamples;
@@ -251,8 +268,8 @@ namespace impl {
 				glVertexPointer(2, GL_FLOAT, sizeof(float) * 2, (const GLvoid*) verts);
 				glTexCoordPointer(2, GL_FLOAT, sizeof(float) * 2, (const GLvoid*) texcs);
 
-				for (int i = 0; i < maxN; ++i) {
-					if (samples[i] != 0) {
+				for (int i = 0, maxT = (int) stamps.size(); i < maxT; ++i) {
+					if (basetime < stamps[i]) {
 						float scaleFactor = 1 / std::max(avgSamples, 1.f);
 						assert(glBlendColor);
 						glBlendColor(scaleFactor, scaleFactor, scaleFactor, 0);

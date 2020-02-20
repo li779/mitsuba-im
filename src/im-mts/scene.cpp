@@ -6,6 +6,7 @@
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/thread.h>
 #include <mitsuba/core/statistics.h>
+#include <cstdlib>
 
 int ProcessConfig::recommendedThreads() {
 	return mitsuba::getCoreCount();
@@ -77,10 +78,15 @@ mitsuba::ref<mitsuba::Integrator> Scene::cloneIntegrator(mitsuba::Integrator con
 	return integrator;
 }
 
-mitsuba::ref<mitsuba::Sampler> Scene::cloneSampler(mitsuba::Sampler const& sampler) {
+mitsuba::ref<mitsuba::Sampler> Scene::cloneSampler(mitsuba::Sampler const& sampler, int scramble, float sampleMultiplier) {
 	mitsuba::ref<mitsuba::PluginManager> pluginMgr = mitsuba::PluginManager::getInstance();
+	auto properties = sampler.getProperties();
+	if (sampleMultiplier != 1.0f)
+		properties.setInteger("sampleCount", int(sampleMultiplier * (mitsuba::Float) sampler.getSampleCount()), false);
+	if (scramble)
+		properties.setInteger("scramble", scramble, false);
 	mitsuba::ref<mitsuba::Sampler> newSampler = static_cast<mitsuba::Sampler *>(
-		pluginMgr->createObject(MTS_CLASS(mitsuba::Sampler), sampler.getProperties())
+		pluginMgr->createObject(MTS_CLASS(mitsuba::Sampler), properties)
 		);
 	newSampler->configure();
 	return newSampler;
@@ -264,10 +270,20 @@ namespace impl {
 		mitsuba::ref_vector<mitsuba::Sampler> samplers;
 		mitsuba::ref_vector<mitsuba::ImageBlock> framebuffers;
 		std::vector<float volatile*> frambufferData;
+		std::vector<double> sppBase;
 
 		mitsuba::ref_vector<mitsuba::ImageBlock> framebuffersDouble;
+		std::vector<float volatile*> frambufferDataDouble;
 
 		mitsuba::ref_vector<mitsuba::Thread> workers;
+
+		bool updateSamplersAndIntegrator() {
+			for (auto& s : samplers) {
+				s = this->samplerPrototype->clone();
+			}
+
+			return integrator->allocate(*scene, (mitsuba::Sampler*const*) samplers.data(), (mitsuba::ImageBlock*const*) framebuffers.data(), maxThreads);
+		}
 
 		InteractiveSceneProcess(mitsuba::Scene* scene, mitsuba::Sampler* sampler, mitsuba::ResponsiveIntegrator* integrator, ProcessConfig const& config) {
 			this->scene = scene;
@@ -281,15 +297,14 @@ namespace impl {
 
 			this->samplerPrototype = Scene::cloneSampler(*sampler);
 			this->samplers.resize(maxThreads);
-			for (int i = 0; i < maxThreads; ++i) {
-				samplers[i] = this->samplerPrototype->clone();
-			}
 
 			mitsuba::Vector2i filmSize = scene->getFilm()->getSize();
 
 			for (int i = 0; i < 1 + int(config.doubleBuffered); ++i) {
-				if (i)
+				if (i) {
 					swap(this->framebuffersDouble, this->framebuffers);
+					swap(this->frambufferDataDouble, this->frambufferData);
+				}
 				this->framebuffers.resize(maxThreads);
 #ifdef ATOMIC_SPLAT
 				framebuffers[0] = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, filmSize, scene->getFilm()->getReconstructionFilter());
@@ -301,16 +316,15 @@ namespace impl {
 					framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, filmSize, scene->getFilm()->getReconstructionFilter());
 				this->uniqueTargets = maxThreads;
 #endif
-			}
-
-			this->frambufferData.resize(maxThreads);
-			for (int i = 0; i < maxThreads; ++i) {
-				frambufferData[i] = framebuffers[i]->getBitmap()->getFloatData();
-				this->resolution = framebuffers[i]->getBitmap()->getSize();
+				this->frambufferData.resize(maxThreads);
+				for (int i = 0; i < maxThreads; ++i) {
+					frambufferData[i] = framebuffers[i]->getBitmap()->getFloatData();
+					this->resolution = framebuffers[i]->getBitmap()->getSize();
+				}
 			}
 			this->imageData = this->frambufferData.data();
 
-			integrator->allocate(*scene, (mitsuba::Sampler*const*) samplers.data(), (mitsuba::ImageBlock*const*) framebuffers.data(), maxThreads);
+			updateSamplersAndIntegrator();
 		}
 
 		void pause(bool pause) override {
@@ -330,44 +344,50 @@ namespace impl {
 			this->paused = false;
 			
 #ifdef ATOMIC_SPLAT
-			framebuffers[0]->clear();
+			this->framebuffers[0]->clear();
 #endif
+			// Update synchronized in order to ensure consecutive sharing
+			this->imageData = this->frambufferData.data();
+
 			mitsuba::Statistics::getInstance()->resetAll();
 
-			auto parallel_execution = [this, sensor, imageSamples, controls, numThreads](int tid) {
+			volatile int returnCode = 0;
+			bool initialRun = true;
+			auto parallel_execution = [this, sensor, imageSamples, controls, numThreads, &returnCode, &initialRun](int tid) {
 				mitsuba::Vector2i resolution = this->resolution;
 				mitsuba::Sampler* sampler = this->samplers[tid];
 				mitsuba::ImageBlock* block = this->framebuffers[tid];
 				double volatile& spp = imageSamples[tid];
+				double sppBase = this->sppBase[tid];
 
+				if (initialRun) {
 #ifndef ATOMIC_SPLAT
-				block->clear();
+					block->clear();
 #endif
-				struct Interrupt : mitsuba::ResponsiveIntegrator::Interrupt {
-					InteractiveSceneProcess* proc;
-					float* imageData;
-					volatile float *volatile& imageDataTarget;
-					double volatile& sppTarget;
+				}
 
-					Interrupt(InteractiveSceneProcess* proc, float* imageData, volatile float *volatile& imageDataTarget, double volatile& spp)
-						: proc(proc), imageData(imageData), imageDataTarget(imageDataTarget), sppTarget(spp) { }
+				struct Interrupt : mitsuba::ResponsiveIntegrator::Interrupt {
+					struct InterruptM {
+						InteractiveSceneProcess* proc;
+						double volatile& sppTarget;
+						double sppBase;
+					} m;
+					Interrupt(InterruptM const & m) : m(m) { }
 
 					int progress(mitsuba::ResponsiveIntegrator* integrator, const mitsuba::Scene &scene, const mitsuba::Sensor &sensor, mitsuba::Sampler &sampler, mitsuba::ImageBlock& target, double spp
 						, mitsuba::ResponsiveIntegrator::Controls controls, int threadIdx, int threadCount) override {
-						if (spp) {
-							imageDataTarget = imageData;
-							sppTarget = spp;
-						}
+						if (spp)
+							m.sppTarget = spp + m.sppBase;
 
-						if (proc->paused) {
-							std::unique_lock<std::mutex> lock(proc->pause_sync.mutex);
-							while (proc->paused && !(controls.continu && !*controls.continu) && !(controls.abort && *controls.abort))
-								proc->pause_sync.condition.wait(lock);
+						if (m.proc->paused) {
+							std::unique_lock<std::mutex> lock(m.proc->pause_sync.mutex);
+							while (m.proc->paused && !(controls.continu && !*controls.continu) && !(controls.abort && *controls.abort))
+								m.proc->pause_sync.condition.wait(lock);
 						}
 
 						return 0;
 					}
-				} interrupt = { this, block->getBitmap()->getFloatData(), this->imageData[tid], spp };
+				} interrupt = { { this, spp, sppBase } };
 
 				struct mitsuba::ResponsiveIntegrator::Controls icontrols = {
 					controls.continu,
@@ -375,33 +395,61 @@ namespace impl {
 					&interrupt
 				};
 
-				this->integrator->render(*this->scene, *sensor, *sampler, *block, icontrols, tid, numThreads);
+				int rc = this->integrator->render(*this->scene, *sensor, *sampler, *block, icontrols, tid, numThreads);
+				if (rc)
+					returnCode = rc;
 
 				// end of parallel execution
 			};
 
 			// build on mitsuba infrastructure instead of OpenMP b/c for classic mitsuba thread-local support etc.
-			while (numThreads > (int) workers.size()) {
-				int i = (int) workers.size();
+			if (numThreads > (int) workers.size())
+				workers.resize(numThreads);
+			for (int i = 0; i < numThreads; ++i) {
 				typedef decltype(parallel_execution) par_exe;
 				struct Thread : mitsuba::Thread {
 					int tid;
-					par_exe& parallel_execution;
-					Thread(int tid, par_exe& parallel_execution)
+					par_exe* parallel_execution;
+					Thread(int tid, par_exe* parallel_execution)
 						: mitsuba::Thread("interactive")
 						, tid(tid)
 						, parallel_execution(parallel_execution) { }
 					void run() override {
-						parallel_execution(tid);
+						(*parallel_execution)(tid);
 					}
 				};
-				workers.push_back(new Thread(i, parallel_execution));
+				if (auto* w = workers[i].get())
+					((Thread*) w)->parallel_execution = &parallel_execution;
+				else
+					workers[i] = new Thread(i, &parallel_execution);
 			}
-			for (int i = 0; i < numThreads; ++i) {
-				workers[i]->start();
-			}
-			for (int i = numThreads; i-- > 0; ) {
-				workers[i]->join();
+
+			bool moreRounds = true;
+			int scramble = 0;
+			while (moreRounds) {
+				if (initialRun) {
+					this->sppBase.resize(numThreads);
+					std::fill(this->sppBase.begin(), this->sppBase.end(), 0.0f);
+				}
+				else
+					std::copy_n(imageSamples, numThreads, this->sppBase.begin());
+
+				for (int i = 0; i < numThreads; ++i) {
+					workers[i]->start();
+				}
+				for (int i = numThreads; i-- > 0; ) {
+					workers[i]->join();
+				}
+
+				initialRun = false;
+				moreRounds = (returnCode == 0);
+				moreRounds &= controls.continu ? *controls.continu : controls.abort != nullptr;
+				moreRounds &= !controls.abort || !*controls.abort;
+				if (moreRounds) {
+					samplerPrototype = Scene::cloneSampler(*samplerPrototype, ++scramble, 2.0f);
+					SLog(mitsuba::EWarn, "Exhausted samples, attempting to restart with changed parameters: %d samples, scramble %d", (int) samplerPrototype->getSampleCount(), scramble);
+					moreRounds = updateSamplersAndIntegrator();
+				}
 			}
 
 			// don't change the contents until next samples are ready, if double buffered
@@ -409,8 +457,10 @@ namespace impl {
 				bool hadRevisions = false;
 				for (int i = 0; i < numThreads; ++i)
 					hadRevisions |= bool(imageSamples[i]);
-				if (hadRevisions)
+				if (hadRevisions) {
 					swap(framebuffers, framebuffersDouble);
+					swap(frambufferData, frambufferDataDouble);
+				}
 			}
 		}
 	};
@@ -455,7 +505,6 @@ namespace impl {
 		mutable std::condition_variable condition;
 
 		mutable int volatile awaiting_sync = false;
-		mutable int is_sync = false;
 
 		std::thread thread;
 
@@ -481,27 +530,25 @@ namespace impl {
 		}
 
 		int synchronized(Sync& sync) const override {
-			std::unique_lock<std::mutex> lock(mutex);
-			++awaiting_sync;
-			while (!is_sync) {
-				condition.wait(lock);
+			int r = 0;
+			bool synced = false;
+			if (awaiting_sync) {
+				std::unique_lock<std::mutex> lock(mutex);
+				if (awaiting_sync) {
+					r = sync.sync();
+					--awaiting_sync;
+					synced = true;
+				}
 			}
-			--awaiting_sync;
-
-			int r = sync.sync();
-			condition.notify_all();
+			if (synced)
+				condition.notify_all();
 			return r;
 		}
 		void synchronize() const override {
-			if (awaiting_sync) {
-				std::unique_lock<std::mutex> lock(mutex);
-				is_sync = true;
-				while (awaiting_sync) {
-					condition.notify_all();
-					condition.wait(lock);
-				}
-				is_sync = false;
-			}
+			std::unique_lock<std::mutex> lock(mutex);
+			++awaiting_sync;
+			while (awaiting_sync)
+				condition.wait(lock);
 		}
 	};
 
