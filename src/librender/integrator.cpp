@@ -347,6 +347,13 @@ int ImageOrderIntegrator::render(const Scene &scene, const Sensor &sensor, Sampl
 		if (work == workEnd) {
 			++completedBlocks;
 			int wid = (threadIdx + 17 * completedBlocks) % threadCount;
+			// advance the sampler (note: random pixels inefficient for samplers that pre-generate)
+			if (completedBlocks) {
+//				SLog(EInfo, "Thread [%d] sample index: %d", threadIdx, (int) sampler.getSampleIndex());
+				if (sampler.getSampleIndex() + 1 >= sampler.getSampleCount())
+					break;
+				sampler.advance();
+			}
 			workBegin = wid * blockSize + this->m_pxPermutation.data();
 			workEnd = std::min((wid+1) * blockSize, planeSamples) + this->m_pxPermutation.data();
 			work = workBegin;
@@ -373,13 +380,11 @@ int ImageOrderIntegrator::render(const Scene &scene, const Sensor &sensor, Sampl
 		// one sample
 		int j = *work++;
 		mitsuba::Point2i offset(j % resolution.x, j / resolution.x);
-		sampler.generate(offset);
+		sampler.generate(offset, ~0);
 
 		returnCode = this->render(scene, sensor, sampler, target, offset, threadIdx, threadCount);
 
-		sampler.advance();
 		++currentSamples;
-
 		// precise sample tracking
 		if (currentSamples == planeSamples) {
 			++completedPlanes;

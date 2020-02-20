@@ -168,9 +168,9 @@ public:
 	}
 
 
-	void generate(const Point2i &pos) {
+	void generate(const Point2i &pos, size_t nextSampleIdx) override {
 		m_pixelPosition = pos;
-		setSampleIndex(0);
+		setSampleIndex(nextSampleIdx != ~0 ? nextSampleIdx : m_sampleIndex);
 
 		/* Dimensions reserved to sample array requests */
 		m_arrayStartDim = 5;

@@ -144,7 +144,7 @@ public:
 		return sampler.get();
 	}
 
-	void generate(const Point2i &) {
+	void generate(const Point2i &, size_t nextSampleIdx) {
 		for (int i=0; i<m_maxDimension; i++) {
 			for (size_t j=0; j<m_sampleCount; j++)
 				m_permutations1D[i][j] = (uint32_t) j;
@@ -161,7 +161,8 @@ public:
 			latinHypercube(m_random, reinterpret_cast<Float *>(m_sampleArrays2D[i]),
 				m_req2D[i] * m_sampleCount, 2);
 
-		m_sampleIndex = 0;
+		if (nextSampleIdx != ~0)
+			m_sampleIndex = nextSampleIdx;
 		m_dimension1D = m_dimension2D = 0;
 		m_dimension1DArray = m_dimension2DArray = 0;
 	}

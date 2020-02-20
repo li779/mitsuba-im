@@ -24,7 +24,7 @@ Sampler::Sampler(const Properties &props)
  : ConfigurableObject(props), m_sampleCount(0), m_sampleIndex(0) { }
 
 Sampler::Sampler(Stream *stream, InstanceManager *manager)
- : ConfigurableObject(stream, manager) {
+ : ConfigurableObject(stream, manager), m_sampleIndex(0) {
 	m_sampleCount = stream->readSize();
 	size_t n1DArrays = stream->readSize();
 	for (size_t i=0; i<n1DArrays; ++i)
@@ -48,8 +48,9 @@ void Sampler::serialize(Stream *stream, InstanceManager *manager) const {
 
 void Sampler::setFilmResolution(const Vector2i &, bool) { }
 
-void Sampler::generate(const Point2i &) {
-	m_sampleIndex = 0;
+void Sampler::generate(const Point2i &, size_t nextSampleIdx) {
+	if (nextSampleIdx != ~0)
+		m_sampleIndex = nextSampleIdx;
 	m_dimension1DArray = m_dimension2DArray = 0;
 }
 

@@ -53,7 +53,7 @@ public:
 
 	/* Does nothing in this implementation */
 	virtual void advance();
-	virtual void generate(const Point2i &pos);
+	virtual void generate(const Point2i &pos, size_t sampleIndex);
 
 	/// Manually set the current sample index
 	virtual void setSampleIndex(size_t sampleIndex);

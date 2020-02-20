@@ -62,7 +62,7 @@ void ReplayableSampler::request2DArray(size_t size) {
 	Log(EError, "ReplayableSampler::request2DArray() - unsupported!");
 }
 
-void ReplayableSampler::generate(const Point2i &) { }
+void ReplayableSampler::generate(const Point2i &, size_t sampleIndex) { }
 void ReplayableSampler::advance() { }
 
 void ReplayableSampler::setSampleIndex(size_t sampleIndex) {

@@ -203,7 +203,7 @@ public:
 		m_pixelPosition = Point2i(0);
 	}
 
-	void generate(const Point2i &pos) {
+	void generate(const Point2i &pos, size_t nextSampleIdx) {
 		/* Dimensions reserved to sample array requests */
 		m_arrayStartDim = 5;
 		m_arrayEndDim = m_arrayStartDim +
@@ -219,7 +219,7 @@ public:
 				m_permutations.get() ? m_permutations->getInversePermutation(0) : NULL);
 		}
 
-		setSampleIndex(0);
+		setSampleIndex(nextSampleIdx != ~0 ? nextSampleIdx : m_sampleIndex);
 	}
 
 	void advance() {

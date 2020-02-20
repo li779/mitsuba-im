@@ -271,7 +271,7 @@ public:
 		m_offset = 0;
 	}
 
-	void generate(const Point2i &pos) {
+	void generate(const Point2i &pos, size_t nextSampleIdx) {
 		/* Dimensions reserved to sample array requests */
 		m_arrayStartDim = 5;
 		m_arrayEndDim = m_arrayStartDim +
@@ -325,7 +325,7 @@ public:
 			dim += 2;
 		}
 
-		setSampleIndex(0);
+		setSampleIndex(nextSampleIdx != ~0 ? nextSampleIdx : m_sampleIndex);
 	}
 
 	void advance() {
