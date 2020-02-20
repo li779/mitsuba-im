@@ -1,0 +1,105 @@
+<html>
+<head><title>mitsuba XSLT upgrader</title></head>
+<body>
+<div>
+	<label>XSLT:</label><input id="xslt-button" type="file" multiple="true" name="xslt" value="C:/Development/Code/mitsuba/data/schema/upgrade_0.5.0.xsl"><br>
+	<label>Scene:</label><input id="input-button" type="file" name="scene">
+	<div id="output-area"></div>
+</div>
+<div id="log-area"></div>
+<script>
+var xsltButton = document.getElementById('xslt-button');
+var inputButton = document.getElementById('input-button');
+var outputArea = document.getElementById('output-area');
+var logArea = document.getElementById('log-area');
+
+function printMsg(text) {
+	var el = document.createElement('div');
+	logArea.appendChild(el);
+	el.outerHTML = text;
+}
+
+var XSLTs = [];
+function handleXSLTSelect(evt) {
+	if (evt.target.files.length < 1)
+		return;
+	var newInputs = [];
+	for (var file of evt.target.files) {
+		newInputs.push(file);
+	}
+	newInputs.sort(function(a,b) { return a.name.localeCompare(b.name); });
+	var newTransforms = [];
+	for (var file of newInputs) {
+		printMsg('Transform ' + file.name + '<br>');
+		var fileUrl = URL.createObjectURL(file);
+		try {
+			xhttp = new XMLHttpRequest();
+			xhttp.overrideMimeType("application/xml");
+			xhttp.open("GET", fileUrl, false);
+			try { xhttp.responseType = "msxml-document"; } catch(err) {} // Helping IE11
+			xhttp.send(null);
+			xsltProcessor = new XSLTProcessor();
+			xsltProcessor.importStylesheet(xhttp.responseXML);
+			newTransforms.push(xsltProcessor);
+			
+		} catch(err) {
+			window.alert(err);
+		}
+		URL.revokeObjectURL(fileUrl);
+	}
+	XSLTs = newTransforms;
+	setTimeout(function() {
+		inputButton.click();
+	}, 0); 
+	printMsg('<p>Select scene (can be repeated!) ...<br>');
+};
+xsltButton.addEventListener('change', handleXSLTSelect, false);
+
+function saveFile(name, xmlobj) {
+	var a = document.createElement("a");
+	a.download = name;
+	a.type = 'application/xml';
+	a.href = URL.createObjectURL(xmlobj);
+	a.appendChild(document.createTextNode(name));
+	logArea.appendChild(a);
+	printMsg(' (download)<br>');
+	a.click();
+}
+
+function handleInputSelect(evt) {
+	if (evt.target.files.length < 1)
+		return;
+	for (var file of evt.target.files) {
+		var fileUrl = URL.createObjectURL(file);
+		try {
+			xhttp = new XMLHttpRequest();
+			xhttp.overrideMimeType("application/xml");
+			xhttp.open("GET", fileUrl, false);
+			try { xhttp.responseType = "msxml-document"; } catch(err) {} // Helping IE11
+			xhttp.send(null);
+			var result = xhttp.responseXML;
+			for (var xsl of XSLTs) {
+				result = xsl.transformToDocument(result);
+			}
+			var s = new XMLSerializer();
+			var sresult = s.serializeToString( result );
+			var blob = new Blob([sresult], {type: "text/xml"});
+			saveFile(file.name, blob)
+		} catch(err) {
+			window.alert(err);
+		}
+		URL.revokeObjectURL(fileUrl);
+	}
+};
+inputButton.addEventListener('change', handleInputSelect, false);
+
+document.body.onload = function() {
+	printMsg('<p>Launching!');
+	setTimeout(function() {
+		xsltButton.click();
+	}, 0); 
+	printMsg('<p>Select XSLTs ...<br>');
+}
+</script>
+</body>
+</html>
