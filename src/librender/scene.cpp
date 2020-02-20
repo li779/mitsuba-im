@@ -481,7 +481,7 @@ void Scene::postprocess(RenderQueue *queue, const RenderJob *job,
 		int sceneResID, int sensorResID, int samplerResID) {
 	m_integrator->postprocess(this, queue, job, sceneResID,
 		sensorResID, samplerResID);
-	m_sensor->getFilm()->develop(this, queue->getRenderTime(job));
+	m_sensor->getFilm()->develop(this, (queue) ? queue->getRenderTime(job) : 0);
 }
 
 void Scene::addChild(const std::string &name, ConfigurableObject *child) {

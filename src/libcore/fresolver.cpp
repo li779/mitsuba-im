@@ -167,7 +167,9 @@ std::vector<fs::pathstr> FileResolver::resolveAll(fs::pathstr const& spath) cons
 }
 
 fs::pathstr FileResolver::resolveAbsolute(fs::pathstr const& path) const {
-	return fs::encode_pathstr(fs::absolute(fs::decode_pathstr(resolve(path))));
+	fs::pathstr rspath = resolve(path);
+	fs::path p = fs::absolute(fs::decode_pathstr(rspath));
+	return exists(p) ? fs::encode_pathstr(p) : rspath;
 }
 
 size_t FileResolver::getPathCount() const { return m_paths.size(); }
