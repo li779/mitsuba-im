@@ -237,7 +237,7 @@ if (NOT XercesC_FOUND)
 
 	set(XercesC_DEFINITIONS -DXERCES_STATIC)
 	if (NOT WIN32)
-		set(XercesC_LIBRARIES ${XercesC_LIBRARIES} icuuc icudata)
+		target_link_libraries(${XercesC_LIBRARY} INTERFACE icuuc icudata)
 	endif ()
 
 	set(XERCES_DEFINITIONS ${XercesC_DEFINITIONS})
