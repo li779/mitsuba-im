@@ -117,10 +117,10 @@ public:
 	/// Return the max. vertical bearing
 	inline int getMaxVerticalBearing() const { return m_maxVerticalBearing; }
 
-	MTS_EXPORT_RENDER MTS_DECLARE_CLASS()
+	MTS_DECLARE_CLASS(MTS_EXPORT_RENDER)
 protected:
 	/// Virtual destructor
-	virtual ~Font();
+	MTS_EXPORT_RENDER virtual ~Font();
 private:
 	std::string m_name;
 	ref<GPUTexture> m_texture;
