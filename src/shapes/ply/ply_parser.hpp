@@ -9,7 +9,6 @@
 #include <vector>
 #include <cctype>
 
-#define MTS_USE_BOOST_TR1 0
 #define ADT_WORKAROUND 1
 
 #include <functional>
@@ -28,6 +27,8 @@
 #include <ply/io_operators.hpp>
 
 #include <mitsuba/core/filesystem.h>
+
+using namespace std::placeholders;
 
 namespace ply {
 
@@ -216,7 +217,7 @@ public:
 
   ply_parser(flags_type flags = 0);
   bool parse(std::istream& istream);
-  bool parse(const fs::pathstr& filename);
+  bool parse(const std::string& filename);
 
 private:
 
@@ -295,9 +296,9 @@ inline ply::ply_parser::ply_parser(flags_type flags)
 {
 }
 
-inline bool ply::ply_parser::parse(const fs::pathstr& filename)
+inline bool ply::ply_parser::parse(const fs::path::string_type& filename)
 {
-  std::ifstream ifstream(fs::path::string_type(filename).c_str(), std::ios::in | std::ios::binary);
+  std::ifstream ifstream(filename.c_str(), std::ios::in | std::ios::binary);
   return parse(ifstream);
 }
 

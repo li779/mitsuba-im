@@ -22,24 +22,7 @@
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/filesystem.h>
 #include <ply/ply_parser.hpp>
-
-#if MTS_USE_BOOST_TR1
-#include <boost/tr1/functional.hpp>
-#else
-#if defined(_MSC_VER) && (_MSC_VER >= 1600)
 #include <functional>
-#else
-#include <tr1/functional>
-#endif
-#endif
-
-#if !MTS_USE_BOOST_TR1 && defined(_MSC_VER) && (_MSC_VER >= 1600)
-# define PLY_USE_NULLPTR 1
-#else
-# define PLY_USE_NULLPTR 0
-#endif
-
-using namespace std::placeholders;
 
 MTS_NAMESPACE_BEGIN
 
@@ -188,15 +171,9 @@ public:
 				std::bind(&PLYLoader::face_end_callback, this)
 			);
 		} else {
-#if PLY_USE_NULLPTR
 			return
 				std::tuple<std::function<void()>,
 				std::function<void()> >(nullptr, nullptr);
-#else
-			return
-				std::tuple<std::function<void()>,
-				std::function<void()> >(0, 0);
-#endif
 		}
 	}
 
@@ -363,11 +340,7 @@ template<> std::function <void (ply::float32)>
 			return std::bind(&PLYLoader::face_blue_callback, this,  _1);
 		}
 	}
-#if PLY_USE_NULLPTR
 	return nullptr;
-#else
-	return 0;
-#endif
 }
 
 template<> std::function <void (ply::uint8)>
@@ -390,11 +363,7 @@ template<> std::function <void (ply::uint8)>
 			return std::bind(&PLYLoader::face_blue_callback_uint8, this,  _1);
 		}
 	}
-#if PLY_USE_NULLPTR
 	return nullptr;
-#else
-	return 0;
-#endif
 }
 
 template<> std::tuple<std::function<void (ply::uint8)>,
@@ -409,15 +378,9 @@ template<> std::tuple<std::function<void (ply::uint8)>,
 			std::bind(&PLYLoader::face_vertex_indices_end, this)
 		);
 	} else {
-#if PLY_USE_NULLPTR
 		return std::tuple<std::function<void (ply::uint8)>,
 			std::function<void (ply::int32)>,
 			std::function<void ()> >(nullptr, nullptr, nullptr);
-#else
-		return std::tuple<std::function<void (ply::uint8)>,
-			std::function<void (ply::int32)>,
-			std::function<void ()> >(0, 0, 0);
-#endif
 	}
 }
 
@@ -433,15 +396,9 @@ template<> std::tuple<std::function<void (ply::uint32)>,
 			std::bind(&PLYLoader::face_vertex_indices_end, this)
 		);
 	} else {
-#if PLY_USE_NULLPTR
-		return std::tuple<std::function<void (ply::uint32)>,
-			std::function<void (ply::int32)>,
-			std::function<void ()> >(nullptr, nullptr, nullptr);
-#else
 		return std::tuple<std::function<void (ply::uint32)>,
 			std::function<void (ply::int32)>,
 			std::function<void ()> >(0, 0, 0);
-#endif
 	}
 }
 
@@ -457,15 +414,9 @@ template<> std::tuple<std::function<void (ply::uint8)>,
 			std::bind(&PLYLoader::face_vertex_indices_end, this)
 		);
 	} else {
-#if PLY_USE_NULLPTR
-		return std::tuple<std::function<void (ply::uint8)>,
-			std::function<void (ply::uint32)>,
-			std::function<void ()> >(nullptr, nullptr, nullptr);
-#else
 		return std::tuple<std::function<void (ply::uint8)>,
 			std::function<void (ply::uint32)>,
 			std::function<void ()> >(0, 0, 0);
-#endif
 	}
 }
 
@@ -481,15 +432,9 @@ template<> std::tuple<std::function<void (ply::uint32)>,
 			std::bind(&PLYLoader::face_vertex_indices_end, this)
 		);
 	} else {
-#if PLY_USE_NULLPTR
-		return std::tuple<std::function<void (ply::uint32)>,
-			std::function<void (ply::uint32)>,
-			std::function<void ()> >(nullptr, nullptr, nullptr);
-#else
 		return std::tuple<std::function<void (ply::uint32)>,
 			std::function<void (ply::uint32)>,
 			std::function<void ()> >(0, 0, 0);
-#endif
 	}
 }
 
