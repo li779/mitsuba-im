@@ -719,7 +719,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 				}
 			}
 			// reload?
-			if (!addedDoc) {
+			if (document && !addedDoc) {
 				bool reload = ImGui::Button("reload");
 				ImGui::SameLine();
 				ImGui::Checkbox("track file changes", &track_file_changes);
