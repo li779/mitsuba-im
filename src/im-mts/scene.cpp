@@ -495,6 +495,7 @@ InteractiveSceneProcess* InteractiveSceneProcess::create(mitsuba::Scene* scene, 
 InteractiveSceneProcess::~InteractiveSceneProcess() = default;
 
 #include <thread>
+#include <chrono>
 
 namespace impl {
 
@@ -536,7 +537,7 @@ namespace impl {
 				std::unique_lock<std::mutex> lock(mutex);
 				if (awaiting_sync) {
 					r = sync.sync();
-					--awaiting_sync;
+					awaiting_sync = 0;
 					synced = true;
 				}
 			}
@@ -547,8 +548,7 @@ namespace impl {
 		void synchronize() const override {
 			std::unique_lock<std::mutex> lock(mutex);
 			++awaiting_sync;
-			while (awaiting_sync)
-				condition.wait(lock);
+			condition.wait_for(lock, std::chrono::milliseconds(100));
 		}
 	};
 

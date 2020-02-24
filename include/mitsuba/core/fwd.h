@@ -192,6 +192,15 @@ namespace fs {
 		operator std::string const&() const { return s; }
 		MTS_EXPORT_CORE operator std::wstring() const;
 	};
+
+	namespace mts_fs_util {
+		MTS_EXPORT_CORE bool exists(const pathstr& what);
+		MTS_EXPORT_CORE unsigned long long last_write_time(const pathstr& what);
+		MTS_EXPORT_CORE bool copy_file(const pathstr& from, const pathstr& to);
+		MTS_EXPORT_CORE bool rename(const pathstr& from, const pathstr& to);
+		MTS_EXPORT_CORE bool remove(const pathstr& what);
+	}
+	using namespace mts_fs_util;
 }
 
 #endif /* __MITSUBA_CORE_FWD_H_ */

@@ -10,8 +10,7 @@
 #include <cstdio>
 #include <memory>
 
-struct InteractiveSensor {
-	mitsuba::ref<mitsuba::Sensor> sensor;
+struct InteractiveTransform {
 	mitsuba::Transform trafo;
 
 	mitsuba::Vector3 rotUp = mitsuba::Vector3(0, 1, 0);
@@ -19,10 +18,8 @@ struct InteractiveSensor {
 	float sensitivity = 1;
 	float speed = 1;
 
-	InteractiveSensor(mitsuba::ref<mitsuba::Sensor> sensor)
-		: sensor(sensor)
-		, trafo(sensor->getWorldTransform()->eval(0.5f)) {
-
+	InteractiveTransform(const mitsuba::Transform& tx)
+		: trafo(tx) {
 		mitsuba::Vector4 approxUp = trafo( mitsuba::Vector4(0, 1, 0, 0) );
 		if (std::abs(approxUp.x * rotUp.x + approxUp.y * rotUp.y + approxUp.z * rotUp.z) < 0.5f) {
 			rotUp = mitsuba::Vector3(0, 0, 1);
@@ -79,17 +76,28 @@ struct InteractiveSensor {
 				changed = true;
 			}
 		}
+		this->trafo = trafo;
+		return changed;
+	}
+};
+struct InteractiveSensor : InteractiveTransform {
+	mitsuba::ref<mitsuba::Sensor> sensor;
+
+	InteractiveSensor(mitsuba::ref<mitsuba::Sensor> sensor)
+		: InteractiveTransform(sensor->getWorldTransform()->eval(0.5f))
+		, sensor(sensor) {
+	}
+	bool update(ImGuiIO& io) {
+		bool changed = InteractiveTransform::update(io);
 		if (changed)
 			transform(trafo);
 		return changed;
 	}
-
 	void transform(mitsuba::Transform const& newTf) {
-		trafo = newTf;
+		this->trafo = newTf;
 		sensor->setWorldTransform(new mitsuba::AnimatedTransform(trafo));
 	}
-
-	void apply(mitsuba::Sensor* target) {
+	void applyTo(mitsuba::Sensor* target) const {
 		target->setWorldTransform(new mitsuba::AnimatedTransform(trafo));
 	}
 };
@@ -100,6 +108,7 @@ struct Config {
 
 struct Document {
 	fs::pathstr filePath = fs::pathstr("../mitsuba/scenes/bitterli/living-room/livingroom_PT.xml");
+	unsigned long long fileTime = 0;
 	std::unique_ptr<Scene> scene{ Scene::load(this->filePath) };
 	InteractiveSensor camera = { Scene::cloneSensor(*this->scene->scene->getSensor()) };
 
@@ -215,9 +224,12 @@ struct Document {
 
 			while (needsSync()) {
 				lane->synchronize();
+				// wake up due to quit/abort?
+				if (!lane->continu)
+					return;
 			}
 
-			sensor->apply(scene->getSensor());
+			sensor->applyTo(scene->getSensor());
 
 			scene->setIntegratorPreprocessed(true);
 			scene->preprocess(nullptr, nullptr, -1, -1, -1); // todo: this might crash for more advanced subsurf integrators ...?
@@ -266,7 +278,7 @@ struct Document {
 				process->cancel();
 			}
 			reallocate();
-			//sensor->apply(processedScene->getSensor());
+			//sensor->applyTo(processedScene->getSensor());
 			process->renderAsync(&revision);
 			return true;
 		}
@@ -299,7 +311,11 @@ struct Document {
 
 	Document(fs::pathstr const& file, Config const& config)
 		: filePath(file)
+		, fileTime(fs::mts_fs_util::last_write_time(file))
 		, renderer(scene->scene, &camera, config) {
+	}
+	bool fileChanged() const {
+		return fs::mts_fs_util::last_write_time(filePath) > fileTime;
 	}
 
 	void run() {
@@ -508,6 +524,8 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		was_window_hidden = window_hidden;
 	};
 
+	unsigned long long lastTrackerTicks = SDL_GetTicks();
+
 	// Main loop
 	while (true) {
 		ImGui::SetCurrentContext(ui_context);
@@ -570,6 +588,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
+		int mouseSceneIdx = -1;
 		if (session && !null_render) {
 			int cols = (int) std::ceil( std::sqrt( (float) session->scenes.size() ) );
 			int rows = ((int) session->scenes.size() + (cols - 1)) / cols;
@@ -585,6 +604,9 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 
 				int cx = col * int(io.DisplaySize.x) / cols + 1, cy = row * int(io.DisplaySize.y) / rows + 1;
 				int cxe = (col+1) * int(io.DisplaySize.x) / cols - 1, cye = (row+1) * int(io.DisplaySize.y) / rows - 1;
+
+				if (io.MousePos.x >= cx && io.MousePos.y >= cy)
+					mouseSceneIdx = sceneIdx;
 
 				bool finalPreview = (show_final_render && s->classic.preview);
 				Preview& preview = finalPreview ? (Preview&) *s->classic.preview : (Preview&) *s->renderer.integration.preview;
@@ -647,7 +669,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		}
 
 		Session* selectedSession = nullptr;
-		std::unique_ptr<Document> addedDoc;
+		std::unique_ptr<Document> addedDoc; int docReplacementIdx = -1;
 		for (int sceneIdx = 0; sceneIdx < int(session && !session->scenes.empty() ? session->scenes.size() : 1) && show_ui; ++sceneIdx) {
 			Document* document = session && sceneIdx < (int) session->scenes.size() ? session->scenes[sceneIdx].get() : nullptr;
 			
@@ -680,7 +702,32 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 						if (newDoc)
 							selectedSession = openSession(std::move(newDoc));
 					}
+					if (session && !session->scenes.empty()) {
+						ImGui::Selectable("-- replace in session: --", ImGuiSelectableFlags_Disabled);
+						int sceneIdx = 0;
+						for (auto& s : session->scenes) {
+							if (ImGui::Selectable(s->filePath.s.c_str(), false)) {
+								Session::AutoPause pause(session);
+								addedDoc = browseForScene(config);
+								docReplacementIdx = sceneIdx;
+							}
+							++sceneIdx;
+						}
+					}
 					ImGui::EndCombo();
+				}
+			}
+			// reload?
+			if (!addedDoc) {
+				bool reload = ImGui::Button("reload");
+				reload |= mouseSceneIdx == sceneIdx && !io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_F5] && !io.KeysDownDuration[SDL_SCANCODE_F5];
+				if (SDL_GetTicks() > lastTrackerTicks + 1500) {
+					reload |= document->fileChanged();
+					lastTrackerTicks = SDL_GetTicks();
+				}
+				if (reload) {
+					addedDoc.reset( new Document(document->filePath, config) );
+					docReplacementIdx = sceneIdx;
 				}
 			}
 
@@ -808,23 +855,32 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		else
 			ImGui::EndFrame();
 		
-		if (session) {
-			bool changes = false;
-			for (auto& s : session->scenes)
-				// todo: the ready check should not indefinitely delay changes ...
-				changes |= s->camera.update(io) && s->renderer.integration.preview->ready(SDL_GetTicks());
+		if (session && mouseSceneIdx >= 0 && mouseSceneIdx < (int) session->scenes.size()) {
+			auto& s = session->scenes[mouseSceneIdx];
+			// todo: the ready check should not indefinitely delay changes ...
+			bool changes = s->camera.update(io) && s->renderer.integration.preview->ready(SDL_GetTicks());
 			if (changes) {
-				if (sync_cams)
+				if (sync_cams) {
 					for (auto& s : session->scenes) {
-						if (s != session->scenes[0])
-							s->camera.transform(session->scenes[0]->camera.trafo);
+						if (s != session->scenes[mouseSceneIdx])
+							s->camera.transform(session->scenes[mouseSceneIdx]->camera.trafo);
 					}
-				session->restart();
+					session->restart();
+				}
+				else
+					s->restart();
 			}
 		}
 
 		if (addedDoc) {
-			session->scenes.push_back( std::move(addedDoc) );
+			if (docReplacementIdx >= 0) {
+				auto oldDoc = std::move(session->scenes[docReplacementIdx]);
+				auto newDoc = addedDoc.get();
+				session->scenes[docReplacementIdx] = std::move(addedDoc);
+				(InteractiveTransform&) newDoc->camera = oldDoc->camera;
+			}
+			else
+				session->scenes.push_back( std::move(addedDoc) );
 			session->reconfigure(config);
 			session->restart(); // restart old ones
 			session->run(); // run new ones

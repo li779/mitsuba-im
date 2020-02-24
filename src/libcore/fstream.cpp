@@ -448,6 +448,7 @@ MTS_NAMESPACE_END
 
 #include <mitsuba/core/filesystem.h>
 #include <codecvt>
+#include <chrono>
 
 namespace fs {
 	pathstr::pathstr(pathdat const& dat)
@@ -467,5 +468,28 @@ namespace fs {
 			return u8path(p.s);
 		else
 			return path(p.s);
+	}
+
+	bool mts_fs_util::exists(const pathstr& what) {
+		return exists(decode_pathstr(what));
+	}
+	unsigned long long mts_fs_util::last_write_time(const pathstr& what) {
+		std::error_code ec;
+		return std::chrono::duration_cast<std::chrono::milliseconds>( last_write_time(decode_pathstr(what), ec).time_since_epoch() ).count();
+	}
+	bool mts_fs_util::copy_file(const pathstr& from, const pathstr& to) {
+		std::error_code ec;
+		copy_file(decode_pathstr(from), decode_pathstr(to), ec);
+		return !ec;
+	}
+	bool mts_fs_util::rename(const pathstr& from, const pathstr& to) {
+		std::error_code ec;
+		rename(decode_pathstr(from), decode_pathstr(to), ec);
+		return !ec;
+	}
+	bool mts_fs_util::remove(const pathstr& what) {
+		std::error_code ec;
+		remove(decode_pathstr(what), ec);
+		return !ec;
 	}
 }
