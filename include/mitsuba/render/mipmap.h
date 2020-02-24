@@ -406,7 +406,7 @@ public:
 	static bool validateCacheFile(const fs::pathstr &path, uint64_t timestamp,
 			Bitmap::EPixelFormat pixelFormat, EBoundaryCondition bcu,
 			EBoundaryCondition bcv, EMIPFilterType filterType, Float gamma) {
-		std::ifstream is(fs::path::string_type(path).c_str());
+		std::ifstream is(decode_pathstr(path).string().c_str());
 		if (!is.good())
 			return false;
 

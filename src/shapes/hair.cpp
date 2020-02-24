@@ -720,7 +720,7 @@ HairShape::HairShape(const Properties &props) : Shape(props) {
 		std::string line;
 		bool newFiber = true;
 
-		std::ifstream is(fs::path::string_type(path).c_str());
+		std::ifstream is(decode_pathstr(path).string().c_str());
 		if (is.fail())
 			Log(EError, "Could not open \"%s\"!", path.s.c_str());
 		while (is.good()) {

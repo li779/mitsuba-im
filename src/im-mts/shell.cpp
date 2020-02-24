@@ -589,6 +589,11 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
+		const unsigned long long currentTicks = SDL_GetTicks();
+		bool isTrackingFrame = currentTicks >= lastTrackerTicks + 1500;
+		if (isTrackingFrame)
+			lastTrackerTicks = currentTicks;
+
 		int mouseSceneIdx = -1;
 		if (session && !null_render) {
 			int cols = (int) std::ceil( std::sqrt( (float) session->scenes.size() ) );
@@ -724,10 +729,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 				ImGui::SameLine();
 				ImGui::Checkbox("track file changes", &track_file_changes);
 				reload |= mouseSceneIdx == sceneIdx && !io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_F5] && !io.KeysDownDuration[SDL_SCANCODE_F5];
-				if (track_file_changes && SDL_GetTicks() > lastTrackerTicks + 1500) {
-					reload |= document->fileChanged();
-					lastTrackerTicks = SDL_GetTicks();
-				}
+				reload |= track_file_changes && isTrackingFrame && document->fileChanged();
 				if (reload) {
 					addedDoc.reset( new Document(document->filePath, config) );
 					docReplacementIdx = sceneIdx;
@@ -861,7 +863,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		if (session && mouseSceneIdx >= 0 && mouseSceneIdx < (int) session->scenes.size()) {
 			auto& s = session->scenes[mouseSceneIdx];
 			// todo: the ready check should not indefinitely delay changes ...
-			bool changes = s->camera.update(io) && s->renderer.integration.preview->ready(SDL_GetTicks());
+			bool changes = s->camera.update(io) && s->renderer.integration.preview->ready(currentTicks);
 			if (changes) {
 				if (sync_cams) {
 					for (auto& s : session->scenes) {

@@ -217,7 +217,7 @@ public:
 
   ply_parser(flags_type flags = 0);
   bool parse(std::istream& istream);
-  bool parse(const std::string& filename);
+  bool parse(const fs::path::string_type& filename);
 
 private:
 

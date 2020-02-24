@@ -19,6 +19,7 @@
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/volume.h>
 #include <mitsuba/core/statistics.h>
+#include <mitsuba/core/util.h>
 
 MTS_NAMESPACE_BEGIN
 
