@@ -524,6 +524,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		was_window_hidden = window_hidden;
 	};
 
+	bool track_file_changes = true;
 	unsigned long long lastTrackerTicks = SDL_GetTicks();
 
 	// Main loop
@@ -706,7 +707,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 						ImGui::Selectable("-- replace in session: --", ImGuiSelectableFlags_Disabled);
 						int sceneIdx = 0;
 						for (auto& s : session->scenes) {
-							if (ImGui::Selectable(s->filePath.s.c_str(), false)) {
+							if (ImGui::Selectable(s->filePath.s.c_str())) {
 								Session::AutoPause pause(session);
 								addedDoc = browseForScene(config);
 								docReplacementIdx = sceneIdx;
@@ -720,8 +721,10 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 			// reload?
 			if (!addedDoc) {
 				bool reload = ImGui::Button("reload");
+				ImGui::SameLine();
+				ImGui::Checkbox("track file changes", &track_file_changes);
 				reload |= mouseSceneIdx == sceneIdx && !io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_F5] && !io.KeysDownDuration[SDL_SCANCODE_F5];
-				if (SDL_GetTicks() > lastTrackerTicks + 1500) {
+				if (track_file_changes && SDL_GetTicks() > lastTrackerTicks + 1500) {
 					reload |= document->fileChanged();
 					lastTrackerTicks = SDL_GetTicks();
 				}
