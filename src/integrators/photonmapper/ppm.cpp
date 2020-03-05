@@ -403,6 +403,11 @@ public:
 	}
 
 	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		if (getProperties().getBoolean("strictConfiguration", true))
+			return nullptr;
+		else
+			Log(EWarn, "Interactive implementation uses different integrator!");
+
 		mitsuba::Properties pmProps(getProperties());
 		pmProps.setPluginName("photonmapper");
 

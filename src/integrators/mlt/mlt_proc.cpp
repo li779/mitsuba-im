@@ -83,6 +83,7 @@ public:
 			static_cast<Sampler *>(getResource("rplSampler"))->clone().get());
 
 		m_currentImageWeight = nullptr;
+		m_control = nullptr;
 
 		prepareAlways();
 	}
@@ -151,6 +152,7 @@ public:
 		if (m_config.luminanceSamples != 0) {
 			result->clear();
 		}
+		m_nMutationsCompleted = 0;
 
 		/// Reconstruct the seed path
 		m_pathSampler->reconstructPath(wu->getSeed(), m_config.importanceMap, *current);
@@ -172,7 +174,8 @@ public:
 			std::ostringstream oss;
 			Path backup;
 		#endif
-		for (size_t mutationCtr=0; mutationCtr < m_config.nMutations
+		size_t mutationCtr;
+		for (mutationCtr=0; mutationCtr < m_config.nMutations
 				&& !stop; ++mutationCtr) {
 			if (wu->getTimeout() > 0 && (mutationCtr % 8192) == 0 &&
 					(int) timer->getMilliseconds() > wu->getTimeout())
@@ -289,8 +292,9 @@ public:
 					Spectrum value = relWeight * accumulatedWeight;
 					if (currentImageWeight)
 						value *= *currentImageWeight;
+					float alphaWeight = accumulatedWeight;
 					if (!value.isZero())
-						result->putAtomic(current->getSamplePosition(), value, 1.0f);
+						result->putAtomic(current->getSamplePosition(), value, alphaWeight);
 
 					/* The mutation was accepted */
 					std::swap(current, proposed);
@@ -308,12 +312,20 @@ public:
 						Spectrum value = proposed->getRelativeWeight() * a;
 						if (currentImageWeight)
 							value *= *currentImageWeight;
-						result->putAtomic(proposed->getSamplePosition(), value, 1.0f);
+						float alphaWeight = a;
+						result->putAtomic(proposed->getSamplePosition(), value, alphaWeight);
 					}
 				}
 			} else {
 				accumulatedWeight += 1;
 				consecRejections++;
+			}
+
+			// Fast interrupt
+			if ((mutationCtr & 0xff) == 0) {
+				m_nMutationsCompleted = mutationCtr;
+				if (m_control && m_control(mutationCtr))
+					break;
 			}
 		}
 		#if defined(MTS_BD_DEBUG)
@@ -326,8 +338,11 @@ public:
 			Spectrum value = relWeight * accumulatedWeight;
 			if (currentImageWeight)
 				value *= *currentImageWeight;
-			result->putAtomic(current->getSamplePosition(), value, 1.0f);
+			float alphaWeight = accumulatedWeight;
+			result->putAtomic(current->getSamplePosition(), value, alphaWeight);
 		}
+
+		m_nMutationsCompleted = mutationCtr;
 
 		#if defined(MTS_DEBUG_FP)
 			disableFPExceptions();
@@ -341,18 +356,30 @@ public:
 	}
 
 	class MLTResponsive : public ResponsiveIntegrator {
-		#define SeedSamplesPerChain 32
+		#define SeedSamplesPerChain 64
 
 		ref<Integrator> m_integrator;
 		MLTConfiguration const* m_config;
 
 		ref_vector<ReplayableSampler> m_seedSamplers;
 
+		ref_vector<Timer> m_timeoutTimers;
+
 	public:
 		MLTResponsive(Integrator* mlt, MLTConfiguration const* config)
 			: ResponsiveIntegrator(mlt->getProperties())
 			, m_integrator(mlt)
 			, m_config(config) {
+		}
+
+		static MLTConfiguration reconfigureUnsupported(const MLTConfiguration& cfg) {
+			MLTConfiguration config = cfg;
+			if (config.separateDirect) {
+				config.separateDirect = false;
+				config.directSamples = -1;
+			}
+			config.twoStage = false;
+			return config;
 		}
 
 		bool preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
@@ -372,6 +399,11 @@ public:
 				m_integrator->configureSampler(&scene, samplers[i]);
 			}
 
+			m_timeoutTimers.clear();
+			for (int i = 0; i < threadCount; ++i) {
+				m_timeoutTimers.push_back(new Timer());
+			}
+
 			return result;
 		}
 
@@ -380,16 +412,24 @@ public:
 			Vector2i pixels = target.getSize();
 			int planeSamples = pixels.x * pixels.y;
 
-			MLTConfiguration config = *m_config;
+			MLTConfiguration config = reconfigureUnsupported(*m_config);
+			if (threadIdx == 0 && memcmp(&config, m_config, sizeof(config))) {
+				m_config->dump();
+				Log(EWarn, "Unsupported responsive configuration, reconfiguring!");
+			}
 			config.luminance = 0.2f;
 			config.luminanceSamples = 0;
-			config.separateDirect = false;
-			config.directSamples = 0;
-			config.twoStage = false;
 			config.firstStage = false;
 			config.importanceMap = NULL;
 			config.workUnits = 0;
 			config.nMutations = std::max(4 * pixels.x * pixels.y / threadCount, 300000);
+			config.nMutations = std::min(config.nMutations, sampler.getSampleCount() * pixels.x * pixels.y / threadCount);
+			if (threadIdx == 0)
+				config.dump();
+
+			if (config.timeout > 0) {
+				m_timeoutTimers[threadIdx]->reset();
+			}
 
 			struct MeanBrightness {
 				Float value = 0;
@@ -425,8 +465,10 @@ public:
 			int returnCode = 0;
 			while (returnCode == 0) {
 				// update statistics and check control
+				auto interact = [&](int additionalSamples) -> int
 				{
-					spp = (double) completedPlanes + double(currentSamples + config.nMutations / 2) / double(planeSamples);
+					spp = (double) completedPlanes + double(currentSamples + additionalSamples) / double(planeSamples);
+					//spp = std::max(spp, double(currentSamples + config.nMutations / 2) / double(planeSamples));
 
 					// external control
 					if (controls.abort && *controls.abort) {
@@ -437,10 +479,12 @@ public:
 						// important: always called on new plane begin!
 						returnCode = controls.interrupt->progress(this, scene, sensor, sampler, target, spp, controls, threadIdx, threadCount);
 					}
-					if (returnCode != 0) {
-						break;
-					}
+					return returnCode;
+				};
+				if (interact(0) != 0) {
+					break;
 				}
+				renderer->m_control = interact;
 
 				{
 					size_t sampleIndex;
@@ -462,9 +506,9 @@ public:
 						i += int(pathSeeds.size() - seedIndex);
 					}
 				}
+				int seedSampleIdx = seedSampler->getSampleIndex();
 
 				SeedWorkUnit swu;
-				swu.setTimeout(0);
 				Float totalSeedWeight = 0;
 				for (PathSeed& s : pathSeeds) {
 					Float seedWeight = s.luminance;
@@ -476,15 +520,31 @@ public:
 						swu.setSeed(s);
 					}
 				}
+
+				int timeout = 0;
+				if (config.timeout > 0) {
+					timeout = static_cast<int>(static_cast<int64_t>(config.timeout*1000) -
+						static_cast<int64_t>(m_timeoutTimers[threadIdx]->getMilliseconds()));
+					if (timeout < 0)
+						break;
+				}
+				swu.setTimeout(timeout);
+
 				bool stop = false;
 				renderer->process(&swu, &target, controls.abort ? *(bool const*) controls.abort : stop);
-				currentSamples += int(config.nMutations);
+				currentSamples += int(renderer->m_nMutationsCompleted);
+
+				// restore
+				seedSampler->setSampleIndex(seedSampleIdx);
 
 				// precise sample tracking
 				while (currentSamples >= planeSamples) {
 					++completedPlanes;
 					currentSamples -= planeSamples;
 					spp = (double) completedPlanes;
+
+					if (threadIdx == 0)
+						Log(EInfo, "Approx MPP/SPP: %f", spp * Float(threadCount));
 				}
 			}
 
@@ -513,6 +573,8 @@ private:
 	ref_vector<Mutator> m_mutators;
 	MemoryPool *m_pool;
 	Float *m_currentImageWeight;
+	std::function<int(int)> m_control;
+	size_t m_nMutationsCompleted;
 };
 
 /* ==================================================================== */
@@ -619,6 +681,12 @@ void MLTProcess::bindResource(const std::string &name, int id) {
 }
 
 ref<ResponsiveIntegrator> MLTProcess::makeResponsiveIntegrator(Integrator* mlt, const MLTConfiguration *config) {
+	if (mlt->getProperties().getBoolean("strictConfiguration", true)) {
+		MLTConfiguration reconf = MLTRenderer::MLTResponsive::reconfigureUnsupported(*config);
+		// unsupported features
+		if (memcmp(&reconf, config, sizeof(reconf)))
+			return nullptr;
+	}
 	return new MLTRenderer::MLTResponsive(mlt, config);
 }
 

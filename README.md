@@ -38,9 +38,7 @@ $ ln -s projects/binaries/im-mts
 
 ## Known Issues
 
-* Wrapper for responsive PSSMLT preview still missing (coming soon!)
 * Some utilities not ported to standard C++ w/o boost yet
-* Console tool support for new integrator interfaces still needs to be implemented (coming soon!)
 
 ## About (Original official description)
 

@@ -484,6 +484,9 @@ InteractiveSceneProcess* InteractiveSceneProcess::create(mitsuba::Scene* scene, 
 	return new impl::InteractiveSceneProcess(scene, sampler, integrator, config);
 }
 InteractiveSceneProcess* InteractiveSceneProcess::create(mitsuba::Scene* scene, mitsuba::Sampler* sampler, mitsuba::Integrator* integrator, ProcessConfig const& config) {
+	// this is a preview tool, allow reconfiguration to have meaningful preview despite unsupported features
+	((mitsuba::Properties&) integrator->getProperties()).setBoolean("strictConfiguration", false);
+	// try to use responsive renderer support
 	mitsuba::ref<mitsuba::ResponsiveIntegrator> rintegrator = integrator->makeResponsiveIntegrator();
 	if (!rintegrator) {
 		SLog(mitsuba::EInfo, "Creating default path integrator ('%s' does not support responsive preview)", integrator->getProperties().getPluginName().c_str());

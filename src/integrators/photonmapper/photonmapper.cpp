@@ -773,6 +773,10 @@ public:
 	};
 
 	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		if (getProperties().getBoolean("strictConfiguration", true))
+			return nullptr;
+		else
+			Log(EWarn, "Interactive implementation is not identical to the classic implementation!");
 		return new PMRefresh(this);
 	}
 

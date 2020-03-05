@@ -29,11 +29,18 @@ MTS_NAMESPACE_BEGIN
 /*                         Configuration storage                        */
 /* ==================================================================== */
 
+// allow memcmp
+template <class T>
+struct MLTConfiguration_ZeroPad {
+	MLTConfiguration_ZeroPad() {
+		memset(this, 0, sizeof(T));
+	}
+};
 /**
  * \brief Stores all configuration parameters used
  * by the MLT rendering implementation
  */
-struct MLTConfiguration {
+struct MLTConfiguration : MLTConfiguration_ZeroPad<MLTConfiguration> {
 	int maxDepth;
 	bool separateDirect;
 	bool bidirectionalMutation;
