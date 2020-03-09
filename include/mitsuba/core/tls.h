@@ -52,8 +52,8 @@ namespace detail {
 		void *get(bool &existed);
 		/// Like the other \c get(), but also returns whether the TLS object existed before (const version)
 		const void *get(bool &existed) const;
-	protected:
 		struct ThreadLocalPrivate;
+	protected:
 		mutable std::unique_ptr<ThreadLocalPrivate> d;
 	};
 }; // namespace tls
