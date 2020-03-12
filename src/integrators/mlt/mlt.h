@@ -33,7 +33,10 @@ MTS_NAMESPACE_BEGIN
 template <class T>
 struct MLTConfiguration_ZeroPad {
 	MLTConfiguration_ZeroPad() {
-		memset(this, 0, sizeof(T));
+		memset((void*) (T*) this, 0, sizeof(T));
+	}
+	MLTConfiguration_ZeroPad(MLTConfiguration_ZeroPad const&) {
+		memset((void*) (T*) this, 0, sizeof(T));
 	}
 };
 /**
