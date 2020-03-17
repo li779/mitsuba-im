@@ -186,24 +186,20 @@ if (MTS_XERCESC_INSTALL_DIR)
 	add_xerces(xerces-c)
 endif ()
 
-if (MTS_SDL_INSTALL_DIR)
-	function (add_sdl MTS_SDL_DIR)
-		set(SDL_SHARED ON CACHE INTERNAL "")
-		set(SDL_STATIC OFF CACHE INTERNAL "") # avoid linker nightmare
-		set(SDL_TEST OFF CACHE INTERNAL "")
-		set(SDL_AUDIO OFF CACHE INTERNAL "")
-		# these seem obligatory for now
-		#set(SDL_HAPTIC OFF CACHE INTERNAL "")
-		#set(SDL_JOYSTICK OFF CACHE INTERNAL "")
-		#set(SDL_POWER OFF CACHE INTERNAL "")
-		#set(SDL_SENSOR OFF CACHE INTERNAL "")
-		set(CMAKE_INSTALL_PREFIX ${MTS_SDL_INSTALL_DIR})
-		
-		add_external_package(${MTS_SDL_DIR} EXCLUDE_FROM_ALL)
-		publish_external_targets(SDL SDL2 SDL2main)
+if (MTS_GLFW_INSTALL_DIR)
+	function (add_glfw MTS_GLFW_DIR)
+		set(BUILD_SHARED_LIBS ON)
+		set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "")
+		set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "")
+		set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "")
+		set(CMAKE_INSTALL_PREFIX ${MTS_GLFW_INSTALL_DIR})
 
-		install(DIRECTORY ${MTS_SDL_DIR}/include/ DESTINATION ${MTS_SDL_INSTALL_DIR}/include/SDL2 FILES_MATCHING PATTERN *.h PATTERN SDL_config.h EXCLUDE)
-		install(FILES ${external_subdir_bin}/include/SDL_config.h DESTINATION ${MTS_SDL_INSTALL_DIR}/include/SDL2)
+		add_external_package(${MTS_GLFW_DIR} EXCLUDE_FROM_ALL)
+		publish_external_targets(GLFW glfw)
+
+		install(DIRECTORY ${MTS_GLFW_DIR}/include/ DESTINATION ${MTS_GLFW_INSTALL_DIR}/include)
+		install(FILES ${external_subdir_bin}/src/glfw_config.h DESTINATION ${MTS_GLFW_INSTALL_DIR}/include/GLFW)
 	endfunction ()
-	add_sdl(SDL)
+	add_glfw(glfw)
 endif ()
+

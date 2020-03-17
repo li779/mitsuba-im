@@ -49,3 +49,6 @@
 [submodule "external/eigen"]
 	path = external/eigen
 	url = https://github.com/eigenteam/eigen-git-mirror
+[submodule "external/glfw"]
+	path = external/glfw
+	url = https://github.com/glfw/glfw

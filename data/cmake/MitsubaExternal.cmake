@@ -342,14 +342,19 @@ set (MTS_HAS_HW ${GLEW_FOUND})
 endif ()
 
 if (MTS_ENABLE_SYSTEM_LIBS)
-	find_package(SDL 2.0)
+	find_package(glfw3)
+	set(GLFW_DEFINITIONS ${GLFW3_DEFINITIONS})
+	set(GLFW_INCLUDE_DIR ${GLFW3_INCLUDE_DIR})
+	set(GLFW_INCLUDE_DIRS ${GLFW3_INCLUDE_DIRS})
+	set(GLFW_LIBRARY ${GLFW3_LIBRARY})
+	set(GLFW_LIBRARIES ${GLFW3_LIBRARIES})
 endif ()
-if (NOT SDL_FOUND)
-	make_external_library(SDL SDL2 SDL2main)
+if (NOT GLFW3_FOUND)
+	make_external_library(GLFW glfw)
 endif ()
 
 # can run in parallel
-build_externals(sdl "${SDL_LIBRARIES}")
+build_externals(glfw "${GLFW_LIBRARIES}")
 
 ###########################################################################
 # System libraries
