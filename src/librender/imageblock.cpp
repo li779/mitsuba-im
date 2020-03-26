@@ -25,16 +25,49 @@ ImageBlock::ImageBlock(Bitmap::EPixelFormat fmt, const Vector2i &size,
         m_size(size), m_filter(filter), m_weightsX(NULL), m_weightsY(NULL), m_warn(warn) {
     m_borderSize = filter ? filter->getBorderSize() : 0;
 
-    /* Allocate a small bitmap data structure for the block */
-    m_bitmap = new Bitmap(fmt, Bitmap::EFloat,
-        size + Vector2i(2 * m_borderSize), channels);
+	/* Convert to multi-channel bitmap for cascaded rendering */
+	if (filter && filter->cascade.count > 1) {
+		int additionalChannels = (int) fmt - (int) Bitmap::ESpectrum;
+		if (additionalChannels >= 0 && additionalChannels <= 2) {
+			channels = SPECTRUM_SAMPLES;
+			fmt = Bitmap::EMultiSpectrumAlphaWeight;
+		}
+		else if ((int) fmt < (int) Bitmap::ESpectrumAlphaWeight) {
+			additionalChannels = (int) fmt & 0x1;
+			channels = (int) fmt >= (int) Bitmap::ERGB ? 3 : 1;
+			fmt = Bitmap::EMultiChannel;
+		}
+		else if (fmt == Bitmap::EMultiSpectrumAlphaWeight) {
+			additionalChannels = 2;
+			channels -= additionalChannels;
+		}
+		else {
+			Assert((int) fmt >= (int) Bitmap::EMultiChannel);
+			additionalChannels = 0;
+		}
+		channels *= filter->cascade.count;
+		channels += additionalChannels;
+		m_sharedChannels = additionalChannels;
+	}
+	else
+		m_sharedChannels = 0;
 
-    if (filter) {
-        /* Temporary buffers used in put() */
-        int tempBufferSize = (int) std::ceil(2*filter->getRadius()) + 1;
-        m_weightsX = new Float[2*tempBufferSize];
-        m_weightsY = m_weightsX + tempBufferSize;
-    }
+	/* Allocate a small bitmap data structure for the block */
+	m_bitmap = new Bitmap(fmt, Bitmap::EFloat,
+		size + Vector2i(2 * m_borderSize), channels);
+	m_normalChannels = m_bitmap->getChannelCount() - m_sharedChannels;
+	m_bitmapSize = m_bitmap->getSize();
+	m_floatData = m_bitmap->getFloatData();
+
+	if (filter) {
+		if (filter->cascade.count > 1)
+			m_normalChannels /= filter->cascade.count;
+		
+		/* Temporary buffers used in put() */
+		int tempBufferSize = (int) std::ceil(2*filter->getRadius()) + 1;
+		m_weightsX = new Float[2*tempBufferSize];
+		m_weightsY = m_weightsX + tempBufferSize;
+	}
 }
 
 ImageBlock::~ImageBlock() {

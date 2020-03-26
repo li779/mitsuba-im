@@ -43,46 +43,87 @@ MTS_NAMESPACE_BEGIN
  */
 class MTS_EXPORT_CORE ReconstructionFilter : public ConfigurableObject {
 public:
-    /**
-     * \brief When resampling data to a different resolution using
-     * \ref Resampler::resample(), this enumeration specifies how lookups
-     * <em>outside</em> of the input domain are handled.
-     *
-     * \see Resampler
-     */
-    enum EBoundaryCondition {
-        /// Clamp to the outermost sample position
-        EClamp = 0,
-        /// Assume that the input repeats in a periodic fashion
-        ERepeat,
-        /// Assume that the input is mirrored along the boundary
-        EMirror,
-        /// Assume that the input function is zero outside of the defined domain
-        EZero,
-        /// Assume that the input function is equal to one outside of the defined domain
-        EOne
-    };
+	/**
+	 * \brief When resampling data to a different resolution using
+	 * \ref Resampler::resample(), this enumeration specifies how lookups
+	 * <em>outside</em> of the input domain are handled.
+	 *
+	 * \see Resampler
+	 */
+	enum EBoundaryCondition {
+		/// Clamp to the outermost sample position
+		EClamp = 0,
+		/// Assume that the input repeats in a periodic fashion
+		ERepeat,
+		/// Assume that the input is mirrored along the boundary
+		EMirror,
+		/// Assume that the input function is zero outside of the defined domain
+		EZero,
+		/// Assume that the input function is equal to one outside of the defined domain
+		EOne
+	};
 
-    /// Return the filter's width
-    inline Float getRadius() const { return m_radius; }
+	/// Return the filter's width
+	inline Float getRadius() const { return m_radius; }
 
-    /// Return the block border size required when rendering with this filter
-    inline int getBorderSize() const { return m_borderSize; }
+	/// Return the block border size required when rendering with this filter
+	inline int getBorderSize() const { return m_borderSize; }
 
-    /// Evaluate the filter function
-    virtual Float eval(Float x) const = 0;
+	/// Evaluate the filter function
+	virtual Float eval(Float x) const = 0;
 
-    /// Perform a lookup into the discretized version
-    inline Float evalDiscretized(Float x) const { return m_values[
-        std::min((int) std::abs(x * m_scaleFactor), MTS_FILTER_RESOLUTION)]; }
+	/// Perform a lookup into the discretized version
+	inline Float evalDiscretized(Float x) const { return m_values[
+		std::min((int) std::abs(x * m_scaleFactor), MTS_FILTER_RESOLUTION)]; }
 
-    /// Serialize the filter to a binary data stream
-    void serialize(Stream *stream, InstanceManager *manager) const;
+	struct CascadeConfiguration {
+		Float base = 8.0f;
+		Float start = 1.0f;
+		int count = 1;
 
-    /** \brief Configure the object (called \a once after construction) */
-    void configure();
+		struct Classification { int idx; Float weight; };
+		Classification classify(Float value) const {
+			Classification c;
+			if (count <= 1) {
+				c.idx = 0;
+				c.weight = 1.0f;
+				return c;
+			}
+			value /= start;
+			Float log2Base = std::log2(base);
+			Float logValue = std::log2(value) / log2Base;
+			if (logValue < Float(count - 1)) {
+				if (logValue > 0.0f) {
+					logValue = std::floor(logValue);
+					c.idx = (int) (unsigned int) logValue;
+					Float invBase = 1.0f / base;
+					c.weight = std::exp2(log2Base * logValue) / value - invBase;
+					c.weight /= 1.0f - invBase;
+				}
+				else {
+					c.idx = 0;
+					c.weight = 1.0f;
+				}
+			} else {
+				c.idx = count - 1;
+				logValue = Float(count - 1);
+				c.weight = std::exp2(log2Base * logValue) / value;
+			}
+			return c;
+		}
 
-    MTS_DECLARE_CLASS()
+		/// Serialize the filter to a binary data stream
+		MTS_EXPORT_CORE void serialize(Stream *stream) const;
+		MTS_EXPORT_CORE void deserialize(Stream *stream);
+	} cascade;
+
+	/// Serialize the filter to a binary data stream
+	void serialize(Stream *stream, InstanceManager *manager) const;
+
+	/** \brief Configure the object (called \a once after construction) */
+	void configure();
+
+	MTS_DECLARE_CLASS()
 protected:
     /// Create a new reconstruction filter
     ReconstructionFilter(const Properties &props);
