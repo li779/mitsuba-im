@@ -76,6 +76,47 @@ public:
 	inline Float evalDiscretized(Float x) const { return m_values[
 		std::min((int) std::abs(x * m_scaleFactor), MTS_FILTER_RESOLUTION)]; }
 
+	struct CascadeConfiguration {
+		Float base = 8.0f;
+		Float start = 1.0f;
+		int count = 1;
+
+		struct Classification { int idx; Float weight; };
+		Classification classify(Float value) const {
+			Classification c;
+			if (count <= 1) {
+				c.idx = 0;
+				c.weight = 1.0f;
+				return c;
+			}
+			value /= start;
+			Float log2Base = std::log2(base);
+			Float logValue = std::log2(value) / log2Base;
+			if (logValue < Float(count - 1)) {
+				if (logValue > 0.0f) {
+					logValue = std::floor(logValue);
+					c.idx = (int) (unsigned int) logValue;
+					Float invBase = 1.0f / base;
+					c.weight = std::exp2(log2Base * logValue) / value - invBase;
+					c.weight /= 1.0f - invBase;
+				}
+				else {
+					c.idx = 0;
+					c.weight = 1.0f;
+				}
+			} else {
+				c.idx = count - 1;
+				logValue = Float(count - 1);
+				c.weight = std::exp2(log2Base * logValue) / value;
+			}
+			return c;
+		}
+
+		/// Serialize the filter to a binary data stream
+		MTS_EXPORT_CORE void serialize(Stream *stream) const;
+		MTS_EXPORT_CORE void deserialize(Stream *stream);
+	} cascade;
+
 	/// Serialize the filter to a binary data stream
 	void serialize(Stream *stream, InstanceManager *manager) const;
 

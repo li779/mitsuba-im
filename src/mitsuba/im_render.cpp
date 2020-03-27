@@ -232,6 +232,10 @@ InteractiveSceneProcess* InteractiveSceneProcess::create(mitsuba::Scene* scene, 
 	return new impl::InteractiveSceneProcess(scene, sampler, integrator, config);
 }
 InteractiveSceneProcess* InteractiveSceneProcess::create(mitsuba::Scene* scene, mitsuba::Sampler* sampler, mitsuba::Integrator* integrator, ProcessConfig const& config) {
+	if (scene->getFilm()->getReconstructionFilter()->cascade.count > 1) {
+		SLog(mitsuba::EInfo, "Using standard integrator (DBOR cascades not supported in responsive preview)");
+		return nullptr;
+	}
 	mitsuba::ref<mitsuba::ResponsiveIntegrator> rintegrator = integrator->makeResponsiveIntegrator();
 	if (!rintegrator) {
 		SLog(mitsuba::EInfo, "Using standard integrator ('%s' does not support responsive preview)", integrator->getProperties().getPluginName().c_str());

@@ -210,6 +210,11 @@ public:
 		/* Attach the log file as the EXR comment attribute? */
 		m_attachLog = props.getBoolean("attachLog", true);
 
+		/* DBOR cascade configuration */
+		m_cascadeConfig.count = props.getInteger("cascadeCount", m_cascadeConfig.count);
+		m_cascadeConfig.base = props.getFloat("cascadeBase", m_cascadeConfig.base);
+		m_cascadeConfig.start = props.getFloat("cascadeStart", m_cascadeConfig.start);
+
 		std::string fileFormat = to_lower_copy(
 			props.getString("fileFormat", "openexr"));
 		std::vector<std::string> pixelFormats = tokenize(to_lower_copy(
@@ -348,11 +353,11 @@ public:
 				props.markQueried(keys[i]);
 		}
 
-		if (m_pixelFormats.size() == 1) {
+		if (m_pixelFormats.size() == 1 && m_cascadeConfig.count <= 1) {
 			m_storage = new ImageBlock(Bitmap::ESpectrumAlphaWeight, m_cropSize);
 		} else {
 			m_storage = new ImageBlock(Bitmap::EMultiSpectrumAlphaWeight, m_cropSize,
-				NULL, (int) (SPECTRUM_SAMPLES * m_pixelFormats.size() + 2));
+				NULL, (int) (SPECTRUM_SAMPLES * m_pixelFormats.size() * m_cascadeConfig.count + 2));
 		}
 	}
 
@@ -368,6 +373,7 @@ public:
 		for (size_t i=0; i<m_channelNames.size(); ++i)
 			m_channelNames[i] = stream->readString();
 		m_componentFormat = (Bitmap::EComponentFormat) stream->readUInt();
+		m_cascadeConfig.deserialize(stream);
 	}
 
 	void serialize(Stream *stream, InstanceManager *manager) const {
@@ -382,6 +388,13 @@ public:
 		for (size_t i=0; i<m_channelNames.size(); ++i)
 			stream->writeString(m_channelNames[i]);
 		stream->writeUInt(m_componentFormat);
+		m_cascadeConfig.serialize(stream);
+	}
+
+	void configure() {
+		Film::configure();
+		if (m_cascadeConfig.count > 1)
+			m_filter->cascade = m_cascadeConfig;
 	}
 
 	void clear() {
@@ -439,7 +452,7 @@ public:
 		uint8_t *targetData = target->getUInt8Data()
 			+ (targetOffset.x + targetOffset.y * target->getWidth()) * targetBpp;
 
-		if (EXPECT_NOT_TAKEN(m_pixelFormats.size() != 1)) {
+		if (EXPECT_NOT_TAKEN(m_pixelFormats.size() != 1 && m_cascadeConfig.count == 1)) {
 			/* Special case for general multi-channel images -- just develop the first component(s) */
 			for (int i=0; i<size.y; ++i) {
 				for (int j=0; j<size.x; ++j) {
@@ -484,12 +497,28 @@ public:
 
 		Log(EDebug, "Developing film ..");
 
-		ref<Bitmap> bitmap;
+		// develop per cascade
+		for (int cascadeIdx = 0; cascadeIdx < m_cascadeConfig.count; ++cascadeIdx) {
+
+			ref<Bitmap> bitmap = m_storage->getBitmap();
+			if (m_cascadeConfig.count > 1) {
+				int channelCount = (bitmap->getChannelCount() - 2) / m_cascadeConfig.count;
+				std::vector<int> channels(channelCount + 2);
+				for (int i = 0; i < channelCount; ++i)
+					channels[i] = channelCount * cascadeIdx + i;
+				channels[channelCount + 0] = bitmap->getChannelCount() - 2;
+				channels[channelCount + 1] = bitmap->getChannelCount() - 1;
+				bitmap = bitmap->extractChannels(
+					  m_pixelFormats.size() == 1 ? Bitmap::ESpectrumAlphaWeight : Bitmap::EMultiSpectrumAlphaWeight
+					, channels);
+			}
+			// now perform original processing
+
 		if (m_pixelFormats.size() == 1) {
-			bitmap = m_storage->getBitmap()->convert(m_pixelFormats[0], m_componentFormat);
+			bitmap = bitmap->convert(m_pixelFormats[0], m_componentFormat);
 			bitmap->setChannelNames(m_channelNames);
 		} else {
-			bitmap = m_storage->getBitmap()->convertMultiSpectrumAlphaWeight(m_pixelFormats,
+			bitmap = bitmap->convertMultiSpectrumAlphaWeight(m_pixelFormats,
 					m_componentFormat, m_channelNames);
 		}
 
@@ -515,6 +544,16 @@ public:
 			properExtension = ".pfm";
 
 		std::string extension = to_lower_copy(filename.extension().string());
+		if (cascadeIdx) {
+			char buffer[128];
+			sprintf(buffer, ".cascade_%.0f", m_cascadeConfig.start * std::pow(m_cascadeConfig.base, Float(cascadeIdx)));
+			properExtension = buffer + properExtension;
+		}
+		if (m_cascadeConfig.count > 1) {
+			char buffer[128];
+			sprintf(buffer, ".spp_" SIZE_T_FMT, scene->getSampler()->getSampleCount());
+			properExtension = buffer + properExtension;
+		}
 		if (extension != properExtension)
 			filename.replace_extension(properExtension);
 
@@ -527,13 +566,15 @@ public:
 		/* Attach the log file to the image if this is requested */
 		Logger *logger = Thread::getThread()->getLogger();
 		std::string log;
-		if (m_attachLog && logger->readLog(log)) {
+		if (!cascadeIdx && m_attachLog && logger->readLog(log)) {
 			log += "\n\n";
 			log += Statistics::getInstance()->getStats();
 			bitmap->setMetadataString("log", log);
 		}
 
 		bitmap->write(m_fileFormat, stream);
+
+		}
 	}
 
 	bool hasAlpha() const {
@@ -590,6 +631,7 @@ protected:
 	std::vector<Bitmap::EPixelFormat> m_pixelFormats;
 	std::vector<std::string> m_channelNames;
 	Bitmap::EComponentFormat m_componentFormat;
+	ReconstructionFilter::CascadeConfiguration m_cascadeConfig;
 	bool m_banner;
 	bool m_attachLog;
 	fs::pathstr m_destFile;

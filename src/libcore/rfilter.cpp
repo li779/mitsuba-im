@@ -27,11 +27,25 @@ ReconstructionFilter::~ReconstructionFilter() { }
 
 ReconstructionFilter::ReconstructionFilter(Stream *stream, InstanceManager *manager)
  : ConfigurableObject(stream, manager) {
-	 m_radius = stream->readFloat();
+	m_radius = stream->readFloat();
+	cascade.deserialize(stream);
 }
 
 void ReconstructionFilter::serialize(Stream *stream, InstanceManager *manager) const {
 	stream->writeFloat(m_radius);
+	cascade.serialize(stream);
+}
+
+void ReconstructionFilter::CascadeConfiguration::serialize(Stream *stream) const {
+	stream->writeInt(count);
+	stream->writeFloat(base);
+	stream->writeFloat(start);
+}
+
+void ReconstructionFilter::CascadeConfiguration::deserialize(Stream *stream) {
+	count = stream->readInt();
+	base = stream->readFloat();
+	start = stream->readFloat();
 }
 
 void ReconstructionFilter::configure() {

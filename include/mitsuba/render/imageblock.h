@@ -134,7 +134,9 @@ public:
 			temp[i] = spec[i];
 		temp[SPECTRUM_SAMPLES] = alpha;
 		temp[SPECTRUM_SAMPLES + 1] = 1.0f;
-		return put(pos, temp);
+		ReconstructionFilter::CascadeConfiguration::Classification cls
+			= m_filter->cascade.classify(spec.getLuminance());
+		return put(pos, temp, cls.idx, cls.weight);
 	}
 #ifndef MTS_NO_ATOMIC_SPLAT
 	FINLINE bool putAtomic(const Point2 &pos, const Spectrum &spec, Float alpha) {
@@ -143,6 +145,12 @@ public:
 			temp[i] = spec[i];
 		temp[SPECTRUM_SAMPLES] = alpha;
 		temp[SPECTRUM_SAMPLES + 1] = 1.0f;
+		// no interactive preview yet
+		if (m_filter->cascade.count > 1) {
+			ReconstructionFilter::CascadeConfiguration::Classification cls
+				= m_filter->cascade.classify(spec.getLuminance());
+			return put(pos, temp, cls.idx, cls.weight);
+		}		
 		return putAtomic(pos, temp);
 	}
 #endif
@@ -158,8 +166,10 @@ public:
 	 * \return \c false if one of the sample values was \a invalid, e.g.
 	 *    NaN or negative. A warning is also printed in this case
 	 */
-	FINLINE bool put(const Point2 &_pos, const Float *value) {
-		const int channels = m_bitmap->getChannelCount();
+	FINLINE bool put(const Point2 &_pos, const Float *value, int cascadeIdx = 0, Float cascadeWeight = 1.0f) {
+		const int channels = m_normalChannels, appendedChannels = m_sharedChannels;
+		const int cascadeChannels = channels * m_filter->cascade.count + appendedChannels;
+		const Float cascadeWeightUpper = cascadeIdx + 1 < m_filter->cascade.count ? 1.0f - cascadeWeight : 0.0f;
 
 		/* Check if all sample values are valid */
 		for (int i=0; i<channels; ++i) {
@@ -169,7 +179,7 @@ public:
 
 		{
 			const Float filterRadius = m_filter->getRadius();
-			const Vector2i &size = m_bitmap->getSize();
+			const Vector2i size = m_bitmapSize;
 
 			/* Convert to pixel coordinates within the image block */
 			const Point2 pos(
@@ -188,17 +198,35 @@ public:
 			for (int y=min.y, idx = 0; y<=max.y; ++y)
 				m_weightsY[idx++] = m_filter->evalDiscretized(y-pos.y);
 
+			Float* floatData = m_floatData + channels * cascadeIdx;
+			Float* floatDataShared = m_floatData + (cascadeChannels - appendedChannels);
 			/* Rasterize the filtered sample into the framebuffer */
 			for (int y=min.y, yr=0; y<=max.y; ++y, ++yr) {
 				const Float weightY = m_weightsY[yr];
-				Float *dest = m_bitmap->getFloatData()
-					+ (y * (size_t) size.x + min.x) * channels;
+				int ptrOffset = y * size.x + min.x;
+				Float *dest = floatData + ptrOffset * cascadeChannels;
+				Float *destShared = floatDataShared + ptrOffset * cascadeChannels;
 
 				for (int x=min.x, xr=0; x<=max.x; ++x, ++xr) {
 					const Float weight = m_weightsX[xr] * weightY;
 
+					const Float weight1 = weight * cascadeWeight;
 					for (int k=0; k<channels; ++k)
-						*dest++ += weight * value[k];
+						*dest++ += weight1 * value[k];
+					
+					if (cascadeWeightUpper > 0.0f) {
+						const Float weight2 = weight * cascadeWeightUpper;
+						for (int k=0; k<channels; ++k)
+							*dest++ += weight2 * value[k];
+						
+						dest += cascadeChannels - 2*channels;
+					}
+					else
+						dest += cascadeChannels - channels;
+
+					for (int k=0; k<appendedChannels; ++k)
+						*destShared++ += weight * value[channels+k];
+					destShared += cascadeChannels - appendedChannels;
 				}
 			}
 		}
@@ -221,7 +249,7 @@ public:
 	}
 #ifndef MTS_NO_ATOMIC_SPLAT
 	FINLINE bool putAtomic(const Point2 &_pos, const Float *aligned_value) {
-		const int channels = m_bitmap->getChannelCount();
+		const int channels = m_normalChannels + m_sharedChannels;
 
 		/* Check if all sample values are valid */
 		for (int i=0; i<channels; ++i) {
@@ -231,7 +259,7 @@ public:
 
 		{
 			const Float filterRadius = m_filter->getRadius();
-			const Vector2i &size = m_bitmap->getSize();
+			const Vector2i size = m_bitmapSize;
 
 			/* Convert to pixel coordinates within the image block */
 			const Point2 pos(
@@ -258,7 +286,7 @@ public:
 					union U {
 						atomic_int_128 i;
 						__m128 c;
-					} volatile* dest = (volatile U*) m_bitmap->getFloatData()
+					} volatile* dest = (volatile U*) m_floatData
 						+ (y * (size_t) size.x + min.x);
 
 					for (int x=min.x, xr=0; x<=max.x; ++x, ++xr) {
@@ -284,7 +312,7 @@ public:
 			} else {
 				for (int y=min.y, yr=0; y<=max.y; ++y, ++yr) {
 					const Float weightY = m_weightsY[yr];
-					Float volatile *dest = m_bitmap->getFloatData()
+					Float volatile *dest = m_floatData
 						+ (y * (size_t) size.x + min.x) * channels;
 
 					for (int x=min.x, xr=0; x<=max.x; ++x, ++xr) {
@@ -350,11 +378,13 @@ protected:
 	virtual ~ImageBlock();
 protected:
 	ref<Bitmap> m_bitmap;
+	int m_normalChannels, m_sharedChannels;
 	Point2i m_offset;
-	Vector2i m_size;
+	Vector2i m_size, m_bitmapSize;
 	int m_borderSize;
 	const ReconstructionFilter *m_filter;
 	Float *m_weightsX, *m_weightsY;
+	Float* m_floatData;
 	bool m_warn;
 };
 
