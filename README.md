@@ -1,7 +1,8 @@
 Mitsuba — Physically Based Renderer
 ===================================
+[![Build status](https://ci.appveyor.com/api/projects/status/qucloe6x2xnok4x8/branch/vanilla-future?svg=true)](https://ci.appveyor.com/project/tszirr/mitsuba-vanilla/branch/vanilla-future)
 
-http://mitsuba-renderer.org/
+Bug fixes for upstream http://mitsuba-renderer.org/
 
 ## About
 
