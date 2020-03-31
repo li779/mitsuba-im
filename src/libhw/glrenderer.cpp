@@ -30,11 +30,13 @@
 #include <mitsuba/hw/font.h>
 #include <boost/algorithm/string.hpp>
 
+#ifdef GLEW_MX
 static mitsuba::PrimitiveThreadLocal<GLEWContextStruct> glewContext;
 
 GLEWContextStruct *glewGetContext() {
     return &glewContext.get();
 }
+#endif
 
 MTS_NAMESPACE_BEGIN
 

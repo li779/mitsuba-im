@@ -227,6 +227,7 @@ if not conf.CheckCXXHeader('fftw3.h'):
     print 'FFTW3 not found (install for fast image convolution support)'
 else:
         env.Append(CPPDEFINES = [['MTS_HAS_FFTW', 1]] )
+hasGLEWmx = True
 if sys.platform == 'win32':
         if not (conf.CheckCHeader(['windows.h', 'GL/gl.h']) \
                         and conf.CheckCHeader(['windows.h', 'GL/glu.h']) \
@@ -244,8 +245,8 @@ elif sys.platform == 'linux2':
                 print 'GLEW headers are missing (install libglewmx1.5-dev)!'
                 Exit(1)
         if not conf.CheckType('GLEWContext', '#include <GL/glew.h>'):
-                print 'GLEW-MX must be present!'
-                Exit(1)
+                print 'GLEW-MX extension missing'
+                hasGLEWmx = False
         if not conf.TryCompile("#include <GL/glew.h>\n int i = GL_VERTEX_ATTRIB_ARRAY_UNIFIED_NV;", '.cpp'):
                 print 'Your version of GLEW-MX seems to be outdated!'
                 Exit(1)
@@ -260,6 +261,10 @@ if sys.platform == 'linux2':
         if not (conf.CheckCHeader(['X11/Xlib.h', 'X11/extensions/xf86vmode.h'])):
                 print 'X Video Mode selection library headers are missing! (Install libxxf86vm-dev)'
                 Exit(1)
+
+if not hasGLEWmx:
+        env.Replace(GLLIB=[w.replace('GLEWmx', 'GLEW') for w in env['GLLIB']])
+        env.Replace(GLFLAGS=[w.replace('GLEW_MX', 'GLEW_NO_MX') for w in env['GLFLAGS']])
 
 env.Replace(CPPPATH=cppPathPrevious)
 env.Replace(LIBPATH=libPathPrevious)
@@ -395,6 +400,6 @@ if sys.platform == 'win32':
         env['LINKCOM'] = [env['LINKCOM'], 'mt.exe -nologo -manifest ${TARGET}.manifest -outputresource:$TARGET;1']
         env['SHLINKCOM'] = [env['SHLINKCOM'], 'mt.exe -nologo -manifest ${TARGET}.manifest -outputresource:$TARGET;2']
 
-env.Export('hasQt', 'hasCollada', 'hasPython', 'resources', 'hasBreakpad')
+env.Export('hasQt', 'hasCollada', 'hasPython', 'hasGLEWmx', 'resources', 'hasBreakpad')
 
 Return('env')
