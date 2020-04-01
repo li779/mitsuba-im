@@ -87,14 +87,6 @@ if sys.platform == 'win32':
 	for boostlib in ['python27', 'python32', 'python33', 'python34', 'system', 'filesystem', 'chrono', 'thread']:
 		install(distDir, ['boost_%s-%s-mt-1_53.dll' % (boostlib, compilerType)], dllprefix)
 
-	if 'WIN64' in env['CXXFLAGS']:
-		if compilerType == 'vc120':
-			installTargets += env.Install(distDir, '#dependencies/bin/vcredist_2013_x64.exe')
-		else:
-			installTargets += env.Install(distDir, '#dependencies/bin/vcredist_2010_sp1_x64.exe')
-	else:
-		installTargets += env.Install(distDir, '#dependencies/bin/vcredist_2010_sp1_x86.exe')
-
 	installTargets += env.Install(distDir, '#data/windows/README.txt')
 
 	if 'REDIST_PATH' in env:
