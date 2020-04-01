@@ -2,18 +2,33 @@
 # Tested only on Windows and Linux (Ubuntu 10.10)
 cmake_minimum_required(VERSION 2.8.3 FATAL_ERROR)
 
-# Internal variable to know whether this is the first time CMake runs
-if (NOT DEFINED MTS_CMAKE_INIT)
-  set(MTS_CMAKE_INIT ON CACHE INTERNAL "Is this the initial CMake run?")
-else()
-  set(MTS_CMAKE_INIT OFF CACHE INTERNAL "Is this the initial CMake run?")
-endif()
-
 # Allow to override the default project name "mitsuba"
 if (NOT DEFINED MTS_PROJECT_NAME)
   set(MTS_PROJECT_NAME "mitsuba")
 endif()
-project(${MTS_PROJECT_NAME})
+
+# Remove Debug from CMAKE_CONFIGURATION_TYPES as the dependencies do not contain the necessary debug libraries
+if(MSVC AND CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_CONFIGURATION_TYPES Release MinSizeRel RelWithDebInfo)
+  set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}" CACHE STRING
+    "Remove Debug from available configuration types"
+     FORCE)
+endif()
+
+# Set CMAKE_BUILD_TYPE to Release by default
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+    "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
+endif()
+
+option(MTS_USE_PCH "Use precompiled headers (PCH)." ON)
+if (MTS_USE_PCH)
+  # Pre-compiled header support
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake/CMakePCHCompiler")
+  project(${MTS_PROJECT_NAME} C CXX CXXPCH)
+else ()
+  project(${MTS_PROJECT_NAME})
+endif ()
 
 # Tell cmake where to find the additional modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake")
@@ -26,15 +41,6 @@ endif()
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endif()
-
-# Remove Debug from CMAKE_CONFIGURATION_TYPES as the dependencies do not contain the necessary debug libraries
-if(MSVC AND CMAKE_CONFIGURATION_TYPES)
-  set(CMAKE_CONFIGURATION_TYPES Release MinSizeRel RelWithDebInfo)
-  set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}" CACHE STRING
-    "Remove Debug from available configuration types"
-     FORCE)
-endif()
-
 
 # make config 'RelWithDebInfo' debuggable by disabling optimizations
 if(MSVC)
@@ -55,12 +61,6 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /RTC1")
   list(REMOVE_DUPLICATES CMAKE_C_FLAGS_RELWITHDEBINFO)
   list(REMOVE_DUPLICATES CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-endif()
-
-# Set CMAKE_BUILD_TYPE to Release by default
-if (MTS_CMAKE_INIT AND DEFINED CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-    "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
 endif()
 
 # Load the required modules

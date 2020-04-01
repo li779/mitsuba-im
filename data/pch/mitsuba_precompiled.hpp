@@ -33,9 +33,9 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
-#include <limits.h>
-#include <stdio.h>
-#include <string.h>
+#include <climits>
+#include <cstdio>
+#include <cstring>
 #include <stdexcept>
 #include <limits>
 
