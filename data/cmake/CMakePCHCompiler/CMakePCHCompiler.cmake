@@ -54,6 +54,11 @@ function(target_precompiled_header) # target [...] header
 		return()
 	endif()
 
+	get_source_file_property(prev_pch_target ${header} PCH_COMPILER_TARGET)
+	if (prev_pch_target)
+		set(ARGS_REUSE "${prev_pch_target}")
+	endif ()
+
 	foreach(target ${ARGS_UNPARSED_ARGUMENTS})
 
 		if(NOT TARGET "${target}")
@@ -118,6 +123,7 @@ function(target_precompiled_header) # target [...] header
 			endif()
 			get_target_property(target_libraries ${target} LINK_LIBRARIES)
 			set_target_properties(${pch_target} PROPERTIES LINK_LIBRARIES "${target_libraries}")
+			set_source_files_properties(${header} PROPERTIES PCH_COMPILER_TARGET "${target}")
 		endif()
 
 		add_dependencies(${target} ${pch_target})
@@ -127,11 +133,8 @@ function(target_precompiled_header) # target [...] header
 			# /Yu - use given include as precompiled header
 			# /Fp - exact location for precompiled header
 			# /FI - force include of precompiled header
-			target_compile_options(
-				${target} PRIVATE "/Fp${abs_pch}" "/FI${abs_header}"
-				)
+			set(flags "/Fp${abs_pch} /FI${abs_header} /Yu${abs_header}")
 			target_sources(${target} PRIVATE $<TARGET_OBJECTS:${pch_target}>)
-			set(flags "/Yu${abs_header}")
 		else()
 			set(flags -include ${target_dir_header})
 		endif()
