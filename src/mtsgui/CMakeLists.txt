@@ -12,12 +12,11 @@ if (MTS_GUI_SOFTWARE_FALLBACK)
 endif()
 
 
-# Set up the Qt4 macros and variables
+# Set up the Qt5 macros and variables
 if (WIN32)
-  set(QT_USE_QTMAIN 0)
   set(MTS_EXE_TYPE "WIN32")
 endif()
-include(${QT_USE_FILE})
+include_directories(${QT_INCLUDE_DIRS})
 
 # Add all the sources
 set (UI_FILES
@@ -110,7 +109,7 @@ if (MTS_SSE)
   #if (APPLE)
     set(test_simdtonemap_PCH "NO_MTS_PCH")
   #endif() # currently incompatible with Qt CMake tools ...
-  add_mts_plugin(test_simdtonemap ${test_simdtonemap_PCH} 
+  add_mts_plugin(test_simdtonemap ${test_simdtonemap_PCH}
     test_simdtonemap.cpp ${SSE_SRCS} TYPE testcase)
 endif()
 
@@ -124,24 +123,23 @@ endif()
 
 
 # Process the UI files through uic and store the generated headers
-QT4_WRAP_UI(UI_HDRS ${UI_FILES})
+QT5_WRAP_UI(UI_HDRS ${UI_FILES})
 source_group("UI Files" FILES ${UI_FILES})
 
 # Add the directory where the generated headers are
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 # Process the resource files through rcc and store the generated cxx files
-QT4_ADD_RESOURCES(RC_SRCS ${RC_FILES})
+QT5_ADD_RESOURCES(RC_SRCS ${RC_FILES})
 source_group("Qt Resources" FILES ${RC_FILES})
 
 # Add our own qtmain and use the static file dialogs
 if (WIN32)
-  add_definitions(-D MTS_CUSTOM_QTMAIN -DMTSGUI_STATIC_QFILEDIALOG=1)
-  list(APPEND SRCS qtmain_win.cpp)
+  add_definitions(-DMTSGUI_STATIC_QFILEDIALOG=1)
 endif()
 
 # Generate the moc files
-QT4_WRAP_CPP(MOC_HDRS ${HDRS_UI} ${HDRS_QOBJECT})
+QT5_WRAP_CPP(MOC_HDRS ${HDRS_UI} ${HDRS_QOBJECT})
 
 # Create a source group for the generated files
 source_group("Qt Generated" FILES ${MOC_HDRS} ${UI_HDRS} ${RC_SRCS})

@@ -56,11 +56,16 @@ else()
 endif()
 
 
-# Qt4 (optional)
-find_package(Qt4 4.7 COMPONENTS
-  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
-CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
-  "QT4_FOUND" OFF)
+# Qt5 (optional)
+find_package(Qt5 COMPONENTS
+	Core Gui Xml XmlPatterns Network OpenGL)
+if (Qt5Widgets_FOUND AND Qt5XmlPatterns_FOUND)
+	set (QT5_FOUND TRUE)
+	set (QT_INCLUDE_DIRS Qt5Core_INCLUDE_DIRS Qt5Gui_INCLUDE_DIRS Qt5Xml_INCLUDE_DIRS Qt5XmlPatterns_INCLUDE_DIRS Qt5Network_INCLUDE_DIRS Qt5OpenGL_INCLUDE_DIRS)
+	set (QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Xml Qt5::XmlPatterns Qt5::Network Qt5::OpenGL)
+endif ()
+CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt5-based mitsuba GUI." ON
+	"QT5_FOUND" OFF)
   
 # System threading library, used for custom options
 set(CMAKE_THREAD_PREFER_PTHREAD ON)

@@ -142,8 +142,8 @@ endif()
 # Build the Qt-based GUI binaries
 if (BUILD_GUI)
   add_subdirectory(src/mtsgui)
-elseif(NOT QT4_FOUND)
-  message(STATUS "Qt4 was not found. The mitsuba gui will not be built.")
+elseif(NOT QT5_FOUND)
+  message(STATUS "Qt5 was not found. The mitsuba gui will not be built.")
 endif()
 
 
