@@ -197,7 +197,7 @@ endif()
 
 
 find_package(OpenGL REQUIRED)
-set (GLEW_MX ON)
+option(GLEW_MX "Enable legacy GLEW MX extension" OFF)
 find_package(GLEW REQUIRED)
 if (GLEW_FOUND)
   set (GLEW_STATE_VARS ${GLEW_INCLUDE_DIRS} ${GLEW_LIBRARIES})
