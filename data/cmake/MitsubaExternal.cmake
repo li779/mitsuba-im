@@ -196,7 +196,7 @@ if (NOT ILMBASE_FOUND OR NOT OPENEXR_FOUND)
 	if (NOT OPENEXR_FOUND)
 		make_external_library(OPENEXR IlmImf Iex IlmThread Imath)
 	endif ()
-	add_dependencies(${OPENEXR_LIBRARY} ${ILMBASE_LIBRARIES} ${ZLIB_LIBRARIES})
+	target_link_libraries(${OPENEXR_LIBRARY} INTERFACE ${ILMBASE_LIBRARIES} ${ZLIB_LIBRARIES})
 	# can run in parallel
 	list(APPEND MTS_EXTERNAL_PROJECT_VARS ZLIB_ROOT)
 	build_externals(openexr "${ILMBASE_LIBRARIES};${OPENEXR_LIBRARIES}" zlib)
