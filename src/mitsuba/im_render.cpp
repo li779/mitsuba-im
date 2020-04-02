@@ -74,7 +74,7 @@ namespace impl {
 				this->uniqueTargets = 0;
 				for (int i = 0; i < maxThreads; ++i) {
 					if (i % CORES_PER_FRAMEBUFFER == 0) {
-						framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, filmSize, scene->getFilm()->getReconstructionFilter());
+						framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ESpectrumAlpha, filmSize, scene->getFilm()->getReconstructionFilter());
 						++this->uniqueTargets;
 					}
 					else
@@ -82,7 +82,7 @@ namespace impl {
 				}
 #else
 				for (int i = 0; i < maxThreads; ++i)
-					framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, filmSize, scene->getFilm()->getReconstructionFilter());
+					framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ESpectrumAlpha, filmSize, scene->getFilm()->getReconstructionFilter());
 				this->uniqueTargets = maxThreads;
 #endif
 			}
@@ -209,7 +209,9 @@ namespace impl {
 
 				SLog(mitsuba::EInfo, "SPP: %f", spp);
 
-				mitsuba::ref<mitsuba::ImageBlock> developBuffer = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, scene->getFilm()->getCropSize());
+				mitsuba::ref<mitsuba::ImageBlock> developBuffer = new mitsuba::ImageBlock(
+						  mitsuba::Bitmap::ESpectrumAlpha | mitsuba::ImageBlock::EAccOnlyNoBorder
+						, scene->getFilm()->getCropSize(), scene->getFilm()->getReconstructionFilter());
 				developBuffer->clear();
 				for (int i = 0; i < numThreads; ++i)
 					if (i % CORES_PER_FRAMEBUFFER == 0)
@@ -232,10 +234,6 @@ InteractiveSceneProcess* InteractiveSceneProcess::create(mitsuba::Scene* scene, 
 	return new impl::InteractiveSceneProcess(scene, sampler, integrator, config);
 }
 InteractiveSceneProcess* InteractiveSceneProcess::create(mitsuba::Scene* scene, mitsuba::Sampler* sampler, mitsuba::Integrator* integrator, ProcessConfig const& config) {
-	if (scene->getFilm()->getReconstructionFilter()->cascade.count > 1) {
-		SLog(mitsuba::EInfo, "Using standard integrator (DBOR cascades not supported in responsive preview)");
-		return nullptr;
-	}
 	mitsuba::ref<mitsuba::ResponsiveIntegrator> rintegrator = integrator->makeResponsiveIntegrator();
 	if (!rintegrator) {
 		SLog(mitsuba::EInfo, "Using standard integrator ('%s' does not support responsive preview)", integrator->getProperties().getPluginName().c_str());
