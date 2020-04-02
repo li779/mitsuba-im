@@ -43,6 +43,10 @@ MTS_NAMESPACE_BEGIN
  */
 class MTS_EXPORT_RENDER ImageBlock : public WorkResult {
 public:
+	enum EFormatFlags {
+		EPixelFormatMask = 0x00ffff,
+		EAccOnlyNoBorder = 0x010000
+	};
 	/**
 	 * Construct a new image block of the requested properties
 	 *
@@ -58,8 +62,8 @@ public:
 	 * \param warn
 	 *    Warn when writing bad sample values?
 	 */
-	ImageBlock(Bitmap::EPixelFormat fmt, const Vector2i &size,
-			const ReconstructionFilter *filter = NULL, int channels = -1, bool warn = true);
+	ImageBlock(int fmt, const Vector2i &size,
+	           const ReconstructionFilter *filter = NULL, int channels = -1, bool warn = true);
 
 	/// Set the current block offset
 	inline void setOffset(const Point2i &offset) { m_offset = offset; }
