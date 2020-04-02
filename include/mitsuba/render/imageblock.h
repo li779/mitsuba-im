@@ -149,13 +149,9 @@ public:
 			temp[i] = spec[i];
 		temp[SPECTRUM_SAMPLES] = alpha;
 		temp[SPECTRUM_SAMPLES + 1] = 1.0f;
-		// no interactive preview yet
-		if (m_filter->cascade.count > 1) {
-			ReconstructionFilter::CascadeConfiguration::Classification cls
-				= m_filter->cascade.classify(spec.getLuminance());
-			return put(pos, temp, cls.idx, cls.weight);
-		}		
-		return putAtomic(pos, temp);
+		ReconstructionFilter::CascadeConfiguration::Classification cls
+			= m_filter->cascade.classify(spec.getLuminance());
+		return putAtomic(pos, temp, cls.idx, cls.weight);
 	}
 #endif
 
@@ -252,8 +248,10 @@ public:
 		return false;
 	}
 #ifndef MTS_NO_ATOMIC_SPLAT
-	FINLINE bool putAtomic(const Point2 &_pos, const Float *aligned_value) {
-		const int channels = m_normalChannels + m_sharedChannels;
+	FINLINE bool putAtomic(const Point2 &_pos, const Float *aligned_value, int cascadeIdx = 0, Float cascadeWeight = 1.0f) {
+		const int channels = m_normalChannels, appendedChannels = m_sharedChannels;
+		const int cascadeChannels = channels * m_filter->cascade.count + appendedChannels;
+		const Float cascadeWeightUpper = cascadeIdx + 1 < m_filter->cascade.count ? 1.0f - cascadeWeight : 0.0f;
 
 		/* Check if all sample values are valid */
 		for (int i=0; i<channels; ++i) {
@@ -283,7 +281,7 @@ public:
 				m_weightsY[idx++] = m_filter->evalDiscretized(y-pos.y);
 
 			/* Rasterize the filtered sample into the framebuffer */
-			if (channels == 4 && sizeof(Float) == sizeof(float)) {
+			if (cascadeChannels == channels && channels == 4 && sizeof(Float) == sizeof(float)) {
 				__m128 cs = _mm_load_ps(aligned_value);
 				for (int y=min.y, yr=0; y<=max.y; ++y, ++yr) {
 					const Float weightY = m_weightsY[yr];
@@ -314,18 +312,41 @@ public:
 					}
 				}
 			} else {
+				Float* floatData = m_floatData + channels * cascadeIdx;
+				Float* floatDataShared = m_floatData + (cascadeChannels - appendedChannels);
+				/* Rasterize the filtered sample into the framebuffer */
 				for (int y=min.y, yr=0; y<=max.y; ++y, ++yr) {
 					const Float weightY = m_weightsY[yr];
-					Float volatile *dest = m_floatData
-						+ (y * (size_t) size.x + min.x) * channels;
+					int ptrOffset = y * size.x + min.x;
+					Float *dest = floatData + ptrOffset * cascadeChannels;
+					Float *destShared = floatDataShared + ptrOffset * cascadeChannels;
 
 					for (int x=min.x, xr=0; x<=max.x; ++x, ++xr) {
 						const Float weight = m_weightsX[xr] * weightY;
 
+						const Float weight1 = weight * cascadeWeight;
 						for (int k=0; k<channels; ++k) {
-							Float s = aligned_value[k] * weight;
+							Float s = aligned_value[k] * weight1;
 							atomicAdd(dest++, s);
 						}
+						
+						if (cascadeWeightUpper > 0.0f) {
+							const Float weight2 = weight * cascadeWeightUpper;
+							for (int k=0; k<channels; ++k) {
+								Float s = aligned_value[k] * weight2;
+								atomicAdd(dest++, s);
+							}
+							
+							dest += cascadeChannels - 2*channels;
+						}
+						else
+							dest += cascadeChannels - channels;
+
+						for (int k=0; k<appendedChannels; ++k) {
+							Float s = aligned_value[channels+k] * weight;
+							atomicAdd(destShared++, s);
+						}
+						destShared += cascadeChannels - appendedChannels;
 					}
 				}
 			}
