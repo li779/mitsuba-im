@@ -30,7 +30,7 @@ ImageBlock::ImageBlock(Bitmap::EPixelFormat fmt, const Vector2i &size,
 		int additionalChannels = (int) fmt - (int) Bitmap::ESpectrum;
 		if (additionalChannels >= 0 && additionalChannels <= 2) {
 			channels = SPECTRUM_SAMPLES;
-			fmt = Bitmap::EMultiSpectrumAlphaWeight;
+			fmt = (additionalChannels == 2) ? Bitmap::EMultiSpectrumAlphaWeight : Bitmap::EMultiChannel;
 		}
 		else if ((int) fmt < (int) Bitmap::ESpectrumAlphaWeight) {
 			additionalChannels = (int) fmt & 0x1;
