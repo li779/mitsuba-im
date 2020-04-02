@@ -20,11 +20,12 @@
 
 MTS_NAMESPACE_BEGIN
 
-ImageBlock::ImageBlock(Bitmap::EPixelFormat fmt, const Vector2i &size,
+ImageBlock::ImageBlock(int fmtFlags, const Vector2i &size,
 		const ReconstructionFilter *filter, int channels, bool warn) : m_offset(0),
 		m_size(size), m_filter(filter), m_weightsX(NULL), m_weightsY(NULL), m_warn(warn) {
-	m_borderSize = filter ? filter->getBorderSize() : 0;
+	m_borderSize = filter && !(fmtFlags & EAccOnlyNoBorder) ? filter->getBorderSize() : 0;
 
+	Bitmap::EPixelFormat fmt = Bitmap::EPixelFormat(fmtFlags & EPixelFormatMask);
 	/* Convert to multi-channel bitmap for cascaded rendering */
 	if (filter && filter->cascade.count > 1) {
 		int additionalChannels = (int) fmt - (int) Bitmap::ESpectrum;
@@ -63,10 +64,12 @@ ImageBlock::ImageBlock(Bitmap::EPixelFormat fmt, const Vector2i &size,
 		if (filter->cascade.count > 1)
 			m_normalChannels /= filter->cascade.count;
 		
-		/* Temporary buffers used in put() */
-		int tempBufferSize = (int) std::ceil(2*filter->getRadius()) + 1;
-		m_weightsX = new Float[2*tempBufferSize];
-		m_weightsY = m_weightsX + tempBufferSize;
+		if (!(fmtFlags & EAccOnlyNoBorder)) {
+			/* Temporary buffers used in put() */
+			int tempBufferSize = (int) std::ceil(2*filter->getRadius()) + 1;
+			m_weightsX = new Float[2*tempBufferSize];
+			m_weightsY = m_weightsX + tempBufferSize;
+		}
 	}
 }
 
