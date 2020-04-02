@@ -1,7 +1,8 @@
 Mitsuba — Physically Based Renderer
 ===================================
+[![Build status](https://ci.appveyor.com/api/projects/status/u12powry2w5fnjct/branch/vf-backport0.5.0-qt4?svg=true)](https://ci.appveyor.com/project/tszirr/mitsuba-backports/branch/vf-backport0.5.0-qt4)
 
-http://mitsuba-renderer.org/
+Qt4/CMake backport of upstream with bugfixes http://mitsuba-renderer.org/
 
 ## About
 
@@ -16,6 +17,10 @@ Mitsuba comes with a command-line interface as well as a graphical frontend to i
 ## Documentation
 
 For compilation, usage, and a full plugin reference, please see the [official documentation](http://mitsuba-renderer.org/docs.html).
+
+## Building
+
+See documentation. For Qt5 on Ubuntu, may need to add libqt5xmlpatterns5-dev to qt5-default.
 
 ## Releases and scenes
 
