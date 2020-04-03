@@ -455,6 +455,8 @@ void Bitmap::updateChannelCount() {
 		case ESpectrum: m_channelCount = SPECTRUM_SAMPLES; break;
 		case ESpectrumAlpha: m_channelCount = SPECTRUM_SAMPLES + 1; break;
 		case ESpectrumAlphaWeight: m_channelCount = SPECTRUM_SAMPLES + 2; break;
+		case EMultiSpectrum: break;
+		case EMultiSpectrumAlpha: break;
 		case EMultiSpectrumAlphaWeight: break;
 		case EMultiChannel: break;
 		default:
@@ -4011,6 +4013,8 @@ std::ostream &operator<<(std::ostream &os, const Bitmap::EPixelFormat &value) {
 		case Bitmap::ESpectrum: os << "spectrum"; break;
 		case Bitmap::ESpectrumAlpha: os << "spectrumAlpha"; break;
 		case Bitmap::ESpectrumAlphaWeight: os << "spectrumAlphaWeight"; break;
+		case Bitmap::EMultiSpectrum: os << "multiSpectrum"; break;
+		case Bitmap::EMultiSpectrumAlpha: os << "multiSpectrumAlpha"; break;
 		case Bitmap::EMultiSpectrumAlphaWeight: os << "multiSpectrumAlphaWeight"; break;
 		case Bitmap::EMultiChannel: os << "multiChannel"; break;
 		default: os << "invalid"; break;

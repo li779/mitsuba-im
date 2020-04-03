@@ -1071,8 +1071,29 @@ template <typename T> struct FormatConverterImpl : public FormatConverter {
 				}
 				break;
 
+				case Bitmap::EMultiSpectrumAlpha: {
+					switch (destFormat) {
+						case Bitmap::EMultiSpectrumAlpha:
+							for (size_t i=0; i<count*channelCount; ++i)
+								*dest++ = convertScalar<DestFormat>(*source++, sourceGamma, precomp, multiplier, invDestGamma);
+							break;
+						case Bitmap::EMultiSpectrumAlphaWeight:
+							for (size_t i=0; i<count; ++i) {
+								for (int j=0; j<channelCount; ++j)
+									*dest++ = convertScalar<DestFormat>(*source++, sourceGamma, precomp, multiplier, invDestGamma);
+								*dest++ = DestFormat(1);
+							}
+							break;
+						default:
+							SLog(EError, "Unsupported destination pixel format!");
+					}
+				}
+				break;
+
+				case Bitmap::EMultiSpectrum:
 				case Bitmap::EMultiChannel: {
 					switch (destFormat) {
+						case Bitmap::EMultiSpectrum:
 						case Bitmap::EMultiChannel:
 							for (size_t i=0; i<count*channelCount; ++i)
 								*dest++ = convertScalar<DestFormat>(*source++, sourceGamma, precomp, multiplier, invDestGamma);
@@ -1081,6 +1102,7 @@ template <typename T> struct FormatConverterImpl : public FormatConverter {
 							for (size_t i=0; i<count; ++i) {
 								for (int j=0; j<channelCount; ++j)
 									*dest++ = convertScalar<DestFormat>(*source++, sourceGamma, precomp, multiplier, invDestGamma);
+								*dest++ = DestFormat(1);
 								*dest++ = DestFormat(1);
 							}
 							break;

@@ -87,6 +87,8 @@ public:
 		ESpectrumAlphaWeight      = 0x08,
 
 		/// Bitmap with multiple spectra + alpha + weight channel (render buckets used by the 'multichannel' plugin)
+		EMultiSpectrum            = 0x29,
+		EMultiSpectrumAlpha       = 0x19,
 		EMultiSpectrumAlphaWeight = 0x09,
 
 		/// Arbitrary multi-channel bitmap without a fixed interpretation
@@ -408,7 +410,8 @@ public:
 			m_pixelFormat == ELuminanceAlpha ||
 			m_pixelFormat == ERGBA ||
 			m_pixelFormat == EXYZA ||
-			m_pixelFormat == ESpectrumAlpha;
+			m_pixelFormat == ESpectrumAlpha || m_pixelFormat == ESpectrumAlphaWeight ||
+			m_pixelFormat == EMultiSpectrumAlpha || m_pixelFormat == EMultiSpectrumAlphaWeight;
 	}
 
 	/// Return whether this image has a weight channel
@@ -420,7 +423,7 @@ public:
 	/// Return whether this is a generic multi-channel image
 	inline bool isMultiChannel() const {
 		return m_pixelFormat == EMultiChannel ||
-		       m_pixelFormat == EMultiSpectrumAlphaWeight;
+		       m_pixelFormat == EMultiSpectrumAlphaWeight || m_pixelFormat == EMultiSpectrumAlpha || m_pixelFormat == EMultiSpectrum;
 	}
 
 	/**

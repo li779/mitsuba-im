@@ -415,7 +415,7 @@ public:
 		   somewhat peculiar film updates done by BDPT */
 
 		Vector2i size = bitmap->getSize();
-		if (bitmap->getPixelFormat() != Bitmap::ESpectrum ||
+		if (bitmap->getPixelFormat() != Bitmap::ESpectrum && bitmap->getPixelFormat() != Bitmap::EMultiSpectrum ||
 			bitmap->getComponentFormat() != Bitmap::EFloat ||
 			bitmap->getGamma() != 1.0f ||
 			size != m_storage->getSize() ||
@@ -426,12 +426,13 @@ public:
 		size_t nPixels = (size_t) size.x * (size_t) size.y;
 		const Float *source = bitmap->getFloatData();
 		Float *target = m_storage->getBitmap()->getFloatData();
+		int spectrumSamples = bitmap->getChannelCount();
 		for (size_t i=0; i<nPixels; ++i) {
-			Float weight = target[SPECTRUM_SAMPLES + 1];
+			Float weight = target[spectrumSamples + 1];
 			if (weight == 0)
-				weight = target[SPECTRUM_SAMPLES + 1] = 1;
+				weight = target[spectrumSamples + 1] = 1;
 			weight *= multiplier;
-			for (size_t j=0; j<SPECTRUM_SAMPLES; ++j)
+			for (size_t j=0; j<spectrumSamples; ++j)
 				*target++ += *source++ * weight;
 			target += 2;
 		}
