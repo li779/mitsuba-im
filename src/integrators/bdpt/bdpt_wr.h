@@ -37,7 +37,8 @@ MTS_NAMESPACE_BEGIN
 class BDPTWorkResult : public WorkResult {
 public:
     BDPTWorkResult(const BDPTConfiguration &conf, const ReconstructionFilter *filter,
-            Vector2i blockSize = Vector2i(-1, -1));
+			Vector2i blockSize = Vector2i(-1, -1),
+			int blockFlags = 0);
 
     // Clear the contents of the work result
     void clear();
