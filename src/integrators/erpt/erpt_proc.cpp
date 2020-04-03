@@ -521,7 +521,8 @@ void ERPTProcess::bindResource(const std::string &name, int id) {
 	if (name == "sensor") {
 		Film *film = static_cast<Sensor *>(Scheduler::getInstance()->getResource(id))->getFilm();
 
-		m_accum = new ImageBlock(Bitmap::ESpectrum, film->getCropSize());
+		m_accum = new ImageBlock(Bitmap::ESpectrum | ImageBlock::EAccOnlyNoBorder
+			, film->getCropSize(), film->getReconstructionFilter());
 		m_accum->clear();
 	}
 }

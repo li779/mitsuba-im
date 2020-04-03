@@ -103,7 +103,7 @@ void CaptureParticleWorker::handleEmission(const PositionSamplingRecord &pRec,
 	value *= emitter->evalDirection(DirectionSamplingRecord(dRec.d), pRec);
 
 	/* Splat onto the accumulation buffer */
-	m_workResult->put(dRec.uv, (Float *) &value[0]);
+	m_workResult->put(dRec.uv, value, 0.0f);
 }
 
 void CaptureParticleWorker::handleSurfaceInteraction(int depth, int nullInteractions,
@@ -124,7 +124,7 @@ void CaptureParticleWorker::handleSurfaceInteraction(int depth, int nullInteract
 		if (value.isZero())
 			return;
 
-		m_workResult->put(uv, (Float *) &value[0]);
+		m_workResult->put(uv, value, 0.0f);
 		return;
 	}
 
@@ -161,7 +161,7 @@ void CaptureParticleWorker::handleSurfaceInteraction(int depth, int nullInteract
 	value *= bsdf->eval(bRec) * correction;
 
 	/* Splat onto the accumulation buffer */
-	m_workResult->put(dRec.uv, (Float *) &value[0]);
+	m_workResult->put(dRec.uv, value, 0.0f);
 }
 
 void CaptureParticleWorker::handleMediumInteraction(int depth, int nullInteractions, bool caustic,
@@ -190,7 +190,7 @@ void CaptureParticleWorker::handleMediumInteraction(int depth, int nullInteracti
 		return;
 
 	/* Splat onto the accumulation buffer */
-	m_workResult->put(dRec.uv, (Float *) &value[0]);
+	m_workResult->put(dRec.uv, value, 0.0f);
 }
 
 /* ==================================================================== */
@@ -222,7 +222,7 @@ void CaptureParticleProcess::bindResource(const std::string &name, int id) {
 	if (name == "sensor") {
 		Sensor *sensor = static_cast<Sensor *>(Scheduler::getInstance()->getResource(id));
 		m_film = sensor->getFilm();
-		m_accum = new ImageBlock(Bitmap::ESpectrum, m_film->getCropSize(), NULL);
+		m_accum = new ImageBlock(Bitmap::ESpectrum | ImageBlock::EAccOnlyNoBorder, m_film->getCropSize(), m_film->getReconstructionFilter());
 		m_accum->clear();
 	}
 	ParticleProcess::bindResource(name, id);

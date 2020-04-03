@@ -532,7 +532,7 @@ void BDPTProcess::bindResource(const std::string &name, int id) {
 	BlockedRenderProcess::bindResource(name, id);
 	if (name == "sensor" && m_config.lightImage) {
 		/* If needed, allocate memory for the light image */
-		m_result = new BDPTWorkResult(m_config, NULL, m_film->getCropSize());
+		m_result = new BDPTWorkResult(m_config, m_film->getReconstructionFilter(), m_film->getCropSize(), nullptr, ImageBlock::EAccOnlyNoBorder);
 		m_result->clear();
 	}
 }

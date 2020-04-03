@@ -28,7 +28,7 @@ MTS_NAMESPACE_BEGIN
 
 BDPTWorkResult::BDPTWorkResult(const BDPTConfiguration &conf,
 		const ReconstructionFilter *rfilter, Vector2i blockSize,
-		ImageBlock* atomicTarget) {
+		ImageBlock* atomicTarget, int blockFlags) {
 	/* Stores the 'camera image' -- this can be blocked when
 	   spreading out work to multiple workers */
 	if (blockSize == Vector2i(-1, -1))
@@ -40,7 +40,7 @@ BDPTWorkResult::BDPTWorkResult(const BDPTConfiguration &conf,
 		blockSize = conf.cropSize;
 	} else {
 
-	m_block = new ImageBlock(Bitmap::ESpectrumAlphaWeight, blockSize, rfilter);
+	m_block = new ImageBlock(Bitmap::ESpectrumAlphaWeight | blockFlags, blockSize, rfilter);
 	m_block->setOffset(Point2i(0, 0));
 	m_block->setSize(blockSize);
 
@@ -48,7 +48,7 @@ BDPTWorkResult::BDPTWorkResult(const BDPTConfiguration &conf,
 		/* Stores the 'light image' -- every worker requires a
 		   full-resolution version, since contributions of s==0
 		   and s==1 paths can affect any pixel of this bitmap */
-		m_lightImage = new ImageBlock(Bitmap::ESpectrum,
+		m_lightImage = new ImageBlock(Bitmap::ESpectrum | blockFlags,
 				conf.cropSize, rfilter);
 		m_lightImage->setSize(conf.cropSize);
 		m_lightImage->setOffset(Point2i(0, 0));
@@ -65,7 +65,7 @@ BDPTWorkResult::BDPTWorkResult(const BDPTConfiguration &conf,
 
 	for (size_t i=0; i<m_debugBlocks.size(); ++i) {
 		m_debugBlocks[i] = new ImageBlock(
-				Bitmap::ESpectrum, conf.cropSize, rfilter);
+				Bitmap::ESpectrum | blockFlags, conf.cropSize, rfilter);
 		m_debugBlocks[i]->setOffset(Point2i(0,0));
 		m_debugBlocks[i]->setSize(conf.cropSize);
 	}

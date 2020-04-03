@@ -37,7 +37,8 @@ MTS_NAMESPACE_BEGIN
 class BDPTWorkResult : public WorkResult {
 public:
 	BDPTWorkResult(const BDPTConfiguration &conf, const ReconstructionFilter *filter,
-			Vector2i blockSize = Vector2i(-1, -1), ImageBlock* atomicTarget = nullptr);
+			Vector2i blockSize = Vector2i(-1, -1), ImageBlock* atomicTarget = nullptr,
+			int blockFlags = 0);
 
 	// Clear the contents of the work result
 	void clear();
@@ -78,14 +79,16 @@ public:
 			alignas(16) Float temp[SPECTRUM_SAMPLES + 2] = { };
 			for (int i=0; i<SPECTRUM_SAMPLES; ++i)
 				temp[i] = spec[i];
+			ReconstructionFilter::CascadeConfiguration::Classification cls
+				= m_lightImage->getFilter()->cascade.classify(spec.getLuminance());
 #ifndef MTS_NO_ATOMIC_SPLAT
-			m_lightImage->putAtomic(sample, temp);
+			m_lightImage->putAtomic(sample, temp, cls.idx, cls.weight);
 #else
-			m_lightImage->put(sample, temp);
+			m_lightImage->put(sample, temp, cls.idx, cls.weight);
 #endif
 			return;
 		}
-		m_lightImage->put(sample, spec, 1.0f);
+		m_lightImage->put(sample, spec, 0.0f);
 	}
 
 	inline const ImageBlock *getImageBlock() const {
