@@ -1,6 +1,8 @@
 Mitsuba IM — Physically Based Renderer (Interactive Fork)
 =========================================================
 
+[![Build status](https://ci.appveyor.com/api/projects/status/5x9me6a6wtihtojl/branch/master?svg=true&passingText=linux:passing&failingText=linux:failing&pendingText=linux:pending)](https://ci.appveyor.com/project/tszirr/mitsuba-im/branch/master)
+[![Build status](https://ci.appveyor.com/api/projects/status/0gvs85hfv3rmv2sm/branch/master?svg=true&passingText=windows:passing&failingText=windows:failing&pendingText=windows:pending)](https://ci.appveyor.com/project/tszirr/mitsuba-im-win/branch/master)
 ![Immediate-mode UI frontend for mitsuba with interactive preview](http://alphanew.net/refresh/portfolio/immitsuba.jpg)
 
 Mitsuba IM is a fork of the comprehensive physically-based renderer mitsuba (http://mitsuba-renderer.org/) by Wenzel Jakob (and other contributors), which has proven an invaluable framework for the scientific evaluation of both classic rendering algorithms and novel rendering research. This IM fork pursues the following additional goals:
