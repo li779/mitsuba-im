@@ -31,7 +31,9 @@ ImageBlock::ImageBlock(int fmtFlags, const Vector2i &size,
 		int additionalChannels = (int) fmt - (int) Bitmap::ESpectrum;
 		if (additionalChannels >= 0 && additionalChannels <= 2) {
 			channels = SPECTRUM_SAMPLES;
-			fmt = (additionalChannels == 2) ? Bitmap::EMultiSpectrumAlphaWeight : Bitmap::EMultiChannel;
+			fmt = (additionalChannels == 2)
+				? Bitmap::EMultiSpectrumAlphaWeight
+				: (additionalChannels == 1) ? Bitmap::EMultiSpectrumAlpha : Bitmap::EMultiSpectrum;
 		}
 		else if ((int) fmt < (int) Bitmap::ESpectrumAlphaWeight) {
 			additionalChannels = (int) fmt & 0x1;
@@ -42,6 +44,12 @@ ImageBlock::ImageBlock(int fmtFlags, const Vector2i &size,
 			additionalChannels = 2;
 			channels -= additionalChannels;
 		}
+		else if (fmt == Bitmap::EMultiSpectrumAlpha) {
+			additionalChannels = 1;
+			channels -= additionalChannels;
+		}
+		else if (fmt == Bitmap::EMultiSpectrum)
+			additionalChannels = 0;
 		else {
 			Assert((int) fmt >= (int) Bitmap::EMultiChannel);
 			additionalChannels = 0;
