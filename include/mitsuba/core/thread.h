@@ -21,7 +21,6 @@
 #define __MITSUBA_CORE_THREAD_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/scoped_ptr.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -193,7 +192,7 @@ protected:
 	virtual void run() = 0;
 private:
 	struct ThreadPrivate;
-	boost::scoped_ptr<ThreadPrivate> d;
+	std::unique_ptr<ThreadPrivate> d;
 };
 
 #if defined(MTS_OPENMP)

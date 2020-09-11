@@ -155,10 +155,10 @@ private:
  * \endcode
  *
  */
-#define MTS_DECLARE_CLASS() \
-	virtual const Class *getClass() const; \
+#define MTS_DECLARE_CLASS(...) \
+	__VA_ARGS__ virtual const Class *getClass() const; \
 public: \
-	static Class *m_theClass;
+	__VA_ARGS__ static Class *m_theClass;
 
 /**
  * \brief Creates basic RTTI support for a class

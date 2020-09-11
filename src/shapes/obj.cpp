@@ -25,7 +25,9 @@
 #include <mitsuba/render/subsurface.h>
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/sensor.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/hw/basicshader.h>
+#include <fstream>
 #include <set>
 
 MTS_NAMESPACE_BEGIN
@@ -188,7 +190,7 @@ public:
 
 	WavefrontOBJ(const Properties &props) : Shape(props) {
 		ref<FileResolver> fileResolver = Thread::getThread()->getFileResolver()->clone();
-		fs::path path = fileResolver->resolve(props.getString("filename"));
+		fs::path path = fs::decode_pathstr(fileResolver->resolve(fs::pathstr(props.getString("filename"))));
 
 		m_name = path.stem().string();
 
@@ -221,11 +223,11 @@ public:
 
 		/* Load the geometry */
 		Log(EInfo, "Loading geometry from \"%s\" ..", path.filename().string().c_str());
-		fs::ifstream is(path);
+		std::ifstream is(path);
 		if (is.bad() || is.fail())
 			Log(EError, "Wavefront OBJ file '%s' not found!", path.string().c_str());
 
-		fileResolver->prependPath(fs::absolute(path).parent_path());
+		fileResolver->prependPath(fs::encode_pathstr(fs::absolute(path).parent_path()));
 
 		ref<Timer> timer = new Timer();
 		std::string buf;
@@ -299,7 +301,7 @@ public:
 
 				materialName = trim(line.substr(6, line.length()-1));
 			} else if (buf == "mtllib") {
-				materialLibrary = fileResolver->resolve(trim(line.substr(6, line.length()-1)));
+				materialLibrary = fs::decode_pathstr(fileResolver->resolve(fs::pathstr(trim(line.substr(6, line.length()-1)))));
 			} else if (buf == "vt") {
 				Float u, v;
 				iss >> u >> v;
@@ -394,7 +396,7 @@ public:
 			const fs::path &mtlPath, std::string filename,
 			bool noGamma = false) {
 		/* Prevent Linux/OSX fs::path handling issues for DAE files created on Windows */
-		for (size_t i=0; i<filename.length(); ++i) {
+		for (size_t i=0; i<filename.size(); ++i) {
 			if (filename[i] == '\\')
 				filename[i] = '/';
 		}
@@ -402,9 +404,10 @@ public:
 		if (cache.find(filename) != cache.end())
 			return cache[filename];
 
-		fs::path path = fileResolver->resolve(filename);
+		fs::pathstr sfilename = fs::pathstr(filename);
+		fs::path path = fs::decode_pathstr(fileResolver->resolve(sfilename));
 		if (!fs::exists(path)) {
-			path = fileResolver->resolve(fs::path(filename).filename());
+			path = fs::decode_pathstr(fileResolver->resolve(fs::encode_pathstr( fs::decode_pathstr(sfilename).filename() )));
 			if (!fs::exists(path)) {
 				Log(EWarn, "Unable to find texture \"%s\" referenced from \"%s\"!",
 					path.string().c_str(), mtlPath.string().c_str());
@@ -431,7 +434,7 @@ public:
 		}
 
 		Log(EInfo, "Loading OBJ materials from \"%s\" ..", mtlPath.filename().string().c_str());
-		fs::ifstream is(mtlPath);
+		std::ifstream is(mtlPath);
 		if (is.bad() || is.fail())
 			Log(EError, "Unexpected I/O error while accessing material file '%s'!",
 				mtlPath.string().c_str());
@@ -581,8 +584,7 @@ public:
 	};
 
 	/// For using vertices as keys in an associative structure
-	struct vertex_key_order : public
-		std::binary_function<Vertex, Vertex, bool> {
+	struct vertex_key_order {
 	public:
 		bool operator()(const Vertex &v1, const Vertex &v2) const {
 			if (v1.p.x < v2.p.x) return true;

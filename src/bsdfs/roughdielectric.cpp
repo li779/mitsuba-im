@@ -18,7 +18,10 @@
 
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/sampler.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include "microfacet.h"
 #include "ior.h"
 
@@ -657,7 +660,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -669,6 +674,7 @@ private:
 	bool m_sampleVisible;
 };
 
+#ifdef MTS_HAS_HW
 /* Fake glass shader -- it is really hopeless to visualize
    this material in the VPL renderer, so let's try to do at least
    something that suggests the presence of a transparent boundary */
@@ -706,6 +712,7 @@ Shader *RoughDielectric::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(RoughDielectricShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(RoughDielectric, false, BSDF)
 MTS_EXPORT_PLUGIN(RoughDielectric, "Rough dielectric BSDF");
 MTS_NAMESPACE_END

@@ -363,7 +363,7 @@ public:
 	 *    Only consider image layers whose identifier begins with \c prefix.
 	 *    This is currently only supported by the OpenEXR format loader.
 	 */
-	Bitmap(const fs::path &path, const std::string &prefix = "");
+	Bitmap(fs::pathstr const& path, const std::string &prefix = "");
 
 	//! @}
 	// ======================================================================
@@ -556,7 +556,7 @@ public:
 	 *    the latter being best). The default argument (-1) uses compression
 	 *    5 for PNG and 100 for JPEG files.
 	 */
-	void write(EFileFormat format, const fs::path &filename, int compression = -1) const;
+	void write(EFileFormat format, fs::pathstr const& filename, int compression = -1) const;
 
 	/**
 	 * Write an encoded form of the bitmap to a file (auto-detecting the file format)
@@ -573,7 +573,7 @@ public:
 	 *    the latter being best). The default argument (-1) uses compression
 	 *    5 for PNG and 100 for JPEG files.
 	 */
-	void write(const fs::path &filename, int compression = -1) const;
+	void write(fs::pathstr const& filename, int compression = -1) const;
 
 	//! @}
 	// ======================================================================

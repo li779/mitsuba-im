@@ -1,0 +1,51 @@
+[submodule "external/boost-config"]
+	path = external/boost-config
+	url = https://github.com/boostorg/config
+[submodule "external/boost-core"]
+	path = external/boost-core
+	url = https://github.com/boostorg/core
+[submodule "external/boost-mpl"]
+	path = external/boost-mpl
+	url = https://github.com/boostorg/mpl
+[submodule "external/boost-preprocessor"]
+	path = external/boost-preprocessor
+	url = https://github.com/boostorg/preprocessor
+[submodule "external/boost-static_assert"]
+	path = external/boost-static_assert
+	url = https://github.com/boostorg/static_assert
+[submodule "external/boost-type_traits"]
+	path = external/boost-type_traits
+	url = https://github.com/boostorg/type_traits
+[submodule "external/boost-utility"]
+	path = external/boost-utility
+	url = https://github.com/boostorg/utility
+[submodule "external/libjpeg-turbo"]
+	path = external/libjpeg-turbo
+	url = https://github.com/libjpeg-turbo/libjpeg-turbo
+[submodule "external/libpng"]
+	path = external/libpng
+	url = https://github.com/glennrp/libpng
+[submodule "external/zlib"]
+	path = external/zlib
+	url = https://github.com/madler/zlib
+[submodule "external/openexr"]
+	path = external/openexr
+	url = https://github.com/openexr/openexr
+[submodule "external/xerces-c"]
+	path = external/xerces-c
+	url = https://github.com/apache/xerces-c
+[submodule "external/CMakePCHCompiler"]
+	path = external/CMakePCHCompiler
+	url = https://github.com/nanoant/CMakePCHCompiler
+[submodule "external/SDL"]
+	path = external/SDL
+	url = https://github.com/spurious/SDL-mirror
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "external/tinyfiledialogs"]
+	path = external/tinyfiledialogs
+	url = https://git.code.sf.net/p/tinyfiledialogs/code
+[submodule "external/eigen"]
+	path = external/eigen
+	url = https://github.com/eigenteam/eigen-git-mirror

@@ -16,9 +16,14 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// manifold mutation requires eigen for now ...
+#ifdef HAS_EIGEN
+
 #include <mitsuba/bidir/manifold.h>
 #include <mitsuba/bidir/path.h>
 #include <mitsuba/core/statistics.h>
+
+
 #define EIGEN_DONT_PARALLELIZE
 #define EIGEN_NO_DEBUG
 #include <Eigen/LU>
@@ -998,3 +1003,5 @@ std::string SpecularManifold::toString() const {
 
 MTS_IMPLEMENT_CLASS(SpecularManifold, false, Object)
 MTS_NAMESPACE_END
+
+#endif

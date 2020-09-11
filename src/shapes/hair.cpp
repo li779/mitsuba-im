@@ -24,7 +24,9 @@
 #include <mitsuba/render/trimesh.h>
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/fresolver.h>
+#include <fstream>
 
 #define MTS_HAIR_USE_FANCY_CLIPPING 1
 
@@ -607,8 +609,8 @@ protected:
 };
 
 HairShape::HairShape(const Properties &props) : Shape(props) {
-	fs::path path = Thread::getThread()->getFileResolver()->resolve(
-		props.getString("filename"));
+	fs::pathstr path = Thread::getThread()->getFileResolver()->resolve(
+		fs::pathstr(props.getString("filename")));
 	Float radius = props.getFloat("radius", 0.025f);
 	/* Skip segments, whose tangent differs by less than one degree
 	   compared to the previous one */
@@ -632,7 +634,7 @@ HairShape::HairShape(const Properties &props) : Shape(props) {
 	Transform objectToWorld = props.getTransform("toWorld", Transform());
 	radius *= objectToWorld(Vector(0, 0, 1)).length();
 
-	Log(EInfo, "Loading hair geometry from \"%s\" ..", path.filename().string().c_str());
+	Log(EInfo, "Loading hair geometry from \"%s\" ..", path.s.c_str());
 	ref<Timer> timer = new Timer();
 
 	ref<FileStream> binaryStream = new FileStream(path, FileStream::EReadOnly);
@@ -718,9 +720,9 @@ HairShape::HairShape(const Properties &props) : Shape(props) {
 		std::string line;
 		bool newFiber = true;
 
-		fs::ifstream is(path);
+		std::ifstream is(decode_pathstr(path).string().c_str());
 		if (is.fail())
-			Log(EError, "Could not open \"%s\"!", path.string().c_str());
+			Log(EError, "Could not open \"%s\"!", path.s.c_str());
 		while (is.good()) {
 			std::getline(is, line);
 			if (line.length() > 0 && line[0] == '#') {
@@ -846,7 +848,7 @@ void HairShape::fillIntersectionRecord(const Ray &ray,
 	its.p += its.geoFrame.n * (m_kdtree->getRadius() - std::sqrt(local.y*local.y+local.z*local.z));
 
 	its.shFrame.n = its.geoFrame.n;
-    coordinateSystem(its.shFrame.n, its.dpdu, its.dpdv);
+	coordinateSystem(its.shFrame.n, its.dpdu, its.dpdv);
 	its.hasUVPartials = false;
 	its.instance = this;
 	its.time = ray.time;

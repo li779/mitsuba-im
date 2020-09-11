@@ -43,6 +43,8 @@ public:
 	ref<WorkProcessor> createWorkProcessor() const;
 	void bindResource(const std::string &name, int id);
 
+	static ref<ResponsiveIntegrator> makeResponsiveIntegrator(Integrator* bdpt, const ERPTConfiguration *config);
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor

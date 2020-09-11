@@ -17,12 +17,17 @@
 */
 
 #pragma once
-#if !defined(__MITSUBA_HW_FONT_H_)
-#define __MITSUBA_HW_FONT_H_
+#if !defined(__MITSUBA_RENDER_FONT_H_)
+#define __MITSUBA_RENDER_FONT_H_
 
-#include <mitsuba/hw/renderer.h>
+#include <mitsuba/core/bitmap.h>
 
 MTS_NAMESPACE_BEGIN
+
+class Shader;
+class Renderer;
+class GPUProgram;
+class GPUTexture;
 
 /** \brief Utility class used to render text inside OpenGL programs
  * using pre-rasterized TrueType fonts stored as textures.
@@ -31,7 +36,7 @@ MTS_NAMESPACE_BEGIN
  * 'tools/linux/fontgen'. Only Latin-1 is supported at the moment.
  * \ingroup libhw
  */
-class MTS_EXPORT_HW Font : public Object {
+class Font : public Object {
 public:
 	/// Glyph metrics data structure
 	struct Glyph {
@@ -74,22 +79,22 @@ public:
 	};
 
 	/// Allocate memory for a certain font
-	Font(EFont font);
+	MTS_EXPORT_RENDER Font(EFont font);
 
 	/// Draw text to the specified bitmap
-	void drawText(Bitmap *dest, Point2i pos, const std::string &text) const;
+	MTS_EXPORT_RENDER void drawText(Bitmap *dest, Point2i pos, const std::string &text) const;
 
 	/// Compute the size covered by the given string when rendered using this font
-	Vector2i getSize(const std::string &text) const;
+	MTS_EXPORT_RENDER Vector2i getSize(const std::string &text) const;
 
 	/// Upload the font to the GPU
-	void init(Renderer *renderer);
+	MTS_EXPORT_HW void init(Renderer *renderer);
 
 	/// Free the GPU memory
-	void cleanup();
+	MTS_EXPORT_HW void cleanup();
 
 	/// Convert the underlying bitmap to a different pixel format
-	void convert(Bitmap::EPixelFormat pixelFormat,
+	MTS_EXPORT_RENDER void convert(Bitmap::EPixelFormat pixelFormat,
 		Bitmap::EComponentFormat componentFormat, Float gamma);
 
 	/// Return the name of this font
@@ -112,10 +117,10 @@ public:
 	/// Return the max. vertical bearing
 	inline int getMaxVerticalBearing() const { return m_maxVerticalBearing; }
 
-	MTS_DECLARE_CLASS()
+	MTS_DECLARE_CLASS(MTS_EXPORT_RENDER)
 protected:
 	/// Virtual destructor
-	virtual ~Font();
+	MTS_EXPORT_RENDER virtual ~Font();
 private:
 	std::string m_name;
 	ref<GPUTexture> m_texture;

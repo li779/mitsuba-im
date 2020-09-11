@@ -18,6 +18,7 @@
 
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/core/sfcurve.h>
+#include <mitsuba/render/integrator2.h>
 #include <mitsuba/bidir/util.h>
 #include "bdpt_proc.h"
 
@@ -63,6 +64,13 @@ public:
 		m_scene->initializeBidirectional();
 	}
 
+	void prepareResponsive(Scene const* scene, Sensor const* sensor, Sampler* sampler) {
+		m_scene = const_cast<Scene*>(scene);
+		m_sampler = sampler;
+		m_sensor = const_cast<Sensor *>(sensor);
+		m_rfilter = m_sensor->getFilm()->getReconstructionFilter();
+	}
+
 	void process(const WorkUnit *workUnit, WorkResult *workResult, const bool &stop) {
 		const RectangularWorkUnit *rect = static_cast<const RectangularWorkUnit *>(workUnit);
 		BDPTWorkResult *result = static_cast<BDPTWorkResult *>(workResult);
@@ -74,17 +82,17 @@ public:
 		result->clear();
 		m_hilbertCurve.initialize(TVector2<uint8_t>(rect->getSize()));
 
-		#if defined(MTS_DEBUG_FP)
-			enableFPExceptions();
-		#endif
+#if defined(MTS_DEBUG_FP)
+		enableFPExceptions();
+#endif
 
 		Path emitterSubpath;
 		Path sensorSubpath;
 
 		/* Determine the necessary random walk depths based on properties of
-		   the endpoints */
+		the endpoints */
 		int emitterDepth = m_config.maxDepth,
-		    sensorDepth = m_config.maxDepth;
+			sensorDepth = m_config.maxDepth;
 
 		/* Go one extra step if the sensor can be intersected */
 		if (!m_scene->hasDegenerateSensor() && emitterDepth != -1)
@@ -123,13 +131,126 @@ public:
 			}
 		}
 
-		#if defined(MTS_DEBUG_FP)
-			disableFPExceptions();
-		#endif
+#if defined(MTS_DEBUG_FP)
+		disableFPExceptions();
+#endif
 
 		/* Make sure that there were no memory leaks */
 		Assert(m_pool.unused());
 	}
+
+	class BDPTResponsive : public ImageOrderIntegrator {
+		struct State {
+			bool needsTimeSample;
+			Float time;
+			Path emitterSubpath;
+			Path sensorSubpath;
+			int emitterDepth, sensorDepth;
+			BDPTRenderer* renderer;
+			BDPTWorkResult* result;
+
+			State(const Scene* m_scene, BDPTConfiguration const& m_config) {
+				/* Determine the necessary random walk depths based on properties of
+				the endpoints */
+				emitterDepth = m_config.maxDepth;
+				sensorDepth = m_config.maxDepth;
+
+				/* Go one extra step if the sensor can be intersected */
+				if (!m_scene->hasDegenerateSensor() && emitterDepth != -1)
+					++emitterDepth;
+
+				/* Go one extra step if there are emitters that can be intersected */
+				if (!m_scene->hasDegenerateEmitters() && sensorDepth != -1)
+					++sensorDepth;
+			}
+
+			void prepare(Sensor const* m_sensor, BDPTRenderer* renderer, BDPTWorkResult* result) {
+				this->needsTimeSample = m_sensor->needsTimeSample();
+				this->time = m_sensor->getShutterOpen();
+				this->renderer = renderer;
+				this->result = result;
+			}
+
+			void process(const Scene* m_scene, Sensor const* m_sensor, Sampler* m_sampler, Point2i offset) {
+				MemoryPool& m_pool = renderer->m_pool;
+				BDPTConfiguration const& m_config = renderer->m_config;
+
+				if (needsTimeSample)
+					time = m_sensor->sampleTime(m_sampler->next1D());
+
+				/* Start new emitter and sensor subpaths */
+				emitterSubpath.initialize(m_scene, time, EImportance, m_pool);
+				sensorSubpath.initialize(m_scene, time, ERadiance, m_pool);
+
+				/* Perform a random walk using alternating steps on each path */
+				Path::alternatingRandomWalkFromPixel(m_scene, m_sampler,
+					emitterSubpath, emitterDepth, sensorSubpath,
+					sensorDepth, offset, m_config.rrDepth, m_pool);
+
+				renderer->evaluate(result, emitterSubpath, sensorSubpath);
+
+				emitterSubpath.release(m_pool);
+				sensorSubpath.release(m_pool);
+			}
+		};
+		std::vector<State> m_state;
+		
+		ref<Integrator> m_integrator;
+		BDPTConfiguration const* m_config;
+
+	public:
+		BDPTResponsive(Integrator* bdpt, BDPTConfiguration const* config)
+			: ImageOrderIntegrator(bdpt->getProperties())
+			, m_integrator(bdpt)
+			, m_config(config) {
+		}
+		
+		bool preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
+			return m_integrator->preprocess(scene, nullptr, nullptr, -1, -1, -1);
+		}
+
+		bool allocate(const Scene &scene, Sampler *const *samplers, ImageBlock *const *targets, int threadCount) override {
+			bool result = ImageOrderIntegrator::allocate(scene, samplers, targets, threadCount);
+
+			m_state.clear();
+			State s(&scene, *m_config);
+			m_state.resize(threadCount, s);
+
+			for (int i = 0; i < threadCount; ++i)
+				m_integrator->configureSampler(&scene, samplers[i]);
+
+			return result;
+		}
+
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+			, Controls controls, int threadIdx, int threadCount) {
+#if defined(MTS_DEBUG_FP)
+			enableFPExceptions();
+#endif
+			int returnCode;
+			{
+				ref<BDPTRenderer> renderer = new BDPTRenderer(*m_config);
+				renderer->prepareResponsive(&scene, &sensor, &sampler);
+				ref<BDPTWorkResult> result = new BDPTWorkResult(*m_config, target.getFilter(), m_config->cropSize, &target);
+				m_state[threadIdx].prepare(&sensor, renderer, result);
+
+				returnCode = ImageOrderIntegrator::render(scene, sensor, sampler, target, controls, threadIdx, threadCount);
+				
+				/* Make sure that there were no memory leaks */
+				Assert(renderer->m_pool.unused());
+			}
+#if defined(MTS_DEBUG_FP)
+			disableFPExceptions();
+#endif
+			
+			return returnCode;
+		}
+
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) {
+			m_state[threadIdx].process(&scene, &sensor, &sampler, pixel);
+			return 0;
+		}
+	};
 
 	/// Evaluate the contributions of the given eye and light paths
 	void evaluate(BDPTWorkResult *wr,
@@ -414,6 +535,10 @@ void BDPTProcess::bindResource(const std::string &name, int id) {
 		m_result = new BDPTWorkResult(m_config, NULL, m_film->getCropSize());
 		m_result->clear();
 	}
+}
+
+ref<ResponsiveIntegrator> BDPTProcess::makeResponsiveIntegrator(Integrator* bdpt, const BDPTConfiguration *config) {
+	return new BDPTRenderer::BDPTResponsive(bdpt, config);
 }
 
 MTS_IMPLEMENT_CLASS_S(BDPTRenderer, false, WorkProcessor)

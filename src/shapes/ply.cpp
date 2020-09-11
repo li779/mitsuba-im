@@ -19,8 +19,8 @@
 #include <mitsuba/render/trimesh.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/properties.h>
-#include <mitsuba/core/fstream.h>
 #include <mitsuba/core/timer.h>
+#include <mitsuba/core/filesystem.h>
 #include <ply/ply_parser.hpp>
 #include <functional>
 
@@ -73,8 +73,8 @@ MTS_NAMESPACE_BEGIN
 class PLYLoader : public TriMesh {
 public:
 	PLYLoader(const Properties &props) : TriMesh(props) {
-		fs::path filePath = Thread::getThread()->getFileResolver()->resolve(
-			props.getString("filename"));
+		fs::path filePath = fs::decode_pathstr(Thread::getThread()->getFileResolver()->resolve(
+			fs::pathstr(props.getString("filename"))));
 		m_name = filePath.stem().string();
 
 		/* Determines whether vertex colors should be
@@ -476,7 +476,7 @@ void PLYLoader::loadPLY(const fs::path &path) {
 	ply_parser.list_property_definition_callbacks(list_property_definition_callbacks);
 
 	ref<Timer> timer = new Timer();
-	ply_parser.parse(path.string());
+	ply_parser.parse(path);
 
 	size_t vertexSize = sizeof(Point);
 	if (m_normals)

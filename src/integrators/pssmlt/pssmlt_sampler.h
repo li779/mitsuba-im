@@ -119,7 +119,7 @@ public:
 
 	/* The following functions do nothing in this implementation */
 	virtual void advance() { }
-	virtual void generate(const Point2i &pos) { }
+	virtual void generate(const Point2i &pos, size_t nextSampleIdx) { }
 
 	/* The following functions are unsupported by this implementation */
 	void request1DArray(size_t size) { Log(EError, "request1DArray(): Unsupported!"); }

@@ -1,5 +1,4 @@
 #include <mitsuba/core/quad.h>
-#include <boost/bind.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -303,7 +302,7 @@ GaussLobattoIntegrator::GaussLobattoIntegrator(size_t maxEvals,
 }
 
 Float GaussLobattoIntegrator::integrate(
-		const boost::function<Float (Float)>& f, Float a, Float b, size_t *_evals) const {
+		const std::function<Float (Float)>& f, Float a, Float b, size_t *_evals) const {
 	Float factor = 1;
 	size_t evals = 0;
 	if (a == b) {
@@ -323,7 +322,7 @@ Float GaussLobattoIntegrator::integrate(
 }
 
 Float GaussLobattoIntegrator::calculateAbsTolerance(
-		const boost::function<Float (Float)>& f, Float a, Float b, size_t &evals) const {
+		const std::function<Float (Float)>& f, Float a, Float b, size_t &evals) const {
 	const Float m = (a+b)/2;
 	const Float h = (b-a)/2;
 	const Float y1 = f(a);
@@ -369,7 +368,7 @@ Float GaussLobattoIntegrator::calculateAbsTolerance(
 }
 
 Float GaussLobattoIntegrator::adaptiveGaussLobattoStep(
-								 const boost::function<Float (Float)>& f,
+								 const std::function<Float (Float)>& f,
 								 Float a, Float b, Float fa, Float fb,
 								 Float acc, size_t &evals) const {
 	const Float h=(b-a)/2;
@@ -1412,8 +1411,8 @@ NDIntegrator::EResult NDIntegrator::integrate(const Integrand &f, const Float *m
 		const Float *max, Float *result, Float *error, size_t *_evals) const {
 	VectorizationAdapter adapter(f, m_fdim, m_dim);
 	size_t evals = 0;
-	EResult retval = mitsuba::integrate((unsigned int) m_fdim, boost::bind(
-		&VectorizationAdapter::f, &adapter, _1, _2, _3), (unsigned int) m_dim,
+	EResult retval = mitsuba::integrate((unsigned int) m_fdim, std::bind(
+		&VectorizationAdapter::f, &adapter, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3), (unsigned int) m_dim,
 		min, max, m_maxEvals, m_absError, m_relError, result, error, evals, false);
 	if (_evals)
 		*_evals = evals;

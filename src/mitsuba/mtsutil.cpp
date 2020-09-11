@@ -26,17 +26,19 @@
 #include <mitsuba/core/sched_remote.h>
 #include <mitsuba/core/sstream.h>
 #include <mitsuba/core/sshstream.h>
+#ifdef MTS_HAS_SHVECTOR
 #include <mitsuba/core/shvector.h>
+#endif
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/version.h>
 #include <mitsuba/core/appender.h>
 #include <mitsuba/render/util.h>
 #include <mitsuba/render/testcase.h>
 #include <mitsuba/render/renderjob.h>
 #include <mitsuba/render/scenehandler.h>
-#include <boost/algorithm/string.hpp>
 #include <fstream>
 #include <stdexcept>
 
@@ -44,6 +46,7 @@
 #include <mitsuba/core/getopt.h>
 #include <winsock2.h>
 #else
+#include <unistd.h>
 #include <signal.h>
 #endif
 
@@ -82,11 +85,11 @@ void help() {
 	testcases << "The following testcases are available:" << endl << endl;
 	utilities << endl << "The following utilities are available:" << endl << endl;
 
-	std::vector<fs::path> dirPaths = fileResolver->resolveAll("plugins");
+	std::vector<fs::pathstr> dirPaths = fileResolver->resolveAll(fs::pathstr("plugins"));
 	std::set<std::string> seen;
 
 	for (size_t i=0; i<dirPaths.size(); ++i) {
-		fs::path dirPath = fs::absolute(dirPaths[i]);
+		fs::path dirPath = fs::absolute(fs::decode_pathstr(dirPaths[i]));
 
 		if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
 			break;
@@ -96,7 +99,7 @@ void help() {
 		for (; it != end; ++it) {
 			if (!fs::is_regular_file(it->status()))
 				continue;
-			std::string extension(boost::to_lower_copy(it->path().extension().string()));
+			std::string extension(to_lower_copy(it->path().extension().string()));
 #if defined(__WINDOWS__)
 			if (extension != ".dll")
 				continue;
@@ -113,10 +116,10 @@ void help() {
 			if (seen.find(shortName) != seen.end())
 				continue;
 			seen.insert(shortName);
-			Plugin utility(shortName, it->path());
+			Plugin utility(shortName, fs::encode_pathstr(it->path()));
 			if (!utility.isUtility())
 				continue;
-			if (boost::starts_with(shortName, "test_")) {
+			if (starts_with(shortName, "test_")) {
 				testcases << "\t" << shortName;
 				for (int i=0; i<22-(int) shortName.length(); ++i)
 					testcases << ' ';
@@ -161,7 +164,7 @@ int mtsutil(int argc, char **argv) {
 				case 'a': {
 						std::vector<std::string> paths = tokenize(optarg, ";");
 						for (int i=(int) paths.size()-1; i>=0; --i)
-							fileResolver->prependPath(paths[i]);
+							fileResolver->prependPath(fs::encode_pathstr(fs::path(paths[i])));
 					}
 					break;
 				case 'c':
@@ -287,12 +290,12 @@ int mtsutil(int argc, char **argv) {
 		scheduler->start();
 
 		if (testCaseMode) {
-			std::vector<fs::path> dirPaths = fileResolver->resolveAll("plugins");
+			std::vector<fs::pathstr> dirPaths = fileResolver->resolveAll(fs::pathstr("plugins"));
 			std::set<std::string> seen;
 			int executed = 0, succeeded = 0;
 
 			for (size_t i=0; i<dirPaths.size(); ++i) {
-				fs::path dirPath = fs::absolute(dirPaths[i]);
+				fs::path dirPath = fs::absolute(fs::decode_pathstr(dirPaths[i]));
 
 				if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
 					break;
@@ -302,7 +305,7 @@ int mtsutil(int argc, char **argv) {
 				for (; it != end; ++it) {
 					if (!fs::is_regular_file(it->status()))
 						continue;
-					std::string extension(boost::to_lower_copy(it->path().extension().string()));
+					std::string extension(to_lower_copy(it->path().extension().string()));
 #if defined(__WINDOWS__)
 					if (extension != ".dll")
 						continue;
@@ -316,10 +319,10 @@ int mtsutil(int argc, char **argv) {
 #error Unknown operating system!
 #endif
 					std::string shortName = it->path().stem().string();
-					if (seen.find(shortName) != seen.end() || !boost::starts_with(shortName, "test_"))
+					if (seen.find(shortName) != seen.end() || !starts_with(shortName, "test_"))
 						continue;
 					seen.insert(shortName);
-					Plugin plugin(shortName, it->path());
+					Plugin plugin(shortName, fs::encode_pathstr(it->path()));
 					if (!plugin.isUtility())
 						continue;
 
@@ -355,7 +358,7 @@ int mtsutil(int argc, char **argv) {
 #else
 #error Unknown operating system!
 #endif
-			fs::path fullName = fileResolver->resolve(fs::path("plugins") / pluginName);
+			fs::path fullName = fs::decode_pathstr(fileResolver->resolve(fs::encode_pathstr(fs::path("plugins") / pluginName)));
 
 			if (!fs::exists(fullName)) {
 				/* Plugin not found! */
@@ -364,7 +367,7 @@ int mtsutil(int argc, char **argv) {
 			}
 
 			SLog(EInfo, "Loading utility \"%s\" ..", argv[optind]);
-			Plugin *plugin = new Plugin(argv[optind], fullName);
+			Plugin *plugin = new Plugin(argv[optind], fs::encode_pathstr(fullName));
 			if (!plugin->isUtility())
 				SLog(EError, "This plugin does not implement the 'Utility' interface!");
 			Statistics::getInstance()->logPlugin(argv[optind], plugin->getDescription());
@@ -398,7 +401,9 @@ int mts_main(int argc, char **argv) {
 	Spectrum::staticInitialization();
 	Bitmap::staticInitialization();
 	Scheduler::staticInitialization();
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticInitialization();
+#endif
 	SceneHandler::staticInitialization();
 
 #if defined(__WINDOWS__)
@@ -419,7 +424,9 @@ int mts_main(int argc, char **argv) {
 
 	/* Shutdown the core framework */
 	SceneHandler::staticShutdown();
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticShutdown();
+#endif
 	Scheduler::staticShutdown();
 	Bitmap::staticShutdown();
 	Spectrum::staticShutdown();

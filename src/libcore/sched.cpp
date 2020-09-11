@@ -20,7 +20,7 @@
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/mstream.h>
 
-#include <boost/thread/thread.hpp>
+#include <thread>
 
 MTS_NAMESPACE_BEGIN
 
@@ -57,6 +57,8 @@ Scheduler::Scheduler() {
 	m_resourceCounter = 0;
 	m_processCounter = 0;
 	m_running = false;
+	m_nextWorkerOffset = 0;
+	m_maxWorkersPerProcess = -1;
 }
 
 Scheduler::~Scheduler() {
@@ -284,6 +286,11 @@ bool Scheduler::schedule(ParallelProcess *process) {
 	}
 	ProcessRecord *rec = new ProcessRecord(m_processCounter++,
 		process->getLogLevel(), m_mutex);
+	if (m_maxWorkersPerProcess > 0 && m_maxWorkersPerProcess < (int) m_workers.size()) {
+		rec->workerCount = m_maxWorkersPerProcess;
+		rec->workerOffset = m_nextWorkerOffset;
+		m_nextWorkerOffset = (m_nextWorkerOffset + m_maxWorkersPerProcess) % (int) m_workers.size();
+	}
 	m_processes[process] = rec;
 #if defined(DEBUG_SCHED)
 	Log(rec->logLevel, "Scheduling process %i: %s..", rec->id, process->toString().c_str());
@@ -435,26 +442,39 @@ Scheduler::EStatus Scheduler::acquireWork(Item &item,
 
 		/* Wait until work is available and return false
 		   if stop() is called */
-		while (queue.size() == 0 && m_running)
-			m_workAvailable->wait();
-
 		if (!m_running) {
 			return EStop;
 		}
 
 		/* Try to create a work unit from the parallel
 		   process currently on top of the queue */
-		ParallelProcess::EStatus wStatus;
+		ParallelProcess::EStatus wStatus = ParallelProcess::EUnknown;
 		try {
-			int id = queue.front();
-			if (item.id != id) {
-				/* First work unit from this parallel process - establish
-				   connections to referenced resources and prepare the
-				   work processor */
-				setProcessByID(item, id);
-			}
+			for (std::deque<int>::iterator it = queue.begin(); it != queue.end(); ++it) {
+				int id = *it;
+				ParallelProcess *proc = m_idToProcess[id];
+				ProcessRecord* rec = m_processes[proc];
 
-			wStatus = item.proc->generateWork(item.workUnit, item.workerIndex);
+				bool workerInRange = true;
+				if (rec->workerCount > 0) {
+					workerInRange = rec->workerOffset <= item.workerIndex && item.workerIndex < rec->workerOffset + rec->workerCount;
+					int wrapAroundOffset = (rec->workerOffset + rec->workerCount) % (int) m_workers.size();
+					workerInRange |= wrapAroundOffset <= rec->workerOffset && item.workerIndex < wrapAroundOffset;
+				}
+				if (!workerInRange) {
+					continue;
+				}
+
+				if (item.id != id) {
+					/* First work unit from this parallel process - establish
+					   connections to referenced resources and prepare the
+					   work processor */
+					setProcessByID(item, id);
+				}
+
+				wStatus = item.proc->generateWork(item.workUnit, item.workerIndex);
+				break;
+			}
 		} catch (const std::exception &ex) {
 			Log(EWarn, "Caught an exception - canceling process %i: %s",
 				item.id, ex.what());
@@ -462,7 +482,11 @@ Scheduler::EStatus Scheduler::acquireWork(Item &item,
 			continue;
 		}
 
-		if (wStatus == ParallelProcess::ESuccess) {
+		if (wStatus == ParallelProcess::EUnknown) {
+			m_workAvailable->wait();
+			continue;
+		}
+		else if (wStatus == ParallelProcess::ESuccess) {
 			break;
 		} else if (wStatus == ParallelProcess::EFailure) {
 #if defined(DEBUG_SCHED)
@@ -491,7 +515,7 @@ Scheduler::EStatus Scheduler::acquireWork(Item &item,
 	else
 		lock.release(); /* Avoid the automatic unlocking upon destruction */
 
-	boost::this_thread::yield();
+	std::this_thread::yield();
 	return EOK;
 }
 

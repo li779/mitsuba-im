@@ -20,7 +20,14 @@
 #if !defined(__MITSUBA_CORE_UTIL_H_)
 #define __MITSUBA_CORE_UTIL_H_
 
-#include <boost/static_assert.hpp>
+//#include <boost/static_assert.hpp>
+#ifndef BOOST_STATIC_ASSERT
+	#define BOOST_STATIC_ASSERT(x) static_assert((x), #x "static assertion failed (formerly boost)")
+#endif
+
+#if defined(__MSVC__)
+#	include <intrin.h> // _rdtsc
+#endif
 
 #if defined(__MSVC__)
 # include <intrin.h>
@@ -64,6 +71,11 @@ extern MTS_EXPORT_CORE std::string timeString(Float time, bool precise = false);
 
 /// Turn a memory size into a human-readable string
 extern MTS_EXPORT_CORE std::string memString(size_t size, bool precise = false);
+
+extern MTS_EXPORT_CORE bool starts_with(std::string const& s, char const* c);
+extern MTS_EXPORT_CORE bool ends_with(std::string const& s, char const* c);
+extern MTS_EXPORT_CORE std::string to_lower_copy(std::string const& s);
+extern MTS_EXPORT_CORE std::string to_upper_copy(std::string const& s);
 
 /// Return a string representation of a list of objects
 template<class Iterator> std::string containerToString(const Iterator &start, const Iterator &end) {

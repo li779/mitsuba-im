@@ -393,6 +393,25 @@ public:
 			<< "]";
 		return oss.str();
 	}
+	
+	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		if (getProperties().getBoolean("strictConfiguration", true))
+			return nullptr;
+		else
+			Log(EWarn, "Interactive implementation uses different integrator!");
+
+		mitsuba::Properties pmProps(getProperties());
+		pmProps.setPluginName("photonmapper");
+
+		mitsuba::ref<mitsuba::PluginManager> pluginMgr = mitsuba::PluginManager::getInstance();
+		mitsuba::ref<mitsuba::Integrator> newIntegrator = static_cast<mitsuba::Integrator *>(
+			pluginMgr->createObject(MTS_CLASS(mitsuba::Integrator), pmProps)
+			);
+
+		newIntegrator->setParent(this); // ok, not a sampling integrator so ignored in PM recursion
+		newIntegrator->configure();
+		return newIntegrator->makeResponsiveIntegrator();
+	}
 
 	MTS_DECLARE_CLASS()
 private:

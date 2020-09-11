@@ -21,20 +21,9 @@
 
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/core/brent.h>
-#include <boost/bind.hpp>
-#include <boost/math/special_functions/erf.hpp>
+#include <functional>
 
 MTS_NAMESPACE_BEGIN
-
-FINLINE Float mts_erf(Float arg) {
-	#if defined(__GNUC__) && defined(SINGLE_PRECISION)
-		return erff(arg);
-	#elif defined(__GNUC__) && defined(DOUBLE_PRECISION)
-		return erf(arg);
-	#else
-		return boost::math::erf<Float>(arg);
-	#endif
-}
 
 #define FIBERDIST_STDDEV_MIN        4e-08
 #define FIBERDIST_STDDEV_MAX        4
@@ -204,8 +193,8 @@ public:
 
 	inline GaussianFiberDistribution(Float stddev) : m_stddev(stddev) {
 		m_normalization = 1/(std::pow(2*M_PI, (Float) 3 / (Float) 2) * m_stddev *
-				mts_erf(1/(SQRT_TWO * m_stddev)));
-		m_c1 = 1.0f/mts_erf(1/(SQRT_TWO * m_stddev));
+				std::erf(1/(SQRT_TWO * m_stddev)));
+		m_c1 = 1.0f/std::erf(1/(SQRT_TWO * m_stddev));
 
 		if (stddev < FIBERDIST_STDDEV_MIN || stddev > FIBERDIST_STDDEV_MAX)
 			SLog(EError, "Standard deviation parameter is out of range (must "
@@ -259,8 +248,8 @@ public:
 	Vector sample(const Point2 &sample) const {
 		BrentSolver brentSolver(100, 1e-6f);
 		BrentSolver::Result result = brentSolver.solve(
-			boost::bind(&GaussianFiberDistribution::cdfFunctor,
-				this, sample.x, _1), -1, 1);
+			std::bind(&GaussianFiberDistribution::cdfFunctor,
+				this, sample.x, std::placeholders::_1), -1, 1);
 		SAssert(result.success);
 
 		#if defined(MICROFLAKE_STATISTICS)
@@ -287,7 +276,7 @@ protected:
 	/// Evaluate the longitudinal CDF as a function of \cos\theta
 	inline Float cdf(Float cosTheta) const {
 		return 0.5f * (1.0f -
-			mts_erf(cosTheta / (SQRT_TWO * m_stddev)) * m_c1);
+			std::erf(cosTheta / (SQRT_TWO * m_stddev)) * m_c1);
 	}
 
 	Float cdfFunctor(Float xi, Float cosTheta) const {

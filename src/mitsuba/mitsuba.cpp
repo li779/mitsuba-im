@@ -17,35 +17,34 @@
 */
 
 #include <mitsuba/core/platform.h>
-
-// Mitsuba's "Assert" macro conflicts with Xerces' XSerializeEngine::Assert(...).
-// This becomes a problem when using a PCH which contains mitsuba/core/logger.h
-#if defined(Assert)
-# undef Assert
-#endif
-#include <xercesc/parsers/SAXParser.hpp>
 #include <mitsuba/core/sched_remote.h>
 #include <mitsuba/core/sstream.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/appender.h>
 #include <mitsuba/core/sshstream.h>
+#ifdef MTS_HAS_SHVECTOR
 #include <mitsuba/core/shvector.h>
+#endif
+#include <mitsuba/core/version.h>
+#include <mitsuba/core/plugin.h>
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/render/renderjob.h>
-#include <mitsuba/render/scenehandler.h>
+#include <mitsuba/render/sceneloader.h>
 #include <fstream>
+#include <memory>
 #include <stdexcept>
-#include <boost/algorithm/string.hpp>
+
+#include "im_render.h"
 
 #if defined(__WINDOWS__)
 #include <mitsuba/core/getopt.h>
 #include <winsock2.h>
 #else
+#include <unistd.h>
 #include <signal.h>
 #endif
-
-using XERCES_CPP_NAMESPACE::SAXParser;
 
 using namespace mitsuba;
 
@@ -126,7 +125,7 @@ private:
 	int m_timeout;
 };
 
-int mitsuba_app(int argc, char **argv) {
+int mitsuba_app(int argc, char*const* argv) {
 	int optchar;
 	char *end_ptr = NULL;
 
@@ -156,7 +155,7 @@ int mitsuba_app(int argc, char **argv) {
 				case 'a': {
 						std::vector<std::string> paths = tokenize(optarg, ";");
 						for (int i=(int) paths.size()-1; i>=0; --i)
-							fileResolver->prependPath(paths[i]);
+							fileResolver->prependPath(fs::encode_pathstr(fs::path(paths[i])));
 					}
 					break;
 				case 'c':
@@ -197,7 +196,7 @@ int mitsuba_app(int argc, char **argv) {
 						logLevel = ETrace;
 					break;
 				case 'L': {
-						std::string arg = boost::to_lower_copy(std::string(optarg));
+						std::string arg = to_lower_copy(std::string(optarg));
 						if (arg == "trace")
 							logLevel = ETrace;
 						else if (arg == "debug")
@@ -341,20 +340,8 @@ int mitsuba_app(int argc, char **argv) {
 #endif
 
 		/* Prepare for parsing scene descriptions */
-		SAXParser* parser = new SAXParser();
-		fs::path schemaPath = fileResolver->resolveAbsolute("data/schema/scene.xsd");
-
-		/* Check against the 'scene.xsd' XML Schema */
-		parser->setDoSchema(true);
-		parser->setValidationSchemaFullChecking(true);
-		parser->setValidationScheme(SAXParser::Val_Always);
-		parser->setExternalNoNamespaceSchemaLocation(schemaPath.c_str());
-
-		/* Set the handler */
-		SceneHandler *handler = new SceneHandler(parameters);
-		parser->setDoNamespaces(true);
-		parser->setDocumentHandler(handler);
-		parser->setErrorHandler(handler);
+		fs::pathstr schemaPath = fileResolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
+		SceneLoader loader(parameters, schemaPath);
 
 		renderQueue = new RenderQueue();
 
@@ -367,31 +354,40 @@ int mitsuba_app(int argc, char **argv) {
 		int jobIdx = 0;
 		for (int i=optind; i<argc; ++i) {
 			fs::path
-				filename = fileResolver->resolve(argv[i]),
+				filename = fs::decode_pathstr(fileResolver->resolve(fs::encode_pathstr(fs::path(argv[i])))),
 				filePath = fs::absolute(filename).parent_path(),
 				baseName = filename.stem();
 			ref<FileResolver> frClone = fileResolver->clone();
-			frClone->prependPath(filePath);
+			frClone->prependPath(fs::encode_pathstr(filePath));
 			Thread::getThread()->setFileResolver(frClone);
 
 			SLog(EInfo, "Parsing scene description from \"%s\" ..", argv[i]);
 
-			parser->parse(filename.c_str());
-			ref<Scene> scene = handler->getScene();
+			ref<Scene> scene = loader.load(fs::encode_pathstr(filename));
 
-			scene->setSourceFile(filename);
-			scene->setDestinationFile(destFile.length() > 0 ?
-				fs::path(destFile) : (filePath / baseName));
+			scene->setSourceFile(fs::encode_pathstr(filename));
+			scene->setDestinationFile(fs::encode_pathstr(destFile.length() > 0 ?
+				fs::path(destFile) : filePath / baseName));
 			scene->setBlockSize(blockSize);
 
 			if (scene->destinationExists() && skipExisting)
 				continue;
 
-			ref<RenderJob> thr = new RenderJob(formatString("ren%i", jobIdx++),
-				scene, renderQueue, -1, -1, -1, true, flushTimer > 0);
-			thr->start();
+			std::unique_ptr<InteractiveSceneProcess> ithr(
+				InteractiveSceneProcess::create(scene, scene->getSampler(), scene->getIntegrator(), ProcessConfig())
+			);
+			if (ithr) {
+				SLog(EInfo, "Using responsive integrator interface");
+				ithr->render();
+			}
+			else {
+				ref<RenderJob> thr = new RenderJob(formatString("ren%i", jobIdx++),
+					scene, renderQueue, -1, -1, -1, true, flushTimer > 0);
+				thr->start();
 
-			renderQueue->waitLeft(numParallelScenes-1);
+				renderQueue->waitLeft(numParallelScenes-1);
+			}
+
 			if (i+1 < argc && numParallelScenes == 1)
 				Statistics::getInstance()->resetAll();
 		}
@@ -401,9 +397,6 @@ int mitsuba_app(int argc, char **argv) {
 		if (flushThread)
 			flushThread->quit();
 		renderQueue = NULL;
-
-		delete handler;
-		delete parser;
 
 		Statistics::getInstance()->printStats();
 	} catch (const std::exception &e) {
@@ -429,8 +422,10 @@ int mts_main(int argc, char **argv) {
 	Spectrum::staticInitialization();
 	Bitmap::staticInitialization();
 	Scheduler::staticInitialization();
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticInitialization();
-	SceneHandler::staticInitialization();
+#endif
+	SceneLoader::staticInitialization();
 
 #if defined(__WINDOWS__)
 	/* Initialize WINSOCK2 */
@@ -449,8 +444,10 @@ int mts_main(int argc, char **argv) {
 	int retval = mitsuba_app(argc, argv);
 
 	/* Shutdown the core framework */
-	SceneHandler::staticShutdown();
+	SceneLoader::staticShutdown();
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticShutdown();
+#endif
 	Scheduler::staticShutdown();
 	Bitmap::staticShutdown();
 	Spectrum::staticShutdown();

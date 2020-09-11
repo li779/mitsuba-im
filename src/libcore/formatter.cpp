@@ -18,7 +18,7 @@
 
 #include <mitsuba/mitsuba.h>
 #include <mitsuba/core/thread.h>
-#include <boost/filesystem.hpp>
+#include <mitsuba/core/filesystem.h>
 #include <ctime>
 
 MTS_NAMESPACE_BEGIN

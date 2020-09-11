@@ -1,10 +1,50 @@
-Mitsuba — Physically Based Renderer
-===================================
-[![Build status](https://ci.appveyor.com/api/projects/status/u12powry2w5fnjct/branch/vf-backport0.5.0-qt4?svg=true)](https://ci.appveyor.com/project/tszirr/mitsuba-backports/branch/vf-backport0.5.0-qt4)
+Mitsuba IM — Physically Based Renderer (Interactive Fork)
+=========================================================
 
-Qt4/CMake backport of upstream with bugfixes http://mitsuba-renderer.org/
+[![Build status](https://ci.appveyor.com/api/projects/status/5x9me6a6wtihtojl/branch/master?svg=true&passingText=linux:passing&failingText=linux:failing&pendingText=linux:pending)](https://ci.appveyor.com/project/tszirr/mitsuba-im/branch/master)
+[![Build status](https://ci.appveyor.com/api/projects/status/0gvs85hfv3rmv2sm/branch/master?svg=true&passingText=windows:passing&failingText=windows:failing&pendingText=windows:pending)](https://ci.appveyor.com/project/tszirr/mitsuba-im-win/branch/master)
+![Immediate-mode UI frontend for mitsuba with interactive preview](http://alphanew.net/refresh/portfolio/immitsuba.jpg)
 
-## About
+Mitsuba IM is a fork of the comprehensive physically-based renderer mitsuba (http://mitsuba-renderer.org/) by Wenzel Jakob (and other contributors), which has proven an invaluable framework for the scientific evaluation of both classic rendering algorithms and novel rendering research. This IM fork pursues the following additional goals:
+
+* Responsive interactive preview of rendering algorithms (with interactive camera & settings)
+* Easier implementation of new rendering algorithms
+	* New simplified interface for responsive integrators (see [include/mitsuba/render/integrator2.h](include/mitsuba/render/integrator2.h))
+	* Integrator parameters no longer need to be specified redundantly, they are automatically extracted from the integrator plugins (no modifications required)
+	* Comes with responsive wrappers for almost all rendering algorithms in classic mitsuba, which serve as examples
+* Responsive imgui frontend that is easily hackable for additional feautres and visualizations (+no more Qt dependencies)
+* Compile out of the box on modern C++ compilers (with one recursive git clone)
+	* Replace binary dependencies by git submodules
+	* Replace boost libraries by C++ standard library
+* Compatibility with previous mitsuba interfaces and thus rendering research (a render button still exists, if integrator is not automatically wrappable, interactive preview then falls back to path tracer)
+
+Note: This is a preview release
+===============================
+
+## Building
+
+Requires git, CMake, and a compiler with C++17 support (sorry, but at least frees you from boost binaries).
+
+Tested on Ubuntu w/ GCC 7 and on Windows w/ MSVC 2017. You might need to install a GCC 7 package manually.
+
+````
+$ git clone https://github.com/tszirr/mitsuba-im --recursive
+$ mkdir mitsuba-im/projects
+$ cd mitsuba-im/projects
+$ cmake ..
+(On Windows replace by: $ cmake .. -Ax64)
+$ make
+$ cd ..
+$ ln -s projects/binaries/im-mts
+````
+
+## Known Issues
+
+* Some utilities not ported to standard C++ w/o boost yet
+
+## About (Original official description)
+
+http://mitsuba-renderer.org/
 
 Mitsuba is a research-oriented rendering system in the style of PBRT, from which it derives much inspiration. It is written in portable C++, implements unbiased as well as biased techniques, and contains heavy optimizations targeted towards current CPU architectures. Mitsuba is extremely modular: it consists of a small set of core libraries and over 100 different plugins that implement functionality ranging from materials and light sources to complete rendering algorithms.
 
@@ -17,10 +57,6 @@ Mitsuba comes with a command-line interface as well as a graphical frontend to i
 ## Documentation
 
 For compilation, usage, and a full plugin reference, please see the [official documentation](http://mitsuba-renderer.org/docs.html).
-
-## Building
-
-See documentation. For Qt5 on Ubuntu, may need to add libqt5xmlpatterns5-dev to qt5-default.
 
 ## Releases and scenes
 

@@ -22,7 +22,7 @@
 
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/lock.h>
-#include <boost/static_assert.hpp>
+//#include <boost/static_assert.hpp>
 #include <stack>
 
 #if defined(__LINUX__)
@@ -1328,7 +1328,7 @@ protected:
 	BOOST_STATIC_ASSERT(sizeof(EdgeEvent) == 12);
 
 	/// Edge event comparison functor
-	struct EdgeEventOrdering : public std::binary_function<EdgeEvent, EdgeEvent, bool> {
+	struct EdgeEventOrdering {
 		inline bool operator()(const EdgeEvent &a, const EdgeEvent &b) const {
 			if (a.axis != b.axis)
 				return a.axis < b.axis;

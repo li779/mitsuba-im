@@ -20,8 +20,8 @@
 
 MTS_NAMESPACE_BEGIN
 
-ReplayableSampler::ReplayableSampler() : Sampler(Properties()) {
-	m_initial = new Random();
+ReplayableSampler::ReplayableSampler(Random* seeding) : Sampler(Properties()) {
+	m_initial = seeding ? new Random(seeding) : new Random();
 	m_random = new Random();
 	m_random->set(m_initial);
 	m_sampleCount = 0;
@@ -62,7 +62,7 @@ void ReplayableSampler::request2DArray(size_t size) {
 	Log(EError, "ReplayableSampler::request2DArray() - unsupported!");
 }
 
-void ReplayableSampler::generate(const Point2i &) { }
+void ReplayableSampler::generate(const Point2i &, size_t sampleIndex) { }
 void ReplayableSampler::advance() { }
 
 void ReplayableSampler::setSampleIndex(size_t sampleIndex) {

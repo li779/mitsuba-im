@@ -177,12 +177,30 @@ typedef AnimationTrack<Point> PointTrack;
 
 MTS_NAMESPACE_END
 
-#if BOOST_VERSION >= 105000
-namespace boost { namespace filesystem { class path; }}
-namespace fs = boost::filesystem;
-#else
-namespace boost { namespace filesystem3 { class path; }}
-namespace fs = boost::filesystem3;
-#endif
+namespace fs {
+	//struct pathref;
+	struct pathdat;
+
+	// annoying
+	struct pathstr {
+		std::string s;
+		pathstr() { }
+		//MTS_EXPORT_CORE pathstr(pathref const& p);
+		MTS_EXPORT_CORE pathstr(pathdat const& p);
+		explicit pathstr(std::string s) : s((std::string&&) s) { }
+		MTS_EXPORT_CORE explicit pathstr(std::wstring s);
+		operator std::string const&() const { return s; }
+		MTS_EXPORT_CORE operator std::wstring() const;
+	};
+
+	namespace mts_fs_util {
+		MTS_EXPORT_CORE bool exists(const pathstr& what);
+		MTS_EXPORT_CORE unsigned long long last_write_time(const pathstr& what);
+		MTS_EXPORT_CORE bool copy_file(const pathstr& from, const pathstr& to);
+		MTS_EXPORT_CORE bool rename(const pathstr& from, const pathstr& to);
+		MTS_EXPORT_CORE bool remove(const pathstr& what);
+	}
+	using namespace mts_fs_util;
+}
 
 #endif /* __MITSUBA_CORE_FWD_H_ */

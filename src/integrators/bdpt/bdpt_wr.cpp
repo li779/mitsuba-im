@@ -27,11 +27,18 @@ MTS_NAMESPACE_BEGIN
 /* ==================================================================== */
 
 BDPTWorkResult::BDPTWorkResult(const BDPTConfiguration &conf,
-		const ReconstructionFilter *rfilter, Vector2i blockSize) {
+		const ReconstructionFilter *rfilter, Vector2i blockSize,
+		ImageBlock* atomicTarget) {
 	/* Stores the 'camera image' -- this can be blocked when
 	   spreading out work to multiple workers */
 	if (blockSize == Vector2i(-1, -1))
 		blockSize = Vector2i(conf.blockSize, conf.blockSize);
+
+	if (atomicTarget) {
+		m_block = atomicTarget;
+		m_lightImage = atomicTarget;
+		blockSize = conf.cropSize;
+	} else {
 
 	m_block = new ImageBlock(Bitmap::ESpectrumAlphaWeight, blockSize, rfilter);
 	m_block->setOffset(Point2i(0, 0));
@@ -45,6 +52,8 @@ BDPTWorkResult::BDPTWorkResult(const BDPTConfiguration &conf,
 				conf.cropSize, rfilter);
 		m_lightImage->setSize(conf.cropSize);
 		m_lightImage->setOffset(Point2i(0, 0));
+	}
+
 	}
 
 	/* When debug mode is active, we additionally create

@@ -28,7 +28,7 @@
  */
 MTS_NAMESPACE_BEGIN
 
-BrentSolver::Result BrentSolver::solve(const boost::function<Float (Float)> &f,
+BrentSolver::Result BrentSolver::solve(const std::function<Float (Float)> &f,
 		Float min, Float max) const {
 	// return the first endpoint if it is good enough
 	Float yMin = f(min);
@@ -51,7 +51,7 @@ BrentSolver::Result BrentSolver::solve(const boost::function<Float (Float)> &f,
 	}
 }
 
-BrentSolver::Result BrentSolver::solve(const boost::function<Float (Float)> &f,
+BrentSolver::Result BrentSolver::solve(const std::function<Float (Float)> &f,
 		Float min, Float max, Float initial) const {
 	if (initial < min || initial > max) {
 		SLog(EWarn, "BrentSolver: Invalid interval: lower=%f, initial=%f, upper=%f",
@@ -88,7 +88,7 @@ BrentSolver::Result BrentSolver::solve(const boost::function<Float (Float)> &f,
 	return Result(false, 0, 0, 0);
 }
 
-BrentSolver::Result BrentSolver::solve(const boost::function<Float (Float)> &f,
+BrentSolver::Result BrentSolver::solve(const std::function<Float (Float)> &f,
 			 Float x0, Float y0,
 			 Float x1, Float y1,
 			 Float x2, Float y2) const {

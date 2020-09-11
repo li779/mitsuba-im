@@ -243,13 +243,18 @@ public:
 	}
 
 	/// Merge a properties record into the current one
-	void merge(const Properties &props);
+	void merge(const Properties &props, const Properties* defaults = NULL, bool existingOnly = false);
 
 	/// Return a string representation
 	std::string toString() const;
+
+	/// Mutate during query to record defaults.
+	void recordQueriesAndDefaults(bool mutateToRecord) { m_mutateToRecord = mutateToRecord; }
 private:
 	std::map<std::string, PropertyElement> *m_elements;
 	std::string m_pluginName, m_id;
+	short m_setCounter;
+	bool m_mutateToRecord;
 };
 
 MTS_NAMESPACE_END

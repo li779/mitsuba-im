@@ -17,7 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include "ior.h"
 
 MTS_NAMESPACE_BEGIN
@@ -319,7 +322,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -328,6 +333,7 @@ private:
 	ref<Texture> m_specularReflectance;
 };
 
+#ifdef MTS_HAS_HW
 /* Fake glass shader -- it is really hopeless to visualize
    this material in the VPL renderer, so let's try to do at least
    something that suggests the presence of a transparent boundary */
@@ -365,6 +371,7 @@ Shader *ThinDielectric::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(ThinDielectricShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(ThinDielectric, false, BSDF)
 MTS_EXPORT_PLUGIN(ThinDielectric, "Thin dielectric BSDF");
 MTS_NAMESPACE_END

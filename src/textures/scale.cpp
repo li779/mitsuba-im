@@ -18,7 +18,11 @@
 
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/shape.h>
+#include <mitsuba/core/bitmap.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -142,7 +146,9 @@ public:
 		return m_nested->isMonochromatic();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		Texture::serialize(stream, manager);
@@ -156,6 +162,7 @@ protected:
 	Spectrum m_scale;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class ScalingTextureShader : public Shader {
@@ -207,6 +214,7 @@ Shader *ScalingTexture::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(ScalingTextureShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(ScalingTexture, false, Texture2D)
 MTS_EXPORT_PLUGIN(ScalingTexture, "Scaling texture");
 MTS_NAMESPACE_END

@@ -24,10 +24,11 @@
 
 // Includes from mitsuba/mitsuba.h
 #include <mitsuba/core/platform.h>
-#include <boost/version.hpp>
+//#include <boost/version.hpp>
 
 #include <sstream>
 #include <string>
+#include <memory>
 #include <map>
 #include <iostream>
 #include <vector>
@@ -38,6 +39,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <limits>
+#include <cassert>
 
 #include <mitsuba/core/constants.h>
 #include <mitsuba/core/fwd.h>

@@ -17,7 +17,11 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/basictexture.h>
+#include <mitsuba/render/shape.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include "microfacet.h"
 #include "rtrans.h"
 #include "ior.h"
@@ -495,7 +499,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -511,6 +517,7 @@ private:
 	bool m_sampleVisible;
 };
 
+#ifdef MTS_HAS_HW
 /**
  * GLSL port of the rough coating shader. This version is much more
  * approximate -- it only supports the Beckmann distribution,
@@ -650,6 +657,7 @@ Shader *RoughCoating::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(RoughCoatingShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(RoughCoating, false, BSDF)
 MTS_EXPORT_PLUGIN(RoughCoating, "Rough coating BSDF");
 MTS_NAMESPACE_END

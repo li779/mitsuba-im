@@ -302,10 +302,10 @@ public:
 		size_t vertexCount, void *vertexPtr, void *uvPtr, void *colPtr, short matNr);
 
 	/// Export a Wavefront OBJ version of this file
-	void writeOBJ(const fs::path &path) const;
+	void writeOBJ(const fs::pathstr &path) const;
 
 	/// Export a Stanford PLY version of this file
-	void writePLY(const fs::path &path) const;
+	void writePLY(const fs::pathstr &path) const;
 
 	/// Return a string representation
 	std::string toString() const;

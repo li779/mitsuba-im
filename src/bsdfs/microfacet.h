@@ -22,7 +22,6 @@
 #include <mitsuba/mitsuba.h>
 #include <mitsuba/core/frame.h>
 #include <mitsuba/core/properties.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -102,7 +101,7 @@ public:
 		  m_exponentV(0.0f) {
 
 		if (props.hasProperty("distribution")) {
-			std::string distr = boost::to_lower_copy(props.getString("distribution"));
+			std::string distr = to_lower_copy(props.getString("distribution"));
 			if (distr == "beckmann")
 				m_type = EBeckmann;
 			else if (distr == "ggx")

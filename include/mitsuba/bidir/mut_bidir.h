@@ -57,7 +57,7 @@ public:
 	 *     Minimum number of edges in newly proposed paths.
 	 */
 	BidirectionalMutator(const Scene *scene, Sampler *sampler,
-		MemoryPool &pool, int kmin, int kmax);
+		MemoryPool &pool, int kmin, int kmax, Float largeStepRate = 0.0f);
 
 	// =============================================================
 	//! @{ \name Implementation of the Mutator interface
@@ -68,6 +68,7 @@ public:
 	Float Q(const Path &source, const Path &proposal,
 			const MutationRecord &muRec) const;
 	void accept(const MutationRecord &muRec);
+	void setLargeStepTracker(LargeStepTracker* tracker, Float largeStepRate = -1.0f);
 
 	//! @}
 	// =============================================================
@@ -88,7 +89,9 @@ protected:
 	std::vector<int> m_temp;
 	MemoryPool &m_pool;
 	int m_kmin, m_kmax;
+	Float m_largeStepRate;
 	Path m_tempPath;
+	LargeStepTracker* m_largeStepTracker;
 };
 
 MTS_NAMESPACE_END

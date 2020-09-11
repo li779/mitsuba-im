@@ -1,8 +1,10 @@
 #include <mitsuba/core/mmap.h>
+#include <mitsuba/core/filesystem.h>
 
 #if defined(__LINUX__) || defined(__OSX__)
 # include <sys/mman.h>
 # include <fcntl.h>
+# include <unistd.h>
 #elif defined(__WINDOWS__)
 # include <windows.h>
 #endif
@@ -189,20 +191,20 @@ struct MemoryMappedFile::MemoryMappedFilePrivate {
 MemoryMappedFile::MemoryMappedFile()
 	: d(new MemoryMappedFilePrivate()) { }
 
-MemoryMappedFile::MemoryMappedFile(const fs::path &filename, size_t size)
-	: d(new MemoryMappedFilePrivate(filename, size)) {
+MemoryMappedFile::MemoryMappedFile(fs::pathstr const& filename, size_t size)
+	: d(new MemoryMappedFilePrivate(fs::decode_pathstr(filename), size)) {
 	SLog(ETrace, "Creating memory-mapped file \"%s\" (%s)..",
-		filename.filename().string().c_str(), memString(d->size).c_str());
+		d->filename.filename().string().c_str(), memString(d->size).c_str());
 	d->create();
 }
 
 
-MemoryMappedFile::MemoryMappedFile(const fs::path &filename, bool readOnly)
-	: d(new MemoryMappedFilePrivate(filename)) {
+MemoryMappedFile::MemoryMappedFile(fs::pathstr const& filename, bool readOnly)
+	: d(new MemoryMappedFilePrivate(fs::decode_pathstr(filename))) {
 	d->readOnly = readOnly;
 	d->map();
 	Log(ETrace, "Mapped \"%s\" into memory (%s)..",
-		filename.filename().string().c_str(), memString(d->size).c_str());
+		d->filename.filename().string().c_str(), memString(d->size).c_str());
 }
 
 MemoryMappedFile::~MemoryMappedFile() {
@@ -245,8 +247,8 @@ bool MemoryMappedFile::isReadOnly() const {
 	return d->readOnly;
 }
 
-const fs::path &MemoryMappedFile::getFilename() const {
-	return d->filename;
+fs::pathstr MemoryMappedFile::getFilename() const {
+	return fs::encode_pathstr(d->filename);
 }
 
 ref<MemoryMappedFile> MemoryMappedFile::createTemporary(size_t size) {

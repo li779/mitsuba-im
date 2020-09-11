@@ -21,8 +21,6 @@
 #define __MITSUBA_CORE_PLUGIN_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/filesystem.hpp>
-#include <boost/scoped_ptr.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -38,7 +36,7 @@ MTS_NAMESPACE_BEGIN
 class MTS_EXPORT_CORE Plugin {
 public:
 	/// Load a plugin from the supplied path
-	Plugin(const std::string &shortName, const fs::path &path);
+	Plugin(const std::string &shortName, fs::pathstr const& path);
 
 	/// Virtual destructor
 	virtual ~Plugin();
@@ -56,7 +54,7 @@ public:
 	std::string getDescription() const;
 
 	/// Return the path of this plugin
-	const fs::path &getPath() const;
+	fs::pathstr getPath() const;
 
 	/// Return a short name of this plugin
 	const std::string &getShortName() const;
@@ -67,7 +65,7 @@ protected:
 	bool hasSymbol(const std::string &sym) const;
 private:
 	struct PluginPrivate;
-	boost::scoped_ptr<PluginPrivate> d;
+	std::unique_ptr<PluginPrivate> d;
 };
 
 /**
@@ -127,6 +125,9 @@ public:
 
 	/// Return the list of loaded plugins
 	std::vector<std::string> getLoadedPlugins() const;
+
+	/// Returns a list of available plugins containing the given string or symbol.
+	std::vector<std::string> getAvailablePlugins(char const* symbol) const;
 
 	/**
 	 * \brief Instantiate a plugin, verify its type,

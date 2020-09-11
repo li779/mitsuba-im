@@ -25,7 +25,7 @@
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/version.h>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 #include <stack>
 #include <map>
 
@@ -57,7 +57,7 @@ public:
 	   that this class has a virtual member. This will ensure that its typeid
 	   structure is in librender, which is important for throwing exceptions
 	   across DLL boundaries */
-	virtual ~VersionException() throw ();
+	virtual ~VersionException() noexcept;
 
 	inline const Version &getVersion() const { return m_version; }
 private:
@@ -90,7 +90,7 @@ public:
 	virtual ~SceneHandler();
 
 	/// Convenience method -- load a scene from a given filename
-	static ref<Scene> loadScene(const fs::path &filename,
+	static ref<Scene> loadScene(const fs::pathstr &filename,
 		const ParameterMap &params= ParameterMap());
 
 	/// Convenience method -- load a scene from a given string
@@ -164,7 +164,7 @@ private:
 
 
 	typedef std::pair<ETag, const Class *> TagEntry;
-	typedef boost::unordered_map<std::string, TagEntry> TagMap;
+	typedef std::unordered_map<std::string, TagEntry> TagMap;
 
 	const xercesc::Locator *m_locator;
 	xercesc::XMLTranscoder* m_transcoder;

@@ -20,6 +20,7 @@
 #include <mitsuba/bidir/path.h>
 #include "pssmlt_proc.h"
 #include "pssmlt_sampler.h"
+#include <mitsuba/render/integrator2.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -76,6 +77,13 @@ public:
 
 		m_rplSampler = static_cast<ReplayableSampler*>(
 			static_cast<Sampler *>(getResource("rplSampler"))->clone().get());
+
+		m_meanTracker = nullptr;
+		
+		prepareAlways();
+	}
+
+	void prepareAlways() {
 		m_sensorSampler = new PSSMLTSampler(m_origSampler);
 		m_emitterSampler = new PSSMLTSampler(m_origSampler);
 		m_directSampler = new PSSMLTSampler(m_origSampler);
@@ -83,6 +91,22 @@ public:
 		m_pathSampler = new PathSampler(m_config.technique, m_scene,
 			m_emitterSampler, m_sensorSampler, m_directSampler, m_config.maxDepth,
 			m_config.rrDepth, m_config.separateDirect, m_config.directSampling);
+
+		m_nMutationsCompleted = 0;
+	}
+
+	void prepareResponsive(Scene const* scene, Sensor const* sensor, PSSMLTSampler* sampler
+		, ImageBlock* result, ReplayableSampler* seedSampler, void* meanTracker) {
+		m_scene = const_cast<Scene*>(scene);
+		m_origSampler = sampler;
+		m_sensor = const_cast<Sensor *>(sensor);
+		m_film = m_sensor->getFilm();
+		
+		m_rplSampler = seedSampler;
+
+		m_meanTracker = (MLTResponsive::MeanBrightness*) meanTracker;
+
+		prepareAlways();
 	}
 
 	void process(const WorkUnit *workUnit, WorkResult *workResult, const bool &stop) {
@@ -90,6 +114,8 @@ public:
 		const SeedWorkUnit *wu = static_cast<const SeedWorkUnit *>(workUnit);
 		const PathSeed &seed = wu->getSeed();
 		SplatList *current = new SplatList(), *proposed = new SplatList();
+
+		auto meanTracker = m_meanTracker;
 
 		m_emitterSampler->reset();
 		m_sensorSampler->reset();
@@ -104,7 +130,6 @@ public:
 		m_rplSampler->setSampleIndex(seed.sampleIndex);
 
 		m_pathSampler->sampleSplats(Point2i(-1), *current);
-		result->clear();
 
 		ref<Random> random = m_origSampler->getRandom();
 		m_sensorSampler->setRandom(random);
@@ -114,6 +139,11 @@ public:
 			+ m_sensorSampler->getSampleIndex()
 			+ m_emitterSampler->getSampleIndex()
 			+ m_directSampler->getSampleIndex());
+		
+		// classic mitsuba mode
+		if (m_config.luminanceSamples != 0) {
+			result->clear();
+		}
 
 		m_sensorSampler->accept();
 		m_emitterSampler->accept();
@@ -132,7 +162,9 @@ public:
 		/* MLT main loop */
 		Float cumulativeWeight = 0;
 		current->normalize(m_config.importanceMap);
-		for (uint64_t mutationCtr=0; mutationCtr<m_config.nMutations && !stop; ++mutationCtr) {
+		m_nMutationsCompleted = 0;
+		uint64_t mutationCtr;
+		for (mutationCtr=0; mutationCtr<m_config.nMutations && !stop; ++mutationCtr) {
 			if (wu->getTimeout() > 0 && (mutationCtr % 8192) == 0
 					&& (int) timer->getMilliseconds() > wu->getTimeout())
 				break;
@@ -145,8 +177,10 @@ public:
 			m_pathSampler->sampleSplats(Point2i(-1), *proposed);
 			proposed->normalize(m_config.importanceMap);
 
-			Float a = std::min((Float) 1.0f, proposed->luminance / current->luminance);
+			if (largeStep && meanTracker)
+				meanTracker->addSample(proposed->luminance);
 
+			Float a = std::min((Float) 1.0f, proposed->luminance / current->luminance);
 			if (std::isnan(proposed->luminance) || proposed->luminance < 0) {
 				Log(EWarn, "Encountered a sample with luminance = %f, ignoring!",
 						proposed->luminance);
@@ -158,11 +192,12 @@ public:
 
 			if (a > 0) {
 				if (m_config.kelemenStyleWeights && !m_config.importanceMap) {
+					Float meanLuminance = meanTracker ? meanTracker->value : m_config.luminance;
 					/* Kelemen-style MLT weights (these don't work for 2-stage MLT) */
 					currentWeight = (1 - a) * current->luminance
-						/ (current->luminance/m_config.luminance + m_config.pLarge);
+						/ (current->luminance + m_config.pLarge * meanLuminance);
 					proposedWeight = (a + (largeStep ? 1 : 0)) * proposed->luminance
-						/ (proposed->luminance/m_config.luminance + m_config.pLarge);
+						/ (proposed->luminance + m_config.pLarge * meanLuminance);
 				} else {
 					/* Veach-style use of expectations */
 					currentWeight = 1-a;
@@ -170,10 +205,11 @@ public:
 				}
 				accept = (a == 1) || (random->nextFloat() < a);
 			} else {
-				if (m_config.kelemenStyleWeights)
+				if (m_config.kelemenStyleWeights) {
+					Float meanLuminance = meanTracker ? meanTracker->value : m_config.luminance;
 					currentWeight = current->luminance
-						/ (current->luminance/m_config.luminance + m_config.pLarge);
-				else
+						/ (current->luminance + m_config.pLarge * meanLuminance);
+				} else
 					currentWeight = 1;
 				proposedWeight = 0;
 				accept = false;
@@ -183,8 +219,10 @@ public:
 			if (accept) {
 				for (size_t k=0; k<current->size(); ++k) {
 					Spectrum value = current->getValue(k) * cumulativeWeight;
+					if (meanTracker)
+						value *= meanTracker->value;
 					if (!value.isZero())
-						result->put(current->getPosition(k), &value[0]);
+						result->putAtomic(current->getPosition(k), value, cumulativeWeight);
 				}
 
 				cumulativeWeight = proposedWeight;
@@ -205,8 +243,10 @@ public:
 			} else {
 				for (size_t k=0; k<proposed->size(); ++k) {
 					Spectrum value = proposed->getValue(k) * proposedWeight;
+					if (meanTracker)
+						value *= meanTracker->value;
 					if (!value.isZero())
-						result->put(proposed->getPosition(k), &value[0]);
+						result->putAtomic(proposed->getPosition(k), value, proposedWeight);
 				}
 
 				m_sensorSampler->reject();
@@ -218,19 +258,227 @@ public:
 				else
 					smallStepRatio.incrementBase(1);
 			}
+
+			// Fast interrupt
+			if ((mutationCtr & 0xff) == 0) {
+				m_nMutationsCompleted = mutationCtr;
+				if (m_control && m_control(mutationCtr))
+					break;
+			}
 		}
+
+		m_nMutationsCompleted = mutationCtr;
 
 		/* Perform the last splat */
 		for (size_t k=0; k<current->size(); ++k) {
 			Spectrum value = current->getValue(k) * cumulativeWeight;
+			if (meanTracker)
+				value *= meanTracker->value;
 			if (!value.isZero())
-				result->put(current->getPosition(k), &value[0]);
+				result->putAtomic(current->getPosition(k), value, cumulativeWeight);
 		}
 
 
 		delete current;
 		delete proposed;
 	}
+
+	class MLTResponsive : public ResponsiveIntegrator {
+		#define SeedSamplesPerChain 64
+
+		ref<Integrator> m_integrator;
+		PSSMLTConfiguration const* m_config;
+
+		ref_vector<ReplayableSampler> m_seedSamplers;
+
+		ref_vector<Timer> m_timeoutTimers;
+
+	public:
+		MLTResponsive(Integrator* mlt, PSSMLTConfiguration const* config)
+			: ResponsiveIntegrator(mlt->getProperties())
+			, m_integrator(mlt)
+			, m_config(config) {
+		}
+
+		static PSSMLTConfiguration reconfigureUnsupported(const PSSMLTConfiguration& cfg) {
+			PSSMLTConfiguration config = cfg;
+			if (config.separateDirect) {
+				config.separateDirect = false;
+				config.directSamples = -1;
+			}
+			config.twoStage = false;
+			return config;
+		}
+
+		bool preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) {
+			return m_integrator->preprocess(scene, nullptr, nullptr, -1, -1, -1);
+		}
+
+		bool allocate(const Scene &scene, Sampler *const *samplers, ImageBlock *const *targets, int threadCount) override {
+			bool result = ResponsiveIntegrator::allocate(scene, samplers, targets, threadCount);
+
+			ref<Random> rnd = new Random();
+			m_seedSamplers.clear();
+			for (int i = 0; i < threadCount; ++i) {
+				m_seedSamplers.push_back(new ReplayableSampler(rnd));
+			}
+
+			for (int i = 0; i < threadCount; ++i) {
+				m_integrator->configureSampler(&scene, samplers[i]);
+			}
+
+			m_timeoutTimers.clear();
+			for (int i = 0; i < threadCount; ++i) {
+				m_timeoutTimers.push_back(new Timer());
+			}
+
+			return result;
+		}
+
+		struct MeanBrightness {
+			Float value = 0;
+			Float samples = 0;
+
+			void addSample(Float newValue, Float weight = 1.0f) {
+				samples += weight;
+				value += (newValue - value) * (weight / samples);
+			}
+		};
+
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+			, Controls controls, int threadIdx, int threadCount) override {
+			Vector2i pixels = target.getSize();
+			int planeSamples = pixels.x * pixels.y;
+
+			PSSMLTConfiguration config = reconfigureUnsupported(*m_config);
+			if (threadIdx == 0 && memcmp(&config, m_config, sizeof(config))) {
+				m_config->dump();
+				Log(EWarn, "Unsupported responsive configuration, reconfiguring!");
+			}
+			config.luminance = 0.2f;
+			config.luminanceSamples = 0;
+			config.firstStage = false;
+			config.importanceMap = NULL;
+			config.workUnits = 0;
+			config.nMutations = std::max(4 * pixels.x * pixels.y / threadCount, 300000);
+			config.nMutations = std::min(config.nMutations, sampler.getSampleCount() * pixels.x * pixels.y / threadCount);
+			if (threadIdx == 0)
+				config.dump();
+
+			if (config.timeout > 0) {
+				m_timeoutTimers[threadIdx]->reset();
+			}
+
+			MeanBrightness meanImage;
+
+			ref<PSSMLTRenderer> renderer = new PSSMLTRenderer(config);
+			ref<PSSMLTSampler> pssmltSampler = new PSSMLTSampler(config);
+			renderer->prepareResponsive(&scene, &sensor, pssmltSampler, &target, m_seedSamplers[threadIdx], &meanImage);
+
+			// todo: offset sampler per thread?
+			ReplayableSampler* seedSampler = renderer->m_rplSampler;
+			PathSampler* pathSampler = renderer->m_pathSampler;
+			std::vector<PathSeed> pathSeeds;
+			SplatList splatContainer;
+
+			int currentSamples = 0, completedPlanes = 0;
+			double spp = 0.0f;
+
+			int returnCode = 0;
+			while (returnCode == 0) {
+				// update statistics and check control
+				auto interact = [&](int additionalSamples) -> int
+				{
+					spp = (double) completedPlanes + double(currentSamples + additionalSamples) / double(planeSamples);
+					//spp = std::max(spp, double(currentSamples + config.nMutations / 2) / double(planeSamples));
+
+					// external control
+					if (controls.abort && *controls.abort) {
+						returnCode = -1;
+					} else if (controls.continu && !*controls.continu) {
+						returnCode = -2;
+					} else if (controls.interrupt) {
+						// important: always called on new plane begin!
+						returnCode = controls.interrupt->progress(this, scene, sensor, sampler, target, spp, controls, threadIdx, threadCount);
+					}
+					return returnCode;
+				};
+				if (interact(0) != 0) {
+					break;
+				}
+				renderer->m_control = interact;
+
+				{
+					renderer->m_sensorSampler->setRandom(seedSampler->getRandom());
+					renderer->m_emitterSampler->setRandom(seedSampler->getRandom());
+					renderer->m_directSampler->setRandom(seedSampler->getRandom());
+					// sample more
+					for (int i = 0; i < SeedSamplesPerChain; ) {
+						size_t sampleIndex = seedSampler->getSampleIndex();
+						renderer->m_emitterSampler->reset();
+						renderer->m_sensorSampler->reset();
+						renderer->m_directSampler->reset();
+						pathSampler->sampleSplats(Point2i(-1), splatContainer);
+						seedSampler->updateSampleIndex(sampleIndex
+							+ renderer->m_sensorSampler->getSampleIndex()
+							+ renderer->m_emitterSampler->getSampleIndex()
+							+ renderer->m_directSampler->getSampleIndex());
+						if (splatContainer.luminance) {
+							pathSeeds.push_back(PathSeed(sampleIndex, splatContainer.luminance));
+							++i;
+						}
+						meanImage.addSample(splatContainer.luminance);
+					}
+				}
+				int seedSampleIdx = seedSampler->getSampleIndex();
+
+				SeedWorkUnit swu;
+				Float totalSeedWeight = 0;
+				for (PathSeed& s : pathSeeds) {
+					Float seedWeight = s.luminance;
+					Float prevSeedWeight = totalSeedWeight;
+					totalSeedWeight += seedWeight;
+
+					Float u = sampler.next1D();
+					if (seedWeight < prevSeedWeight ? u < seedWeight / totalSeedWeight : u >= prevSeedWeight / totalSeedWeight) {
+						swu.setSeed(s);
+					}
+				}
+
+				int timeout = 0;
+				if (config.timeout > 0) {
+					timeout = static_cast<int>(static_cast<int64_t>(config.timeout*1000) -
+						static_cast<int64_t>(m_timeoutTimers[threadIdx]->getMilliseconds()));
+					if (timeout < 0)
+						break;
+				}
+				swu.setTimeout(timeout);
+
+				bool stop = false;
+				renderer->process(&swu, &target, controls.abort ? *(bool const*) controls.abort : stop);
+				currentSamples += int(renderer->m_nMutationsCompleted);
+
+				// restore
+				seedSampler->setSampleIndex(seedSampleIdx);
+
+				// precise sample tracking
+				while (currentSamples >= planeSamples) {
+					++completedPlanes;
+					currentSamples -= planeSamples;
+					spp = (double) completedPlanes;
+
+					if (threadIdx == 0)
+						Log(EInfo, "Approx MPP/SPP: %f", spp * Float(threadCount));
+				}
+			}
+
+			return returnCode;
+		}
+
+		Float getLowerSampleBound() const override {
+			return 0.0f;
+		}
+	};
 
 	ref<WorkProcessor> clone() const {
 		return new PSSMLTRenderer(m_config);
@@ -248,6 +496,9 @@ private:
 	ref<PSSMLTSampler> m_emitterSampler;
 	ref<PSSMLTSampler> m_directSampler;
 	ref<ReplayableSampler> m_rplSampler;
+	MLTResponsive::MeanBrightness* m_meanTracker;
+	std::function<int(int)> m_control;
+	size_t m_nMutationsCompleted;
 };
 
 /* ==================================================================== */
@@ -349,6 +600,16 @@ void PSSMLTProcess::bindResource(const std::string &name, int id) {
 		m_accum->clear();
 		m_developBuffer = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat, m_film->getCropSize());
 	}
+}
+
+ref<ResponsiveIntegrator> PSSMLTProcess::makeResponsiveIntegrator(Integrator* mlt, const PSSMLTConfiguration *config) {
+	if (mlt->getProperties().getBoolean("strictConfiguration", true)) {
+		PSSMLTConfiguration reconf = PSSMLTRenderer::MLTResponsive::reconfigureUnsupported(*config);
+		// unsupported features
+		if (memcmp(&reconf, config, sizeof(reconf)))
+			return nullptr;
+	}
+	return new PSSMLTRenderer::MLTResponsive(mlt, config);
 }
 
 MTS_IMPLEMENT_CLASS_S(PSSMLTRenderer, false, WorkProcessor)

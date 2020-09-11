@@ -102,7 +102,7 @@ public:
 	 * render each pixel, and the argument denotes the pixel position.
 	 * Otherwise, some dummy value should be provided, e.g. Point2i(-1)
 	 */
-	virtual void generate(const Point2i &offset);
+	virtual void generate(const Point2i &offset, size_t nextSampleIdx = 0);
 
 	/// Advance to the next sample
 	virtual void advance();

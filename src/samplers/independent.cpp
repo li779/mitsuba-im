@@ -79,7 +79,7 @@ public:
 		return sampler.get();
 	}
 
-	void generate(const Point2i &) {
+	void generate(const Point2i &, size_t nextSampleIdx) {
 		for (size_t i=0; i<m_req1D.size(); i++)
 			for (size_t j=0; j<m_sampleCount * m_req1D[i]; ++j)
 				m_sampleArrays1D[i][j] = m_random->nextFloat();
@@ -88,7 +88,8 @@ public:
 				m_sampleArrays2D[i][j] = Point2(
 					m_random->nextFloat(),
 					m_random->nextFloat());
-		m_sampleIndex = 0;
+		if (nextSampleIdx != ~0)
+			m_sampleIndex = nextSampleIdx;
 		m_dimension1DArray = m_dimension2DArray = 0;
 	}
 

@@ -125,7 +125,7 @@ public:
 		 */
 		 m_sendData = props.getBoolean("sendData", false);
 
-		 loadFromFile(props.getString("filename"));
+		 loadFromFile(fs::pathstr(props.getString("filename")));
 	}
 
 	GridDataSource(Stream *stream, InstanceManager *manager)
@@ -137,12 +137,12 @@ public:
 			m_volumeType = (EVolumeType) stream->readInt();
 			m_res = Vector3i(stream);
 			m_channels = stream->readInt();
-			m_filename = stream->readString();
+			m_filename = fs::pathstr(stream->readString());
 			size_t volumeSize = getVolumeSize();
 			m_data = new uint8_t[volumeSize];
 			stream->read(m_data, volumeSize);
 		} else {
-			fs::path filename = stream->readString();
+			fs::pathstr filename = fs::pathstr(stream->readString());
 			loadFromFile(filename);
 		}
 		configure();
@@ -178,10 +178,10 @@ public:
 			stream->writeInt(m_volumeType);
 			m_res.serialize(stream);
 			stream->writeInt(m_channels);
-			stream->writeString(m_filename.string());
+			stream->writeString(m_filename.s);
 			stream->write(m_data, getVolumeSize());
 		} else {
-			stream->writeString(m_filename.string());
+			stream->writeString(m_filename.s);
 		}
 	}
 
@@ -214,9 +214,9 @@ public:
 		m_densityMap[255] = 1.0f;
 	}
 
-	void loadFromFile(const fs::path &filename) {
+	void loadFromFile(const fs::pathstr &filename) {
 		m_filename = filename;
-		fs::path resolved = Thread::getThread()->getFileResolver()->resolve(filename);
+		fs::pathstr resolved = Thread::getThread()->getFileResolver()->resolve(filename);
 		m_mmap = new MemoryMappedFile(resolved);
 		ref<MemoryStream> stream = new MemoryStream(m_mmap->getData(), m_mmap->getSize());
 		stream->setByteOrder(Stream::ELittleEndian);
@@ -281,7 +281,7 @@ public:
 		}
 
 		Log(EDebug, "Mapped \"%s\" into memory: %ix%ix%i (%i channels, format = %s), %s, %s",
-			resolved.filename().string().c_str(), m_res.x, m_res.y, m_res.z, m_channels, format.c_str(),
+			resolved.s.c_str(), m_res.x, m_res.y, m_res.z, m_channels, format.c_str(),
 			memString(m_mmap->getSize()).c_str(), m_dataAABB.toString().c_str());
 		m_data = (uint8_t *) (((float *) m_mmap->getData()) + 12);
 	}
@@ -606,7 +606,7 @@ protected:
 	}
 
 protected:
-	fs::path m_filename;
+	fs::pathstr m_filename;
 	uint8_t *m_data;
 	bool m_sendData;
 	EVolumeType m_volumeType;

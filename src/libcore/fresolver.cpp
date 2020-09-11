@@ -1,5 +1,5 @@
 #include <mitsuba/core/fresolver.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/filesystem.h>
 
 #if defined(__LINUX__)
 # if !defined(_GNU_SOURCE)
@@ -32,10 +32,10 @@ FileResolver::FileResolver() {
 	dladdr((const void *) &dummySymbol, &info);
 	if (info.dli_fname) {
 		/* Try to detect a few default setups */
-		if (boost::starts_with(info.dli_fname, "/usr/lib") ||
-			boost::starts_with(info.dli_fname, "/lib")) {
+		if (starts_with(info.dli_fname, "/usr/lib") ||
+			starts_with(info.dli_fname, "/lib")) {
 			basePath = fs::path("/usr/share/mitsuba");
-		} else if (boost::starts_with(info.dli_fname, "/usr/local/lib")) {
+		} else if (starts_with(info.dli_fname, "/usr/local/lib")) {
 			basePath = fs::path("/usr/local/share/mitsuba");
 		} else {
 			/* This is a locally-compiled repository */
@@ -47,7 +47,7 @@ FileResolver::FileResolver() {
 	uint32_t imageCount = _dyld_image_count();
 	for (uint32_t i=0; i<imageCount; ++i) {
 		const char *imageName = _dyld_get_image_name(i);
-		if (boost::ends_with(imageName, "libmitsuba-core.dylib")) {
+		if (ends_with(imageName, "libmitsuba-core.dylib")) {
 			basePath = fs::canonical(imageName).parent_path().parent_path().parent_path();
 			break;
 		}
@@ -56,7 +56,7 @@ FileResolver::FileResolver() {
 	if (basePath.empty())
 		Log(EError, "Could not detect the executable path!");
 #elif defined(__WINDOWS__)
-	std::vector<WCHAR> lpFilename(MAX_PATH);
+	std::wstring lpFilename(MAX_PATH, 0);
 
 	// Module handle to this DLL. If the function fails it sets handle to NULL.
 	// In that case GetModuleFileName will get the name of the executable which
@@ -90,6 +90,10 @@ FileResolver::FileResolver() {
 	m_paths.push_back(fs::current_path());
 }
 
+FileResolver::FileResolver(const FileResolver&) = default;
+
+FileResolver::~FileResolver() = default;
+
 FileResolver *FileResolver::clone() const {
 	FileResolver *cloned = new FileResolver();
 	cloned->m_paths = m_paths;
@@ -100,34 +104,37 @@ void FileResolver::clear() {
 	m_paths.clear();
 }
 
-void FileResolver::prependPath(const fs::path &path) {
+void FileResolver::prependPath(fs::pathstr const& spath) {
+	fs::path path = fs::decode_pathstr(spath);
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		if (m_paths[i] == path)
+		if (m_paths[i].p == path)
 			return;
 	}
-	m_paths.push_front(path);
+	m_paths.insert(m_paths.begin(), path);
 }
 
-void FileResolver::appendPath(const fs::path &path) {
+void FileResolver::appendPath(fs::pathstr const& spath) {
+	fs::path path = fs::decode_pathstr(spath);
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		if (m_paths[i] == path)
+		if (m_paths[i].p == path)
 			return;
 	}
 	m_paths.push_back(path);
 }
 
-fs::path FileResolver::resolve(const fs::path &path) const {
+fs::pathstr FileResolver::resolve(fs::pathstr const& spath) const {
+	fs::path path = fs::decode_pathstr(spath);
 	/* First, try to resolve in case-sensitive mode */
 	for (size_t i=0; i<m_paths.size(); i++) {
 		fs::path newPath = m_paths[i] / path;
 		if (fs::exists(newPath))
-			return newPath;
+			return fs::encode_pathstr(newPath);
 	}
 
 	#if defined(__LINUX__)
 		/* On Linux, also try case-insensitive mode if the above failed */
 		fs::path parentPath = path.parent_path();
-		std::string filename = boost::to_lower_copy(path.filename().string());
+		std::string filename = to_lower_copy(path.filename().string());
 
 		for (size_t i=0; i<m_paths.size(); i++) {
 			fs::path path = m_paths[i] / parentPath;
@@ -137,37 +144,44 @@ fs::path FileResolver::resolve(const fs::path &path) const {
 
 			fs::directory_iterator end, it(path);
 			for (; it != end; ++it) {
-				if (boost::algorithm::to_lower_copy(it->path().filename().string()) == filename)
-					return it->path();
+				if (to_lower_copy(it->path().filename().string()) == filename)
+					return fs::encode_pathstr(it->path());
 			}
 		}
 	#endif
 
-	return path;
+	return spath;
 }
 
-std::vector<fs::path> FileResolver::resolveAll(const fs::path &path) const {
-	std::vector<fs::path> results;
+std::vector<fs::pathstr> FileResolver::resolveAll(fs::pathstr const& spath) const {
+	fs::path path = fs::decode_pathstr(spath);
+	std::vector<fs::pathstr> results;
 
 	for (size_t i=0; i<m_paths.size(); i++) {
 		fs::path newPath = m_paths[i] / path;
 		if (fs::exists(newPath))
-			results.push_back(newPath);
+			results.push_back(fs::encode_pathstr(newPath));
 	}
 
 	return results;
 }
 
-fs::path FileResolver::resolveAbsolute(const fs::path &path) const {
-	return fs::absolute(resolve(path));
+fs::pathstr FileResolver::resolveAbsolute(fs::pathstr const& path) const {
+	fs::pathstr rspath = resolve(path);
+	fs::path p = fs::absolute(fs::decode_pathstr(rspath));
+	return exists(p) ? fs::encode_pathstr(p) : rspath;
 }
+
+size_t FileResolver::getPathCount() const { return m_paths.size(); }
+
+fs::pathstr FileResolver::getPath(size_t index) const { return fs::encode_pathstr(m_paths[index].p); }
 
 std::string FileResolver::toString() const {
 	std::ostringstream oss;
 	oss << "FileResolver[" << endl
 		<< "  paths = {" << endl;
 	for (size_t i=0; i<m_paths.size(); ++i) {
-		oss << "    \"" << m_paths[i].string() << "\"";
+		oss << "    \"" << m_paths[i].p.string() << "\"";
 		if (i+1 < m_paths.size())
 			oss << ",";
 		oss << endl;

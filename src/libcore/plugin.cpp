@@ -22,7 +22,9 @@
 #include <mitsuba/core/lock.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/cobject.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/version.h>
+#include <fstream>
 
 #if !defined(__WINDOWS__)
 # include <dlfcn.h>
@@ -59,16 +61,16 @@ struct Plugin::PluginPrivate {
 	: shortName(sn), path(p) {}
 };
 
-Plugin::Plugin(const std::string &shortName, const fs::path &path)
- : d(new PluginPrivate(shortName, path)) {
+Plugin::Plugin(const std::string &shortName, fs::pathstr const& path)
+ : d(new PluginPrivate(shortName, fs::decode_pathstr(path))) {
 #if defined(__WINDOWS__)
-	d->handle = LoadLibraryW(path.c_str());
+	d->handle = LoadLibraryW(d->path.c_str());
 	if (!d->handle) {
 		SLog(EError, "Error while loading plugin \"%s\": %s",
 				d->path.string().c_str(), lastErrorText().c_str());
 	}
 #else
-	d->handle = dlopen(path.string().c_str(), RTLD_LAZY | RTLD_LOCAL);
+	d->handle = dlopen(d->path.string().c_str(), RTLD_LAZY | RTLD_LOCAL);
 	if (!d->handle) {
 		SLog(EError, "Error while loading plugin \"%s\": %s",
 			d->path.string().c_str(), dlerror());
@@ -143,8 +145,8 @@ std::string Plugin::getDescription() const {
 	return d->getDescription();
 }
 
-const fs::path& Plugin::getPath() const {
-	return d->path;
+fs::pathstr Plugin::getPath() const {
+	return fs::encode_pathstr(d->path);
 }
 
 const std::string& Plugin::getShortName() const {
@@ -219,13 +221,15 @@ std::vector<std::string> PluginManager::getLoadedPlugins() const {
 	return list;
 }
 
+static char const* pluginSearchDir = "plugins";
+
 void PluginManager::ensurePluginLoaded(const std::string &name) {
 	/* Plugin already loaded? */
 	if (m_plugins[name] != NULL)
 		return;
 
 	/* Build the full plugin file name */
-	fs::path shortName = fs::path("plugins") / name;
+	fs::path shortName = fs::decode_pathstr(fs::pathstr(pluginSearchDir)) / name;
 #if defined(__WINDOWS__)
 	shortName.replace_extension(".dll");
 #elif defined(__OSX__)
@@ -235,16 +239,65 @@ void PluginManager::ensurePluginLoaded(const std::string &name) {
 #endif
 
 	const FileResolver *resolver = Thread::getThread()->getFileResolver();
-	fs::path path = resolver->resolve(shortName);
+	fs::pathstr spath = resolver->resolve(fs::encode_pathstr(shortName));
+	fs::path path = fs::decode_pathstr(spath);
 
 	if (fs::exists(path)) {
 		Log(EInfo, "Loading plugin \"%s\" ..", shortName.string().c_str());
-		m_plugins[name] = new Plugin(shortName.string(), path);
+		m_plugins[name] = new Plugin(shortName.string(), spath);
 		return;
 	}
 
 	/* Plugin not found! */
 	Log(EError, "Plugin \"%s\" not found!", name.c_str());
+}
+
+/// Returns a list of available plugins containing the given string or symbol.
+std::vector<std::string> PluginManager::getAvailablePlugins(char const* symbol) const {
+	/* Build the full plugin path */
+	const FileResolver *resolver = Thread::getThread()->getFileResolver();
+	fs::pathstr spath = resolver->resolve(fs::pathstr(pluginSearchDir));
+	fs::path searchPath = fs::decode_pathstr(spath);
+
+	std::vector<std::string> plugins;
+
+	int symbolLen = (int) std::strlen(symbol);
+	int blockSize = 1024 * 1024;
+	std::string textblock(blockSize + symbolLen + 1, 0);
+
+	/* Enumerate candidates */
+	for (auto& entry : fs::directory_iterator(searchPath))
+		if (is_regular_file(entry)) {
+			fs::path p = entry;
+			try {
+				std::fstream f(p, std::fstream::binary | std::fstream::in);
+				for (int blockOffset = 0, endOfBlock = 0; f; ) {
+					if (endOfBlock > blockOffset) {
+						int prefixLen = std::min(symbolLen, endOfBlock);
+						std::memmove(textblock.data(), textblock.data() + (endOfBlock - prefixLen), prefixLen);
+						blockOffset = prefixLen;
+					}
+					endOfBlock = blockOffset;
+					f.read(textblock.data() + blockOffset, blockSize);
+					endOfBlock += (int) f.gcount();
+					textblock[endOfBlock] = '\0'; // warning str str stops at 0, todo: avoid ...
+					char* textEnd = textblock.data() + endOfBlock;
+					char const* occurred = std::search(textblock.data(), textEnd, symbol, symbol + symbolLen);
+					if (occurred != textEnd) {
+						plugins.push_back(p.stem().string());
+						break;
+					}
+				}
+			}
+			catch (...) {
+				SLog(EWarn, "Cannot open plugin candidate file \"%s\"", p.string());
+			}
+		}
+
+	/* Clean in case of duplicates */
+	std::sort(plugins.begin(), plugins.end());
+	plugins.erase(std::unique(plugins.begin(), plugins.end()), plugins.end());
+	return plugins;
 }
 
 void PluginManager::staticInitialization() {

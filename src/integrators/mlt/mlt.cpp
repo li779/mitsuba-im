@@ -325,6 +325,10 @@ public:
 		return process->getReturnStatus() == ParallelProcess::ESuccess;
 	}
 
+	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		return MLTProcess::makeResponsiveIntegrator(this, &this->m_config);
+	}
+
 	MTS_DECLARE_CLASS()
 private:
 	ref<ParallelProcess> m_process;

@@ -17,7 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include <mitsuba/core/warp.h>
 #include "ior.h"
 
@@ -464,7 +467,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -475,6 +480,7 @@ private:
 	bool m_nonlinear;
 };
 
+#ifdef MTS_HAS_HW
 /**
  * Smooth plastic shader -- it is really hopeless to visualize
  * this material in the VPL renderer, so let's try to do at least
@@ -583,7 +589,7 @@ Shader *SmoothPlastic::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(SmoothPlasticShader, false, Shader)
-
+#endif
 MTS_IMPLEMENT_CLASS_S(SmoothPlastic, false, BSDF)
 MTS_EXPORT_PLUGIN(SmoothPlastic, "Smooth plastic BRDF");
 MTS_NAMESPACE_END

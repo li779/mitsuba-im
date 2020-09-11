@@ -36,14 +36,14 @@ public:
 		m_volumeToWorld = props.getTransform("toWorld", Transform());
 		m_prefix = props.getString("prefix");
 		m_postfix = props.getString("postfix");
-		std::string filename = props.getString("filename");
+		fs::pathstr filename = fs::pathstr(props.getString("filename"));
 		loadDictionary(filename);
 	}
 
 	HierarchicalGridDataSource(Stream *stream, InstanceManager *manager)
 	: VolumeDataSource(stream, manager) {
 		m_volumeToWorld = Transform(stream);
-		std::string filename = stream->readString();
+		fs::pathstr filename = fs::pathstr(stream->readString());
 		m_prefix = stream->readString();
 		m_postfix = stream->readString();
 		loadDictionary(filename);
@@ -67,9 +67,9 @@ public:
 		stream->writeString(m_postfix);
 	}
 
-	void loadDictionary(const std::string &filename) {
-		fs::path resolved = Thread::getThread()->getFileResolver()->resolve(filename);
-		Log(EInfo, "Loading hierarchical grid dictionary \"%s\"", filename.c_str());
+	void loadDictionary(const fs::pathstr &filename) {
+		fs::pathstr resolved = Thread::getThread()->getFileResolver()->resolve(filename);
+		Log(EInfo, "Loading hierarchical grid dictionary \"%s\"", filename.s.c_str());
 		ref<FileStream> stream = new FileStream(resolved, FileStream::EReadOnly);
 		stream->setByteOrder(Stream::ELittleEndian);
 		Float xmin = stream->readSingle(), ymin = stream->readSingle(), zmin = stream->readSingle();
@@ -198,7 +198,8 @@ public:
 
 	MTS_DECLARE_CLASS()
 protected:
-	std::string m_filename, m_prefix, m_postfix;
+	fs::pathstr m_filename;
+	std::string m_prefix, m_postfix;
 	Transform m_volumeToWorld;
 	Transform m_worldToVolume;
 	Transform m_worldToGrid;

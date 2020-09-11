@@ -17,8 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
-#include <mitsuba/render/texture.h>
-#include <mitsuba/hw/gpuprogram.h>
+#include <mitsuba/render/shape.h>
+#ifdef MTS_HAS_HW
+#include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -225,14 +227,16 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
 	ref<BSDF> m_nestedBRDF[2];
 };
 
-
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class TwoSidedShader : public Shader {
@@ -298,6 +302,7 @@ Shader *TwoSidedBRDF::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(TwoSidedShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(TwoSidedBRDF, false, BSDF)
 MTS_EXPORT_PLUGIN(TwoSidedBRDF, "Two-sided BRDF adapter");
 MTS_NAMESPACE_END

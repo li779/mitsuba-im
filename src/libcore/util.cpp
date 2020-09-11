@@ -22,9 +22,10 @@
 #include <mitsuba/core/quad.h>
 #include <mitsuba/core/sse.h>
 #include <mitsuba/core/frame.h>
-#include <boost/bind.hpp>
+#include <functional>
 #include <stdarg.h>
 #include <iomanip>
+#include <cctype>
 #include <errno.h>
 
 #if defined(__OSX__)
@@ -43,6 +44,7 @@
 # include <winsock2.h>
 # include <ws2tcpip.h>
 #else
+# include <unistd.h>
 # include <sys/types.h>
 # include <sys/socket.h>
 # include <netdb.h>
@@ -855,7 +857,7 @@ Float fresnelDiffuseReflectance(Float eta, bool fast) {
 	} else {
 		GaussLobattoIntegrator quad(1024, 0, 1e-5f);
 		return quad.integrate(
-			boost::bind(&fresnelDiffuseIntegrand, eta, _1), 0, 1);
+			std::bind(&fresnelDiffuseIntegrand, eta, std::placeholders::_1), 0, 1);
 	}
 
 	return 0.0f;
@@ -898,6 +900,35 @@ std::string memString(size_t size, bool precise) {
 	   << std::fixed << value << " " << suffixes[suffix];
 
 	return os.str();
+}
+
+bool starts_with(std::string const& s, char const* c) {
+	return 0 == strncmp(s.c_str(), c, std::strlen(c));
+}
+
+bool ends_with(std::string const& s, char const* c) {
+	size_t len = s.size(), lenc = std::strlen(c);
+	if (len < lenc)
+		return false;
+	return 0 == strncmp(s.c_str() + (len - lenc), c, lenc);
+}
+
+std::string to_lower_copy(std::string const& s) {
+	size_t len = s.size();
+	std::string r(len, 0);
+	for (size_t i = 0; i < len; ++i) {
+		r[i] = ::tolower(s[i]);
+	}
+	return r;
+}
+
+std::string to_upper_copy(std::string const& s) {
+	size_t len = s.size();
+	std::string r(len, 0);
+	for (size_t i = 0; i < len; ++i) {
+		r[i] = ::toupper(s[i]);
+	}
+	return r;
 }
 
 MTS_NAMESPACE_END

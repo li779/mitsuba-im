@@ -24,10 +24,14 @@
 # include <omp.h>
 #endif
 
-#include <boost/thread/thread.hpp>
+#include <thread>
+#include <mutex>
 
 // Required for native thread functions
-#if defined(__OSX__)
+#if defined(__LINUX__)
+# include <unistd.h>
+# include <sys/prctl.h>
+#elif defined(__OSX__)
 # include <pthread.h>
 #elif defined(__WINDOWS__)
 # include <windows.h>
@@ -82,14 +86,14 @@ struct Thread::ThreadPrivate {
 	ref<Thread> parent;
 	ref<Logger> logger;
 	ref<FileResolver> fresolver;
-	boost::mutex joinMutex;
+	std::mutex joinMutex;
 	std::string name;
 	bool running, joined;
 	Thread::EThreadPriority priority;
 	int coreAffinity;
 	static ThreadLocal<Thread> *self;
 	bool critical;
-	boost::thread thread;
+	std::thread thread;
 	#if defined(__LINUX__) || defined(__OSX__)
 		pthread_t native_handle;
 	#endif
@@ -102,7 +106,7 @@ struct Thread::ThreadPrivate {
 
 static std::vector<bool (*)(void)> __crashHandlers;
 static std::vector<Thread *> __unmanagedThreads;
-static boost::mutex __unmanagedMutex;
+static std::mutex __unmanagedMutex;
 
 /**
  * Dummy class to associate a thread identity with the main thread
@@ -226,8 +230,8 @@ void Thread::start() {
 
 	incRef();
 	try {
-		d->thread = boost::thread(&Thread::dispatch, this);
-	} catch (boost::thread_resource_error &ex) {
+		d->thread = std::thread(&Thread::dispatch, this);
+	} catch (std::system_error &ex) {
 		Log(EError, "Could not create thread!");
 		throw ex;
 	}
@@ -464,15 +468,15 @@ void Thread::dispatch(Thread *thread) {
 
 void Thread::join() {
 	/* Only one call to join() at a time */
-	boost::lock_guard<boost::mutex> guard(d->joinMutex);
+	std::lock_guard<std::mutex> guard(d->joinMutex);
 	if (d->joined)
 		return;
-	try {
+	/*try*/ {
 		d->thread.join();
-	} catch (boost::thread_interrupted &ex) {
+	} /*catch (boost::thread_interrupted &ex) {
 		Log(EError, "Thread::join() - the thread was interrupted");
 		throw ex;
-	}
+	}*/
 	d->joined = true;
 }
 
@@ -481,16 +485,16 @@ void Thread::detach() {
 }
 
 void Thread::sleep(unsigned int ms) {
-	try {
-		boost::this_thread::sleep(boost::posix_time::milliseconds(ms));
-	} catch (boost::thread_interrupted &ex) {
+	/*try*/ {
+		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+	} /*catch (boost::thread_interrupted &ex) {
 		Log(EError, "Thread::sleep(ms) - interrupted!");
 		throw ex;
-	}
+	}*/
 }
 
 void Thread::yield() {
-	boost::this_thread::yield();
+	std::this_thread::yield();
 }
 
 void Thread::exit() {
@@ -564,7 +568,7 @@ Thread *Thread::registerUnmanagedThread(const std::string &name) {
 		thread->incRef();
 		ThreadPrivate::self->set(thread);
 
-		boost::lock_guard<boost::mutex> guard(__unmanagedMutex);
+		std::lock_guard<std::mutex> guard(__unmanagedMutex);
 		__unmanagedThreads.push_back((UnmanagedThread *) thread);
 	}
 	return thread;
@@ -632,8 +636,8 @@ void Thread::initializeOpenMP(size_t threadCount) {
 			}
 			const std::string threadName = "Mitsuba: " + thread->getName();
 
-			#if defined(__LINUX__)
-                pthread_setname_np(pthread_self(), threadName.c_str());
+			#if defined(__LINUX__) 
+				pthread_setname_np(pthread_self(), threadName.c_str());
 			#elif defined(__OSX__)
 				pthread_setname_np(threadName.c_str());
 			#elif defined(__WINDOWS__)

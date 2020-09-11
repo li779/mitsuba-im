@@ -25,6 +25,8 @@
 # include <sys/sysctl.h>
 #elif defined(__WINDOWS__)
 # include <windows.h>
+#else
+# include <unistd.h>
 #endif
 
 MTS_NAMESPACE_BEGIN
@@ -138,6 +140,13 @@ void Logger::log(ELogLevel level, const Class *theClass,
 		if (IsDebuggerPresent())
 			__debugbreak();
 #endif
+
+		try {
+			LockGuard lock(m_mutex);
+			for (size_t i=0; i<m_appenders.size(); ++i)
+				m_appenders[i]->append(level, text);
+		}
+		catch(...) { }
 
 		DefaultFormatter fmt;
 		fmt.setHaveDate(false);

@@ -101,10 +101,13 @@ public:
 	 */
 	virtual void accept(const MutationRecord &muRec) = 0;
 
+	/// Sets the large step tracker to be called on large step proposals, optionally changing the minimum large step rate. May be ignored by mutations.
+	virtual void setLargeStepTracker(struct LargeStepTracker* tracker, Float largeStepRate = -1.0f);
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor
-	virtual ~Mutator() { }
+	virtual ~Mutator();
 };
 
 /**
@@ -148,7 +151,7 @@ protected:
 	MutatorBase();
 
 	/// Virtual destructor
-	virtual ~MutatorBase() { }
+	virtual ~MutatorBase();
 
 	/// Perturb a distance within a medium
 	Float perturbMediumDistance(Sampler *sampler,
@@ -160,6 +163,11 @@ protected:
 
 protected:
 	Float m_mediumDensityMultiplier;
+};
+
+/// Allows tracking of large step proposals.
+struct LargeStepTracker {
+	virtual void proposedLargeStep(Float weight, Path const &path) = 0;
 };
 
 MTS_NAMESPACE_END

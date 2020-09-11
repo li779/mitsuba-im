@@ -3,8 +3,21 @@ if (NOT MTS_VERSION)
   message(FATAL_ERROR "Use the top level configuration file")
 endif()
 
-macro(add_integrator)
-  add_mts_plugin(${ARGN} TYPE integrator)
+macro(add_integrator_ name)
+  add_mts_plugin(${name} ${ARGN} TYPE integrator)
+endmacro()
+
+macro(add_integrator name)
+  add_integrator_(${name} ${ARGN})
+  if (TARGET ${name})
+    target_sources(${name} PRIVATE mark_integrator.cpp)
+  endif ()
+endmacro()
+macro(add_integrator2 name)
+  add_integrator_(${name} ${ARGN})
+  if (TARGET ${name})
+    target_sources(${name} PRIVATE mark_integrator2.cpp)
+  endif ()
 endmacro()
 
 macro(add_bidir)
@@ -25,7 +38,9 @@ add_integrator(ppm          photonmapper/ppm.cpp)
 add_integrator(sppm         photonmapper/sppm.cpp)
 
 # Miscellaneous
+if (MTS_HAS_HW)
 add_integrator(vpl          vpl/vpl.cpp MTS_HW)
+endif()
 add_integrator(adaptive     misc/adaptive.cpp)
 add_integrator(irrcache     misc/irrcache.cpp
                             misc/irrcache_proc.h misc/irrcache_proc.cpp)

@@ -21,7 +21,7 @@
 #define __MITSUBA_BIDIR_PATHSAMPLER_H_
 
 #include <mitsuba/bidir/path.h>
-#include <boost/function.hpp>
+#include <functional>
 
 MTS_NAMESPACE_BEGIN
 
@@ -45,7 +45,7 @@ public:
 	 * of steps from the emitter, \c is the number of steps from the sensor,
 	 * and \c weight contains the importance weight associated with the sample.
 	 */
-	typedef boost::function<void (int, int, Float, Path &)> PathCallback;
+	typedef std::function<void (int, int, Float, Path &)> PathCallback;
 
 	/// Specifies the sampling algorithm that is internally used
 	enum ETechnique {

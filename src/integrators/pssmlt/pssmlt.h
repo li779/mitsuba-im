@@ -31,11 +31,21 @@ MTS_NAMESPACE_BEGIN
 /*                         Configuration storage                        */
 /* ==================================================================== */
 
+// allow memcmp
+template <class T>
+struct PSSMLTConfiguration_ZeroPad {
+	PSSMLTConfiguration_ZeroPad() {
+		memset((void*) (T*) this, 0, sizeof(T));
+	}
+	PSSMLTConfiguration_ZeroPad(PSSMLTConfiguration_ZeroPad const&) {
+		memset((void*) (T*) this, 0, sizeof(T));
+	}
+};
 /**
  * \brief Stores all configuration parameters used by
  * the MLT rendering implementation
  */
-struct PSSMLTConfiguration {
+struct PSSMLTConfiguration : PSSMLTConfiguration_ZeroPad<PSSMLTConfiguration> {
 	PathSampler::ETechnique technique;
 	int maxDepth;
 	bool directSampling;

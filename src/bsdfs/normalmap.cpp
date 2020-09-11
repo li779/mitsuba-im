@@ -17,7 +17,9 @@
 */
 
 #include <mitsuba/render/scene.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -259,7 +261,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
@@ -267,6 +271,7 @@ protected:
 	ref<BSDF> m_nested;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 /**
@@ -332,6 +337,7 @@ Shader *NormalMap::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(NormalMapShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(NormalMap, false, BSDF)
 MTS_EXPORT_PLUGIN(NormalMap, "Normal map modifier");
 MTS_NAMESPACE_END

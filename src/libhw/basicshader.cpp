@@ -20,94 +20,6 @@
 
 MTS_NAMESPACE_BEGIN
 
-
-ConstantSpectrumTexture::ConstantSpectrumTexture(Stream *stream, InstanceManager *manager)
- : Texture(stream, manager) {
-	m_value = Spectrum(stream);
-}
-
-void ConstantSpectrumTexture::serialize(Stream *stream, InstanceManager *manager) const {
-	Texture::serialize(stream, manager);
-
-	m_value.serialize(stream);
-}
-
-ref<Bitmap> ConstantSpectrumTexture::getBitmap(const Vector2i &sizeHint) const {
-	ref<Bitmap> result = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat, Vector2i(1, 1));
-	*((Spectrum *) result->getFloatData()) = m_value;
-	return result;
-}
-
-ConstantFloatTexture::ConstantFloatTexture(Stream *stream, InstanceManager *manager)
- : Texture(stream, manager) {
-	m_value = stream->readFloat();
-}
-
-void ConstantFloatTexture::serialize(Stream *stream, InstanceManager *manager) const {
-	Texture::serialize(stream, manager);
-	stream->writeFloat(m_value);
-}
-
-ref<Bitmap> ConstantFloatTexture::getBitmap(const Vector2i &sizeHint) const {
-	ref<Bitmap> result = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat, Vector2i(1, 1));
-	*result->getFloatData() = m_value;
-	return result;
-}
-
-SpectrumProductTexture::SpectrumProductTexture(Stream *stream, InstanceManager *manager)
- : Texture(stream, manager) {
-	m_a = static_cast<Texture *>(manager->getInstance(stream));
-	m_b = static_cast<Texture *>(manager->getInstance(stream));
-}
-
-void SpectrumProductTexture::serialize(Stream *stream, InstanceManager *manager) const {
-	Texture::serialize(stream, manager);
-	manager->serialize(stream, m_a.get());
-	manager->serialize(stream, m_b.get());
-}
-
-ref<Bitmap> SpectrumProductTexture::getBitmap(const Vector2i &sizeHint) const {
-	ref<Bitmap> bitmap1 = m_a->getBitmap(sizeHint);
-	ref<Bitmap> bitmap2 = m_b->getBitmap(sizeHint);
-	return Bitmap::arithmeticOperation(Bitmap::EMultiplication, bitmap1.get(), bitmap2.get());
-}
-
-SpectrumAdditionTexture::SpectrumAdditionTexture(Stream *stream, InstanceManager *manager)
- : Texture(stream, manager) {
-	m_a = static_cast<Texture *>(manager->getInstance(stream));
-	m_b = static_cast<Texture *>(manager->getInstance(stream));
-}
-
-void SpectrumAdditionTexture::serialize(Stream *stream, InstanceManager *manager) const {
-	Texture::serialize(stream, manager);
-	manager->serialize(stream, m_a.get());
-	manager->serialize(stream, m_b.get());
-}
-
-ref<Bitmap> SpectrumAdditionTexture::getBitmap(const Vector2i &sizeHint) const {
-	ref<Bitmap> bitmap1 = m_a->getBitmap(sizeHint);
-	ref<Bitmap> bitmap2 = m_b->getBitmap(sizeHint);
-	return Bitmap::arithmeticOperation(Bitmap::EAddition, bitmap1.get(), bitmap2.get());
-}
-
-SpectrumSubtractionTexture::SpectrumSubtractionTexture(Stream *stream, InstanceManager *manager)
- : Texture(stream, manager) {
-	m_a = static_cast<Texture *>(manager->getInstance(stream));
-	m_b = static_cast<Texture *>(manager->getInstance(stream));
-}
-
-void SpectrumSubtractionTexture::serialize(Stream *stream, InstanceManager *manager) const {
-	Texture::serialize(stream, manager);
-	manager->serialize(stream, m_a.get());
-	manager->serialize(stream, m_b.get());
-}
-
-ref<Bitmap> SpectrumSubtractionTexture::getBitmap(const Vector2i &sizeHint) const {
-	ref<Bitmap> bitmap1 = m_a->getBitmap(sizeHint);
-	ref<Bitmap> bitmap2 = m_b->getBitmap(sizeHint);
-	return Bitmap::arithmeticOperation(Bitmap::ESubtraction, bitmap1.get(), bitmap2.get());
-}
-
 class ConstantSpectrumTextureShader : public Shader {
 public:
 	ConstantSpectrumTextureShader(Renderer *renderer, const Spectrum &value)
@@ -294,14 +206,9 @@ Shader *SpectrumSubtractionTexture::createShader(Renderer *renderer) const {
 	return new SpectrumSubtractionTextureShader(renderer, m_a.get(), m_b.get());
 }
 
-MTS_IMPLEMENT_CLASS_S(ConstantSpectrumTexture, false, Texture)
 MTS_IMPLEMENT_CLASS(ConstantSpectrumTextureShader, false, Shader)
-MTS_IMPLEMENT_CLASS_S(ConstantFloatTexture, false, Texture)
 MTS_IMPLEMENT_CLASS(ConstantFloatTextureShader, false, Shader)
-MTS_IMPLEMENT_CLASS_S(SpectrumProductTexture, false, Texture)
 MTS_IMPLEMENT_CLASS(SpectrumProductTextureShader, false, Shader)
-MTS_IMPLEMENT_CLASS_S(SpectrumAdditionTexture, false, Texture)
 MTS_IMPLEMENT_CLASS(SpectrumAdditionTextureShader, false, Shader)
-MTS_IMPLEMENT_CLASS_S(SpectrumSubtractionTexture, false, Texture)
 MTS_IMPLEMENT_CLASS(SpectrumSubtractionTextureShader, false, Shader)
 MTS_NAMESPACE_END

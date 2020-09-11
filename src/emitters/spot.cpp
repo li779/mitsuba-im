@@ -17,7 +17,10 @@
 */
 
 #include <mitsuba/render/scene.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -226,7 +229,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -236,6 +241,7 @@ private:
 	Float m_cosBeamWidth, m_cosCutoffAngle, m_invTransitionWidth;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class SpotEmitterShader : public Shader {
@@ -321,6 +327,7 @@ Shader *SpotEmitter::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(SpotEmitterShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(SpotEmitter, false, Emitter)
 MTS_EXPORT_PLUGIN(SpotEmitter, "Spot light");
 MTS_NAMESPACE_END

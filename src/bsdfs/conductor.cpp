@@ -18,8 +18,10 @@
 
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/core/fresolver.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
-#include <boost/algorithm/string.hpp>
+#endif
 #include "ior.h"
 
 MTS_NAMESPACE_BEGIN
@@ -159,14 +161,14 @@ public:
 		std::string materialName = props.getString("material", "Cu");
 
 		Spectrum intEta, intK;
-		if (boost::to_lower_copy(materialName) == "none") {
+		if (to_lower_copy(materialName) == "none") {
 			intEta = Spectrum(0.0f);
 			intK = Spectrum(1.0f);
 		} else {
 			intEta.fromContinuousSpectrum(InterpolatedSpectrum(
-				fResolver->resolve("data/ior/" + materialName + ".eta.spd")));
+				fResolver->resolve(fs::pathstr("data/ior/" + materialName + ".eta.spd"))));
 			intK.fromContinuousSpectrum(InterpolatedSpectrum(
-				fResolver->resolve("data/ior/" + materialName + ".k.spd")));
+				fResolver->resolve(fs::pathstr("data/ior/" + materialName + ".k.spd"))));
 		}
 
 		Float extEta = lookupIOR(props, "extEta", "air");
@@ -299,7 +301,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -308,6 +312,7 @@ private:
 	Spectrum m_k;
 };
 
+#ifdef MTS_HAS_HW
 /* Smooth conductor shader -- it is really hopeless to visualize
    this material in the VPL renderer, so let's try to do at least
    something that suggests the presence of a specularly-reflecting
@@ -405,6 +410,7 @@ Shader *SmoothConductor::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(SmoothConductorShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(SmoothConductor, false, BSDF)
 MTS_EXPORT_PLUGIN(SmoothConductor, "Smooth conductor");
 MTS_NAMESPACE_END

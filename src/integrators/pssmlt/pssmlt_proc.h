@@ -45,6 +45,8 @@ public:
 	void bindResource(const std::string &name, int id);
 	EStatus generateWork(WorkUnit *unit, int worker);
 
+	static ref<ResponsiveIntegrator> makeResponsiveIntegrator(Integrator* mlt, const PSSMLTConfiguration *config);
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor

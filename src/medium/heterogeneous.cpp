@@ -19,7 +19,7 @@
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/volume.h>
 #include <mitsuba/core/statistics.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/util.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -192,7 +192,7 @@ public:
 		if (props.hasProperty("densityMultiplier"))
 			Log(EError, "The 'densityMultiplier' parameter has been deprecated and is now called 'scale'.");
 
-		std::string method = boost::to_lower_copy(props.getString("method", "woodcock"));
+		std::string method = to_lower_copy(props.getString("method", "woodcock"));
 		if (method == "woodcock")
 			m_method = EWoodcockTracking;
 		else if (method == "simpson")
@@ -668,15 +668,15 @@ public:
 			Float mintDensity = lookupDensity(ray(ray.mint), ray.d) * m_scale;
 			Float maxtDensity = 0.0f;
 			Spectrum maxtAlbedo(0.0f);
-            Vector orientation(0.0f);
+			Vector orientation(0.0f);
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
 				maxtDensity = lookupDensity(p, ray.d) * m_scale;
 				maxtAlbedo = m_albedo->lookupSpectrum(p);
-                orientation = m_orientation != NULL
-                             ? m_orientation->lookupVector(p) : Vector(0.0f);
+				orientation = m_orientation != NULL
+							 ? m_orientation->lookupVector(p) : Vector(0.0f);
 			}
-            mRec.orientation = orientation;
+			mRec.orientation = orientation;
 			mRec.transmittance = Spectrum(expVal);
 			mRec.pdfFailure = expVal;
 			mRec.pdfSuccess = expVal * maxtDensity;

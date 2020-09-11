@@ -17,7 +17,11 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/shape.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include <mitsuba/core/warp.h>
 #include "microfacet.h"
 #include "rtrans.h"
@@ -546,7 +550,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -562,6 +568,7 @@ private:
 	bool m_sampleVisible;
 };
 
+#ifdef MTS_HAS_HW
 /**
  * GLSL port of the rough plastic shader. This version is much more
  * approximate -- it only supports the Beckmann distribution,
@@ -681,6 +688,7 @@ Shader *RoughPlastic::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(RoughPlasticShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(RoughPlastic, false, BSDF)
 MTS_EXPORT_PLUGIN(RoughPlastic, "Rough plastic BRDF");
 MTS_NAMESPACE_END

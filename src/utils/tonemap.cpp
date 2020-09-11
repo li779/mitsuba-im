@@ -22,7 +22,6 @@
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/algorithm/string.hpp>
 #if defined(WIN32)
 # include <mitsuba/core/getopt.h>
 #endif
@@ -151,7 +150,7 @@ public:
 					break;
 
 				case 'f': {
-					  std::string fmt = boost::to_lower_copy(std::string(optarg));
+					  std::string fmt = to_lower_copy(std::string(optarg));
 					  if (fmt == "png")
 						  format = Bitmap::EPNG;
 					  else if (fmt == "jpg" || fmt == "jpeg")

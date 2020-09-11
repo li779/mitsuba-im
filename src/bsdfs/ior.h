@@ -20,7 +20,6 @@
 #define __IOR_DATA_H
 
 #include <mitsuba/mitsuba.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -67,7 +66,7 @@ static IOREntry iorData[] = {
 };
 
 static Float lookupIOR(const std::string &name) {
-	std::string lowerCase = boost::to_lower_copy(name);
+	std::string lowerCase = to_lower_copy(name);
 	IOREntry *ior = iorData;
 
 	while (ior->name) {

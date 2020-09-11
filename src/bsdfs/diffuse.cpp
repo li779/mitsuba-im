@@ -17,8 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
-#include <mitsuba/render/texture.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include <mitsuba/core/warp.h>
 
 MTS_NAMESPACE_BEGIN
@@ -177,13 +179,16 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
 	ref<Texture> m_reflectance;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class SmoothDiffuseShader : public Shader {
@@ -230,6 +235,7 @@ Shader *SmoothDiffuse::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(SmoothDiffuseShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(SmoothDiffuse, false, BSDF)
 MTS_EXPORT_PLUGIN(SmoothDiffuse, "Smooth diffuse BRDF")
 MTS_NAMESPACE_END

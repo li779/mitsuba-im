@@ -29,10 +29,11 @@
 #include <xercesc/util/TransService.hpp>
 #include <xercesc/sax/Locator.hpp>
 #include <mitsuba/render/scenehandler.h>
+#include <mitsuba/render/sceneloader.h>
 #include <mitsuba/core/fresolver.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/render/scene.h>
-#include <boost/algorithm/string.hpp>
-#include <boost/unordered_set.hpp>
+#include <unordered_set>
 
 MTS_NAMESPACE_BEGIN
 XERCES_CPP_NAMESPACE_USE
@@ -46,7 +47,7 @@ XERCES_CPP_NAMESPACE_USE
 	## __VA_ARGS__)
 
 typedef void (*CleanupFun) ();
-typedef boost::unordered_set<CleanupFun> CleanupSet;
+typedef std::unordered_set<CleanupFun> CleanupSet;
 static PrimitiveThreadLocal<CleanupSet> __cleanup_tls;
 
 SceneHandler::SceneHandler(const ParameterMap &params,
@@ -273,7 +274,7 @@ void pushSceneCleanupHandler(void (*cleanup)()) {
 void SceneHandler::endElement(const XMLCh* const xmlName) {
 	std::string name = transcode(xmlName);
 	ParseContext &context = m_context.top();
-	std::string type = boost::to_lower_copy(context.attributes["type"]);
+	std::string type = to_lower_copy(context.attributes["type"]);
 	context.properties.setPluginName(type);
 	if (context.attributes.find("id") != context.attributes.end())
 		context.properties.setID(context.attributes["id"]);
@@ -464,7 +465,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 					intent = Spectrum::EIlluminant;
 
 				if (context.attributes.find("intent") != context.attributes.end()) {
-					std::string intentString = boost::to_lower_copy(context.attributes["intent"]);
+					std::string intentString = to_lower_copy(context.attributes["intent"]);
 					if (intentString == "reflectance")
 						intent = Spectrum::EReflectance;
 					else if (intentString == "illuminant")
@@ -558,7 +559,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 					if (hasIntent)
 						XMLLog(EError, "<spectrum>: 'intent' and 'filename' cannot be specified at the same time!");
 					FileResolver *resolver = Thread::getThread()->getFileResolver();
-					fs::path path = resolver->resolve(context.attributes["filename"]);
+					fs::pathstr path = resolver->resolve(fs::pathstr(context.attributes["filename"]));
 					InterpolatedSpectrum interp(path);
 					interp.zeroExtend();
 					Spectrum discrete;
@@ -575,7 +576,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 							intent = Spectrum::EIlluminant;
 
 						if (hasIntent) {
-							std::string intentString = boost::to_lower_copy(context.attributes["intent"]);
+							std::string intentString = to_lower_copy(context.attributes["intent"]);
 							if (intentString == "reflectance")
 								intent = Spectrum::EReflectance;
 							else if (intentString == "illuminant")
@@ -658,22 +659,22 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 		case EInclude: {
 				SAXParser* parser = new SAXParser();
 				FileResolver *resolver = Thread::getThread()->getFileResolver();
-				fs::path schemaPath = resolver->resolveAbsolute("data/schema/scene.xsd");
+				fs::pathstr schemaPath = resolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
 
 				/* Check against the 'scene.xsd' XML Schema */
 				parser->setDoSchema(true);
 				parser->setValidationSchemaFullChecking(true);
 				parser->setValidationScheme(SAXParser::Val_Always);
-				parser->setExternalNoNamespaceSchemaLocation(schemaPath.c_str());
+				parser->setExternalNoNamespaceSchemaLocation(schemaPath.s.c_str());
 
 				/* Set the handler and start parsing */
 				SceneHandler *handler = new SceneHandler(m_params, m_namedObjects, true);
 				parser->setDoNamespaces(true);
 				parser->setDocumentHandler(handler);
 				parser->setErrorHandler(handler);
-				fs::path path = resolver->resolve(context.attributes["filename"]);
-				XMLLog(EInfo, "Parsing included file \"%s\" ..", path.filename().string().c_str());
-				parser->parse(path.c_str());
+				fs::pathstr path = resolver->resolve(fs::pathstr(context.attributes["filename"]));
+				XMLLog(EInfo, "Parsing included file \"%s\" ..", path.s.c_str());
+				parser->parse(path.s.c_str());
 
 				object = handler->getScene();
 				delete parser;
@@ -821,25 +822,25 @@ void SceneHandler::fatalError(const SAXParseException& e) {
 
 // -----------------------------------------------------------------------
 
-ref<Scene> SceneHandler::loadScene(const fs::path &filename, const ParameterMap &params) {
+ref<Scene> SceneHandler::loadScene(const fs::pathstr &filename, const ParameterMap &params) {
 	/* Prepare for parsing scene descriptions */
 	FileResolver *resolver = Thread::getThread()->getFileResolver();
 	SAXParser* parser = new SAXParser();
-	fs::path schemaPath = resolver->resolveAbsolute("data/schema/scene.xsd");
-	SLog(EDebug, "Loading scene \"%s\" ..", filename.string().c_str());
+	fs::pathstr schemaPath = resolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
+	SLog(EDebug, "Loading scene \"%s\" ..", filename.s.c_str());
 
 	/* Check against the 'scene.xsd' XML Schema */
 	parser->setDoSchema(true);
 	parser->setValidationSchemaFullChecking(true);
 	parser->setValidationScheme(SAXParser::Val_Always);
-	parser->setExternalNoNamespaceSchemaLocation(schemaPath.c_str());
+	parser->setExternalNoNamespaceSchemaLocation(schemaPath.s.c_str());
 
 	SceneHandler *handler = new SceneHandler(params);
 	parser->setDoNamespaces(true);
 	parser->setDocumentHandler(handler);
 	parser->setErrorHandler(handler);
 
-	parser->parse(filename.c_str());
+	parser->parse(filename.s.c_str());
 	ref<Scene> scene = handler->getScene();
 
 	delete parser;
@@ -852,13 +853,13 @@ ref<Scene> SceneHandler::loadSceneFromString(const std::string &content, const P
 	/* Prepare for parsing scene descriptions */
 	FileResolver *resolver = Thread::getThread()->getFileResolver();
 	SAXParser* parser = new SAXParser();
-	fs::path schemaPath = resolver->resolveAbsolute("data/schema/scene.xsd");
+	fs::pathstr schemaPath = resolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
 
 	/* Check against the 'scene.xsd' XML Schema */
 	parser->setDoSchema(true);
 	parser->setValidationSchemaFullChecking(true);
 	parser->setValidationScheme(SAXParser::Val_Always);
-	parser->setExternalNoNamespaceSchemaLocation(schemaPath.c_str());
+	parser->setExternalNoNamespaceSchemaLocation(schemaPath.s.c_str());
 
 	SceneHandler *handler = new SceneHandler(params);
 	parser->setDoNamespaces(true);
@@ -879,6 +880,57 @@ ref<Scene> SceneHandler::loadSceneFromString(const std::string &content, const P
 	return scene;
 }
 
+SceneLoader::SceneLoader(ParameterMap const& parameters, fs::pathstr const &schemaPathIn) {
+	this->handler.reset( new SceneHandler(parameters) );
+
+	fs::pathstr schemaPath = schemaPathIn;
+	if (schemaPath.s.empty())
+		schemaPath = Thread::getThread()->getFileResolver()->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
+
+	/* Prepare for parsing scene descriptions */
+	SAXParser* parser = new SAXParser();
+	this->parser = parser;
+
+	/* Check against the 'scene.xsd' XML Schema */
+	parser->setDoSchema(true);
+	parser->setValidationSchemaFullChecking(true);
+	parser->setValidationScheme(SAXParser::Val_Always);
+	parser->setExternalNoNamespaceSchemaLocation(schemaPath.s.c_str());
+
+	/* Set the handler */
+	parser->setDoNamespaces(true);
+	parser->setDocumentHandler(handler.get());
+	parser->setErrorHandler(handler.get());
+}
+
+SceneLoader::~SceneLoader() {
+	SAXParser* parser = static_cast<SAXParser*>(this->parser);
+	delete parser;
+}
+
+ref<Scene> SceneLoader::load(fs::pathstr const &file) {
+	SAXParser* parser = static_cast<SAXParser*>(this->parser);
+
+	struct DocResolver {
+		ref<FileResolver> resolver = Thread::getThread()->getFileResolver();
+		ref<FileResolver> docResolver = resolver->clone();
+
+		DocResolver(fs::pathstr const &file) {
+			fs::path docDir = fs::absolute(fs::decode_pathstr(file)).parent_path();
+			docResolver->appendPath(fs::encode_pathstr(docDir));
+			Thread::getThread()->setFileResolver(docResolver);
+		}
+		~DocResolver() {
+			Thread::getThread()->setFileResolver(resolver);
+		}
+	} docPathGuard(file);
+
+	parser->parse(file.s.c_str()); // todo: xerces might not handle arbirary special char paths in UTF-8 encoding?
+	return handler->getScene();
+}
+
+void SceneLoader::staticInitialization() { SceneHandler::staticInitialization(); }
+void SceneLoader::staticShutdown() { SceneHandler::staticShutdown(); }
 
 void SceneHandler::staticInitialization() {
 	/* Initialize Xerces-C */
@@ -894,6 +946,6 @@ void SceneHandler::staticShutdown() {
 	XMLPlatformUtils::Terminate();
 }
 
-VersionException::~VersionException() throw () {}
+VersionException::~VersionException() noexcept {}
 
 MTS_NAMESPACE_END

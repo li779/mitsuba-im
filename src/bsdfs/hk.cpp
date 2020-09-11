@@ -21,7 +21,10 @@
 #include <mitsuba/render/phase.h>
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/plugin.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include "../medium/materials.h"
 
 MTS_NAMESPACE_BEGIN
@@ -427,7 +430,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -440,7 +445,7 @@ private:
 	ref<Texture> m_albedo;
 };
 
-
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 /**
@@ -505,6 +510,7 @@ Shader *HanrahanKrueger::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(HanrahanKruegerShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(HanrahanKrueger, false, BSDF)
 MTS_EXPORT_PLUGIN(HanrahanKrueger, "Hanrahan-Krueger BSDF");
 MTS_NAMESPACE_END

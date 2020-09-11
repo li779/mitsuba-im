@@ -21,19 +21,21 @@
 #define __MITSUBA_MITSUBA_H_
 
 #include <mitsuba/core/platform.h>
-#include <boost/version.hpp>
+//#include <boost/version.hpp>
 #include <sstream>
 #include <string>
+#include <memory>
 #include <map>
 #include <iostream>
 #include <vector>
 #include <cmath>
 #include <algorithm>
-#include <limits.h>
-#include <stdio.h>
-#include <string.h>
+#include <climits>
+#include <cstdio>
+#include <cstring>
 #include <stdexcept>
 #include <limits>
+#include <cassert>
 
 using std::cout;
 using std::cerr;

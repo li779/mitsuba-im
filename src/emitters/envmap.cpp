@@ -17,14 +17,16 @@
 */
 
 #include <mitsuba/render/scene.h>
+#include <mitsuba/core/filesystem.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/mstream.h>
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/timer.h>
 #include <mitsuba/render/mipmap.h>
-#include <mitsuba/hw/gpuprogram.h>
-#include <mitsuba/hw/gputexture.h>
+#ifdef MTS_HAS_HW
+#include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -114,15 +116,15 @@ public:
 			/* Support initialization via raw data passed from another plugin */
 			bitmap = reinterpret_cast<Bitmap *>(props.getData("bitmap").ptr);
 		} else {
-			m_filename = Thread::getThread()->getFileResolver()->resolve(
-				props.getString("filename"));
+			m_filename = fs::decode_pathstr(Thread::getThread()->getFileResolver()->resolve(
+				fs::pathstr(props.getString("filename"))));
 
 			Log(EInfo, "Loading environment map \"%s\"", m_filename.filename().string().c_str());
 			if (!fs::exists(m_filename))
 				Log(EError, "Environment map file \"%s\" could not be found!", m_filename.string().c_str());
 
-			boost::system::error_code ec;
-			timestamp = (uint64_t) fs::last_write_time(m_filename, ec);
+			std::error_code ec;
+			timestamp = (uint64_t) fs::last_write_time(m_filename, ec).time_since_epoch().count();
 			if (ec.value())
 				Log(EError, "Could not determine modification time of \"%s\"!", m_filename.string().c_str());
 
@@ -141,16 +143,17 @@ public:
 		EMIPFilterType filterType = EEWA;
 		Float maxAnisotropy = 10.0f;
 
-		if (tryReuseCache && MIPMap::validateCacheFile(cacheFile, timestamp,
+		fs::pathstr scacheFile = fs::encode_pathstr(cacheFile);
+		if (tryReuseCache && MIPMap::validateCacheFile(scacheFile, timestamp,
 				ENVMAP_PIXELFORMAT, ReconstructionFilter::ERepeat,
 				ReconstructionFilter::EClamp, filterType, m_gamma)) {
 			/* Reuse an existing MIP map cache file */
-			m_mipmap = new MIPMap(cacheFile, maxAnisotropy);
+			m_mipmap = new MIPMap(scacheFile, maxAnisotropy);
 		} else {
 			if (bitmap == NULL) {
 				/* Load the input image if necessary */
 				ref<Timer> timer = new Timer();
-				ref<FileStream> fs = new FileStream(m_filename, FileStream::EReadOnly);
+				ref<FileStream> fs = new FileStream(fs::encode_pathstr(m_filename), FileStream::EReadOnly);
 				bitmap = new Bitmap(Bitmap::EAuto, fs);
 				if (m_gamma != 0)
 					bitmap->setGamma(m_gamma);
@@ -177,7 +180,7 @@ public:
 
 			m_mipmap = new MIPMap(bitmap, ENVMAP_PIXELFORMAT, Bitmap::EFloat,
 				rfilter, ReconstructionFilter::ERepeat, ReconstructionFilter::EClamp,
-				filterType, maxAnisotropy, createCache ? cacheFile : fs::path(), timestamp,
+				filterType, maxAnisotropy, createCache ? scacheFile : fs::pathstr(), timestamp,
 				std::numeric_limits<Float>::infinity(), Spectrum::EIlluminant);
 		}
 
@@ -190,7 +193,7 @@ public:
 
 	EnvironmentMap(Stream *stream, InstanceManager *manager) : Emitter(stream, manager),
 			m_mipmap(NULL), m_cdfRows(NULL), m_cdfCols(NULL), m_rowWeights(NULL) {
-		m_filename = stream->readString();
+		m_filename = fs::decode_pathstr(fs::pathstr(stream->readString()));
 		Log(EDebug, "Unserializing texture \"%s\"", m_filename.filename().string().c_str());
 		m_gamma = stream->readFloat();
 		m_scale = stream->readFloat();
@@ -215,7 +218,7 @@ public:
 
 		m_mipmap = new MIPMap(bitmap, ENVMAP_PIXELFORMAT, Bitmap::EFloat, rfilter,
 			ReconstructionFilter::ERepeat, ReconstructionFilter::EClamp, EEWA, 10.0f,
-			fs::path(), 0, std::numeric_limits<Float>::infinity(), Spectrum::EIlluminant);
+			fs::pathstr(), 0, std::numeric_limits<Float>::infinity(), Spectrum::EIlluminant);
 
 		configure();
 	}
@@ -233,7 +236,7 @@ public:
 
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		Emitter::serialize(stream, manager);
-		stream->writeString(m_filename.string());
+		stream->writeString(fs::encode_pathstr(m_filename).s);
 		stream->writeFloat(m_gamma);
 		stream->writeFloat(m_scale);
 		m_sceneBSphere.serialize(stream);
@@ -242,7 +245,7 @@ public:
 		if (!m_filename.empty() && fs::exists(m_filename)) {
 			/* We still have access to the original image -- use that, since
 			   it is probably much smaller than the in-memory representation */
-			ref<Stream> is = new FileStream(m_filename, FileStream::EReadOnly);
+			ref<Stream> is = new FileStream(fs::encode_pathstr(m_filename), FileStream::EReadOnly);
 			stream->writeSize(is->getSize());
 			is->copyTo(stream);
 		} else {
@@ -649,7 +652,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -675,6 +680,7 @@ private:
 	Vector2 m_pixelSize;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class EnvironmentMapShader : public Shader {
@@ -767,6 +773,7 @@ Shader *EnvironmentMap::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(EnvironmentMapShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(EnvironmentMap, false, Emitter)
 MTS_EXPORT_PLUGIN(EnvironmentMap, "Environment map");
 MTS_NAMESPACE_END

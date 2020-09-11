@@ -110,7 +110,7 @@ file (GLOB PYBINDINGS "${CMAKE_INSTALL_PREFIX}/@MTS_PYTHON_DEST@/*")
 
 # Get an executable or just the bundle name for fixup
 if (NOT DEFINED BUILD_GUI)
-  set (BUILD_GUI @BUILD_GUI@)
+  set (BUILD_GUI @BUILD_QTGUI@)
 endif ()
 if (NOT APPLE OR NOT BUILD_GUI)
   get_filename_component(EXEDIR "${CMAKE_INSTALL_PREFIX}/@MTS_EXE_DEST@" ABSOLUTE)

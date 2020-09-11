@@ -17,7 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 #include <mitsuba/core/warp.h>
 
 MTS_NAMESPACE_BEGIN
@@ -286,7 +289,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
@@ -295,6 +300,7 @@ private:
 	bool m_useFastApprox;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class RoughDiffuseShader : public Shader {
@@ -363,6 +369,7 @@ Shader *RoughDiffuse::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(RoughDiffuseShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(RoughDiffuse, false, BSDF)
 MTS_EXPORT_PLUGIN(RoughDiffuse, "Rough diffuse BRDF")
 MTS_NAMESPACE_END

@@ -21,6 +21,9 @@ find_path(Eigen_INCLUDE_DIR Eigen/Core
 )
 if(Eigen_INCLUDE_DIR)
   mark_as_advanced(Eigen_INCLUDE_DIR)
+  # consistency w/ modern modules
+  set(Eigen_INCLUDE_DIRS ${Eigen_INCLUDE_DIR})
+  mark_as_advanced(Eigen_INCLUDE_DIRS)
 endif()
 
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(Eigen DEFAULT_MSG Eigen_INCLUDE_DIR)

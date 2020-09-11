@@ -20,7 +20,6 @@
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/algorithm/string.hpp>
 #if defined(WIN32)
 #include <mitsuba/core/getopt.h>
 #endif
@@ -154,7 +153,7 @@ public:
 		ref<Scene> scene;
 		ref<ShapeKDTree> kdtree;
 
-		std::string lowercase = boost::to_lower_copy(std::string(argv[optind]));
+		std::string lowercase = to_lower_copy(std::string(argv[optind]));
 		if (boost::ends_with(lowercase, ".xml")) {
 			fs::path
 				filename = fileResolver->resolve(argv[optind]),

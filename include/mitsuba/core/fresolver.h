@@ -21,9 +21,6 @@
 #define __MITSUBA_CORE_FRESOLVER_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <deque>
 
 MTS_NAMESPACE_BEGIN
 
@@ -47,6 +44,8 @@ public:
 	 * directory as the initial search path.
 	 */
 	FileResolver();
+	FileResolver(const FileResolver&);
+	FileResolver& operator =(const FileResolver&) = delete;
 
 	/**
 	 * \brief Resolve a file using the stored list of search paths
@@ -55,7 +54,7 @@ public:
 	 * supplied path with respect to each one. If everything fails,
 	 * the path is returned as-is.
 	 */
-	fs::path resolve(const fs::path &path) const;
+	fs::pathstr resolve(fs::pathstr const& path) const;
 
 	/**
 	 * \brief Resolve a file using the stored list of search paths
@@ -63,40 +62,40 @@ public:
 	 * In comparison to \ref resolve(), this funtion returns all
 	 * matches instead of only the first one.
 	 */
-	std::vector<fs::path> resolveAll(const fs::path &path) const;
+	std::vector<fs::pathstr> resolveAll(fs::pathstr const& path) const;
 
 	/**
 	 * \brief Does the same as \ref resolve(), but returns an
 	 * absolute path.
 	 */
-	fs::path resolveAbsolute(const fs::path &path) const;
+	fs::pathstr resolveAbsolute(fs::pathstr const& path) const;
 
 	/// Create a clone of the file resolver
 	FileResolver *clone() const;
 
 	/// Append a search path to the resolver
-	void appendPath(const fs::path &path);
+	void appendPath(fs::pathstr const& path);
 
 	/// Prepend a search path to the resolver
-	void prependPath(const fs::path &path);
+	void prependPath(fs::pathstr const& path);
 
 	/// Clear all stored search paths
 	void clear();
 
 	/// Return the number of stored paths
-	inline size_t getPathCount() const { return m_paths.size(); }
+	size_t getPathCount() const;
 
 	/// Return one of the stored paths
-	inline const fs::path &getPath(size_t index) const { return m_paths[index]; }
+	fs::pathstr getPath(size_t index) const;
 
 	/// Return a human-readable string representation
 	std::string toString() const;
 
 	MTS_DECLARE_CLASS()
 protected:
-	virtual ~FileResolver() { }
+	virtual ~FileResolver();
 private:
-	std::deque<fs::path> m_paths;
+	std::vector<fs::pathdat> m_paths;
 };
 
 MTS_NAMESPACE_END

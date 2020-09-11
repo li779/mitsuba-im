@@ -1,24 +1,21 @@
 # Experimental CMake file for Mitusba
-# Tested only on Windows and Linux (Ubuntu 10.10)
-cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
+
+# ===== Project setup =====
 
 # Allow to override the default project name "mitsuba"
 if (NOT DEFINED MTS_PROJECT_NAME)
   set(MTS_PROJECT_NAME "mitsuba")
 endif()
 
-# Remove Debug from CMAKE_CONFIGURATION_TYPES as the dependencies do not contain the necessary debug libraries
-if(MSVC AND CMAKE_CONFIGURATION_TYPES)
-  set(CMAKE_CONFIGURATION_TYPES Release MinSizeRel RelWithDebInfo)
-  set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}" CACHE STRING
-    "Remove Debug from available configuration types"
-     FORCE)
-endif()
-
 # Set CMAKE_BUILD_TYPE to Release by default
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING
     "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
+endif()
+
+if (NOT DEFINED MTS_TARGET_BINARIES_DIR)
+  set(MTS_TARGET_BINARIES_DIR ${CMAKE_CURRENT_BINARY_DIR}/binaries/$<CONFIG>)
 endif()
 
 option(MTS_USE_PCH "Use precompiled headers (PCH)." ON)
@@ -33,51 +30,30 @@ endif ()
 # Tell cmake where to find the additional modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake")
 # Make sure the cmake-provided modules use the versions they expect
-if(NOT CMAKE_VERSION VERSION_LESS "2.8.4")
-  cmake_policy(SET CMP0017 NEW)
-endif()
+cmake_policy(SET CMP0017 NEW)
+# Allow for quoted macro variable checks :-////
+cmake_policy(SET CMP0054 NEW)
 
 # Enable folders for projects in Visual Studio
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endif()
 
-# make config 'RelWithDebInfo' debuggable by disabling optimizations
-if(MSVC)
-  # /MD link against release libs, /Od disable optimizations, /Ob0
-  if(CMAKE_C_FLAGS_RELWITHDEBINFO MATCHES "/O2")
-    string(REGEX REPLACE "/O2" "/Od" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-  endif()
-  if(CMAKE_CXX_FLAGS_RELWITHDEBINFO MATCHES "/O2")
-    string(REGEX REPLACE "/O2" "/Od" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-  endif()
-  if(CMAKE_C_FLAGS_RELWITHDEBINFO MATCHES "/Ob1")
-    string(REGEX REPLACE "/Ob1" "/Ob0" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-  endif()
-  if(CMAKE_CXX_FLAGS_RELWITHDEBINFO MATCHES "/Ob1")
-    string(REGEX REPLACE "/Ob1" "/Ob0" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-  endif()
-  set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /RTC1")
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /RTC1")
-  list(REMOVE_DUPLICATES CMAKE_C_FLAGS_RELWITHDEBINFO)
-  list(REMOVE_DUPLICATES CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-endif()
-
 # Load the required modules
-include (MitsubaUtil)
-include (MtsGetVersionInfo)
+include (CMakeParseArguments)
 include (CheckCXXSourceCompiles)
 include (CMakeDependentOption)
 
+include (MtsGetVersionInfo)
 # Read the version information
 MTS_GET_VERSION_INFO()
 if (MTS_HAS_VALID_REV)
-  message(STATUS "mitsuba ${MTS_VERSION}-hg${MTS_REV_ID} (${MTS_DATE})")
+  message(STATUS "mitsuba ${MTS_VERSION}-git${MTS_REV_ID} (${MTS_DATE})")
 else()
   message(STATUS "mitsuba ${MTS_VERSION} (${MTS_DATE})")
 endif()
 
-# Setup the build options
+include (MitsubaUtil)
 include (MitsubaBuildOptions)
 
 # Find the external libraries and setup the paths
@@ -95,7 +71,6 @@ add_subdirectory(data/ior)
 # Microfacet precomputed data
 add_subdirectory(data/microfacet)
 
-
 # ===== Build the support libraries ====
 
 # Core support library
@@ -103,7 +78,9 @@ add_subdirectory(src/libcore)
 # Rendering-related APIs
 add_subdirectory(src/librender)
 # Hardware acceleration
-add_subdirectory(src/libhw)
+if (MTS_HAS_HW)
+	add_subdirectory(src/libhw)
+endif ()
 # Bidirectional support library
 add_subdirectory(src/libbidir)
 # Python binding library
@@ -140,17 +117,21 @@ else()
 endif()
 
 # Build the Qt-based GUI binaries
-if (BUILD_GUI)
+if (BUILD_QTGUI)
   add_subdirectory(src/mtsgui)
 elseif(NOT QT4_FOUND)
   message(STATUS "Qt4 was not found. The mitsuba gui will not be built.")
 endif()
 
+# Build IM-MTS
+if (BUILD_IMGUI)
+	add_subdirectory(src/im-mts)
+endif()
 
 # ===== Build the plugins =====
 
 # Utilities
-add_subdirectory(src/utils)
+#add_subdirectory(src/utils) #todo: convert to std c++
 # Surface scattering models
 add_subdirectory(src/bsdfs)
 # Phase functions
@@ -178,7 +159,9 @@ add_subdirectory(src/textures)
 # Integrators
 add_subdirectory(src/integrators)
 # Testcases
-add_subdirectory(src/tests)
+if (BUILD_TESTS)
+  add_subdirectory(src/tests)
+endif()
 
 
 # ===== Packaging =====

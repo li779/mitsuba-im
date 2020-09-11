@@ -19,7 +19,9 @@
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/shape.h>
 #include <mitsuba/core/properties.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/gpuprogram.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -119,7 +121,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
@@ -127,6 +131,7 @@ protected:
 	Spectrum m_color0;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class CheckerboardShader : public Shader {
@@ -187,6 +192,7 @@ Shader *Checkerboard::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(CheckerboardShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(Checkerboard, false, Texture2D)
 MTS_EXPORT_PLUGIN(Checkerboard, "Checkerboard texture");
 MTS_NAMESPACE_END

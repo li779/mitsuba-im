@@ -17,7 +17,10 @@
 */
 
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/basictexture.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -241,7 +244,9 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 protected:
@@ -249,6 +254,7 @@ protected:
 	ref<BSDF> m_nestedBSDF;
 };
 
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 /**
@@ -302,6 +308,7 @@ Shader *Mask::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(MaskShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(Mask, false, BSDF)
 MTS_EXPORT_PLUGIN(Mask, "Mask BSDF");
 MTS_NAMESPACE_END

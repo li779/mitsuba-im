@@ -20,6 +20,7 @@
 #define __MATERIAL_DATA_H
 
 #include "../bsdfs/ior.h"
+#include <mitsuba/core/filesystem.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -106,13 +107,13 @@ static void lookupMaterial(const Properties &props, Spectrum &sigmaS, Spectrum &
 			"sigmaT & albedo, but no other combinations!");
 
 	std::string material =
-		boost::to_lower_copy(props.getString("material", "Skin1"));
+		to_lower_copy(props.getString("material", "Skin1"));
 
 	/* Start with a preset */
 	bool found = false;
 	MaterialEntry *matEntry = materialData;
 	while (matEntry->name) {
-		if (material == boost::to_lower_copy(std::string(matEntry->name))) {
+		if (material == to_lower_copy(std::string(matEntry->name))) {
 			sigmaS.fromLinearRGB(
 				matEntry->sigmaS[0],
 				matEntry->sigmaS[1],

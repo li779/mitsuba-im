@@ -19,7 +19,9 @@
 #include <mitsuba/render/emitter.h>
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/track.h>
+#ifdef MTS_HAS_HW
 #include <mitsuba/hw/gpuprogram.h>
+#endif
 #include <mitsuba/core/warp.h>
 
 MTS_NAMESPACE_BEGIN
@@ -164,14 +166,16 @@ public:
 		return oss.str();
 	}
 
+#ifdef MTS_HAS_HW
 	Shader *createShader(Renderer *renderer) const;
+#endif
 
 	MTS_DECLARE_CLASS()
 private:
 	Spectrum m_intensity;
 };
 
-
+#ifdef MTS_HAS_HW
 // ================ Hardware shader implementation ================
 
 class PointEmitterShader : public Shader {
@@ -213,6 +217,7 @@ Shader *PointEmitter::createShader(Renderer *renderer) const {
 }
 
 MTS_IMPLEMENT_CLASS(PointEmitterShader, false, Shader)
+#endif
 MTS_IMPLEMENT_CLASS_S(PointEmitter, false, Emitter)
 MTS_EXPORT_PLUGIN(PointEmitter, "Point emitter");
 MTS_NAMESPACE_END

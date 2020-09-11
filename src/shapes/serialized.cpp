@@ -22,8 +22,8 @@
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/lrucache.h>
-
-#include <boost/make_shared.hpp>
+#include <mitsuba/core/thread.h>
+#include <mitsuba/core/filesystem.h>
 
 /// How many files to keep open in the cache, per thread
 #define MTS_SERIALIZED_CACHE_SIZE 4
@@ -146,8 +146,8 @@ extern MTS_EXPORT_RENDER void pushSceneCleanupHandler(void (*cleanup)());
 class SerializedMesh : public TriMesh {
 public:
 	SerializedMesh(const Properties &props) : TriMesh(props) {
-		fs::path filePath = Thread::getThread()->getFileResolver()->resolve(
-			props.getString("filename"));
+		fs::path filePath = fs::decode_pathstr(Thread::getThread()->getFileResolver()->resolve(
+			fs::pathstr(props.getString("filename"))));
 
 		/* Object-space -> World-space transformation */
 		Transform objectToWorld = props.getTransform("toWorld", Transform());
@@ -227,7 +227,7 @@ private:
 	class MeshLoader {
 	public:
 		MeshLoader(const fs::path& filePath) {
-			m_fstream = new FileStream(filePath, FileStream::EReadOnly);
+			m_fstream = new FileStream(fs::encode_pathstr(filePath), FileStream::EReadOnly);
 			m_fstream->setByteOrder(Stream::ELittleEndian);
 			const short version = SerializedMesh::readHeader(m_fstream);
 			if (SerializedMesh::readOffsetDictionary(m_fstream,
@@ -258,11 +258,11 @@ private:
 	};
 
 	typedef LRUCache<fs::path, std::less<fs::path>,
-		boost::shared_ptr<MeshLoader> > MeshLoaderCache;
+		std::shared_ptr<MeshLoader> > MeshLoaderCache;
 
 	class FileStreamCache : MeshLoaderCache {
 	public:
-		inline boost::shared_ptr<MeshLoader> get(const fs::path& path) {
+		inline std::shared_ptr<MeshLoader> get(const fs::path& path) {
 			bool dummy;
 			return MeshLoaderCache::get(path, dummy);
 		}
@@ -271,8 +271,8 @@ private:
 			&FileStreamCache::create) { }
 
 	private:
-		inline static boost::shared_ptr<MeshLoader> create(const fs::path &path) {
-			return boost::make_shared<MeshLoader>(path);
+		inline static std::shared_ptr<MeshLoader> create(const fs::path &path) {
+			return std::make_shared<MeshLoader>(path);
 		}
 	};
 
@@ -296,7 +296,7 @@ private:
 			mitsuba::pushSceneCleanupHandler(&SerializedMesh::flushCache);
 		}
 
-		boost::shared_ptr<MeshLoader> meshLoader = cache->get(filePath);
+		std::shared_ptr<MeshLoader> meshLoader = cache->get(filePath);
 		Assert(meshLoader != NULL);
 		TriMesh::loadCompressed(meshLoader->seekStream((size_t) idx));
 	}

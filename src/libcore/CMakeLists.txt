@@ -86,7 +86,6 @@ set(SRCS
   appender.cpp
   bitmap.cpp
   brent.cpp
-  chisquare.cpp
   class.cpp
   cstream.cpp
   fmtconv.cpp
@@ -109,7 +108,7 @@ set(SRCS
   sched.cpp
   sched_remote.cpp
   serialization.cpp
-  shvector.cpp
+#  shvector.cpp
   spectrum.cpp
   spline.cpp
   ssemath.cpp
@@ -129,6 +128,10 @@ set(SRCS
   zstream.cpp
 )
 
+if (BUILD_TESTS)
+  list(APPEND SRCS chisquare.cpp)
+endif ()
+
 add_definitions(-DMTS_BUILD_MODULE=MTS_MODULE_CORE)
 
 if (APPLE)
@@ -139,11 +142,12 @@ elseif (WIN32)
 endif()
 
 include_directories(
-  ${ZLIB_INCLUDE_DIRS} ${PNG_INCLUDE_DIR} ${JPEG_INCLUDE_DIR}
+  ${ZLIB_INCLUDE_DIRS} ${PNG_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS}
   ${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
   
-set(LIBS ${ZLIB_LIBRARIES} ${PNG_LIBRARIES} ${JPEG_LIBRARIES}
-  ${ILMBASE_LIBRARIES} ${OPENEXR_LIBRARIES}
+set(LIBS ${PNG_LIBRARIES} ${JPEG_LIBRARIES}
+  ${OPENEXR_LIBRARIES} ${ILMBASE_LIBRARIES}
+  ${ZLIB_LIBRARIES}
   ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
   
 if(MTS_FFTW)
@@ -151,16 +155,19 @@ if(MTS_FFTW)
   list(APPEND LIBS ${FFTW3_LIBRARIES})
 endif()
   
+set(LIBS_SYS )
 if(WIN32)
-  list(APPEND LIBS ws2_32 psapi)
+  list(APPEND LIBS_SYS ws2_32 psapi)
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-  list(APPEND LIBS rt)
+  list(APPEND LIBS_SYS rt)
 elseif (APPLE)
-  list(APPEND LIBS ${COCOA_LIBRARY})
+  list(APPEND LIBS_SYS ${COCOA_LIBRARY})
 endif()
 add_mts_corelib(mitsuba-core ${MTS_MAIN_HEADER} ${HDRS} ${SRCS}
-  LINK_LIBRARIES ${LIBS})
+  LINK_LIBRARIES ${LIBS} ${LIBS_SYS})
 add_dependencies(mitsuba-core ior_database microfacet_data)
+# implementation of half is automatically replaced by OpenEXR's
+target_link_libraries(mitsuba-core INTERFACE ${ILMBASE_LIBRARIES} ${LIBS_SYS})
 
 mts_install_headers (${MTS_MAIN_HEADER} FOLDER "mitsuba")
 mts_install_headers (${HDRS} FOLDER "mitsuba/core")

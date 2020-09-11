@@ -1104,13 +1104,13 @@ public:
 	inline const ref_vector<ConfigurableObject> &getReferencedObjects() const { return m_objects; }
 
 	/// Return the name of the file containing the original description of this scene
-	inline const fs::path &getSourceFile() const { return *m_sourceFile; }
+	inline const fs::pathstr &getSourceFile() const { return *m_sourceFile; }
 	/// Set the name of the file containing the original description of this scene
-	void setSourceFile(const fs::path &name);
+	void setSourceFile(const fs::pathstr &name);
 	/// Return the render output filename
-	inline const fs::path &getDestinationFile() const { return *m_destinationFile; }
+	inline const fs::pathstr &getDestinationFile() const { return *m_destinationFile; }
 	/// Set the render output filename
-	void setDestinationFile(const fs::path &name);
+	void setDestinationFile(const fs::pathstr &name);
 
 	/// Does the destination file already exist?
 	inline bool destinationExists() const { return m_sensor->getFilm()->destinationExists(*m_destinationFile); }
@@ -1119,6 +1119,11 @@ public:
 	inline void setBlockSize(uint32_t size) { m_blockSize = size; }
 	/// Return the block resolution used to split images into parallel workloads
 	inline uint32_t getBlockSize() const { return m_blockSize; }
+
+	/// Sets the scene pre-processed flag (scene preprocessing outside normal render job logic).
+	inline void setScenePreprocessed(bool preprocessed) { m_scenePreprocessed = preprocessed; }
+	/// Sets the integrator pre-processed flag (preprocessing outside normal scene/render job logic).
+	inline void setIntegratorPreprocessed(bool preprocessed) { m_integratorPreprocessed = preprocessed; }
 
 	/// Serialize the whole scene to a network/file stream
 	void serialize(Stream *stream, InstanceManager *manager) const;
@@ -1158,13 +1163,15 @@ private:
 	ref_vector<Subsurface> m_ssIntegrators;
 	ref_vector<Medium> m_media;
 	std::vector<TriMesh *> m_meshes;
-	fs::path *m_sourceFile;
-	fs::path *m_destinationFile;
+	fs::pathstr *m_sourceFile;
+	fs::pathstr *m_destinationFile;
 	DiscreteDistribution m_emitterPDF;
 	AABB m_aabb;
 	uint32_t m_blockSize;
 	bool m_degenerateSensor;
 	bool m_degenerateEmitters;
+	bool m_scenePreprocessed;
+	bool m_integratorPreprocessed;
 };
 
 MTS_NAMESPACE_END

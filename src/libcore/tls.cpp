@@ -18,24 +18,103 @@
 
 #include <mitsuba/core/tls.h>
 
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/unordered_set.hpp>
-
-#include <boost/scoped_ptr.hpp>
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/sequenced_index.hpp>
-
-#if defined(__OSX__)
-# include <pthread.h>
-#endif
+#include <algorithm>
+#include <mutex>
 
 MTS_NAMESPACE_BEGIN
 
-namespace mi = boost::multi_index;
+namespace {
+
+thread_local bool has_thread_table_entry = false;
+
+struct compact_thread_table {
+	std::mutex mutex;
+	std::vector<int> free_ids;
+	std::vector<int> open;
+
+	std::mutex data_mutex;
+	std::vector<detail::ThreadLocalBase::ThreadLocalPrivate*> data;
+
+	int alloc_thread() {
+		assert(!has_thread_table_entry);
+		int next_id;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			if (free_ids.empty()) {
+				next_id = (int) open.size();
+				open.push_back(0);
+			} else {
+				next_id = free_ids.back();
+				free_ids.pop_back();
+				assert(open[next_id] == 0);
+			}
+		}
+		has_thread_table_entry = true;
+		return next_id;
+	}
+	void free_thread(int id) {
+		assert(has_thread_table_entry);
+		bool cleanUp = false;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			if (open[id]) {
+				std::cout << "Attempting to clean up " << open[id] << " open thread-local storage spaces for thread idx " << id << std::endl;
+				cleanUp = true;
+			}
+		}
+		if (cleanUp) {
+			try {
+				detail::destroyLocalTLS();
+			} catch (...) {
+				std::cout << "Error during cleanup for thread idx " << id << std::endl;
+			}
+		}
+		has_thread_table_entry = false;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			if (!open[id]) {
+				free_ids.push_back(id);
+			} else {
+				std::cout << open[id] << " unfreed thread-local storage spaces for thread idx " << id << ", not going to be re-used!" << std::endl;
+			}
+		}
+	}
+	void register_storage(detail::ThreadLocalBase::ThreadLocalPrivate* it) {
+		std::lock_guard<std::mutex> lock(data_mutex);
+		data.push_back(it);
+	}
+	void unregister_storage(detail::ThreadLocalBase::ThreadLocalPrivate* it) {
+		std::lock_guard<std::mutex> lock(data_mutex);
+		data.erase(std::find(data.begin(), data.end(), it));
+	}
+	void alloc_storage(detail::ThreadLocalBase::ThreadLocalPrivate* it, int id) {
+		std::lock_guard<std::mutex> lock(mutex);
+		++open[id];
+		//std::cout << open[id] << " storage spaces for thread idx " << id << " (1 alloc)" << std::endl;
+	}
+	void free_storage(detail::ThreadLocalBase::ThreadLocalPrivate* it, int id) {
+		std::lock_guard<std::mutex> lock(mutex);
+		--open[id];
+		//std::cout << open[id] << " storage spaces for thread idx " << id << " (1 free)" << std::endl;
+	}
+
+	static compact_thread_table& global_table() {
+		static compact_thread_table thread_table;
+		return thread_table;
+	}
+	struct thread_table_entry {
+		int id = global_table().alloc_thread();
+		~thread_table_entry() {
+			global_table().free_thread(id);
+		}
+	};
+	static int thread_id() {
+		static thread_local thread_table_entry local_thread_entry;
+		return local_thread_entry.id;
+	}
+};
+
+} // namespace
 
 /* The native TLS classes on Linux/MacOS/Windows only support a limited number
    of dynamically allocated entries (usually 1024 or 1088). Furthermore, they
@@ -47,86 +126,41 @@ namespace mi = boost::multi_index;
    of more involved locking when creating or destroying threads and TLS objects */
 namespace detail {
 
-/// A single TLS entry + cleanup hook
-struct TLSEntry {
-	void *data;
-	void (*destructFunctor)(void *);
-
-	inline TLSEntry() : data(NULL), destructFunctor(NULL) { }
-};
-
-/// boost multi-index element to act as replacement of map<Key,T>
-template<typename T1, typename T2>
-struct mutable_pair {
-	mutable_pair(const T1 &f, const T2 &s) : first(f), second(s) { }
-
-	T1 first;
-	mutable T2 second;
-};
-
-/// Per-thread TLS entry map
-struct PerThreadData {
-	typedef mutable_pair<void *, TLSEntry> MapData;
-	typedef mi::member<MapData, void *, &MapData::first> key_member;
-	struct seq_tag {};
-	struct key_tag {};
-
-	typedef mi::multi_index_container<MapData,
-		mi::indexed_by<
-			mi::hashed_unique<mi::tag<key_tag>, key_member>,
-			mi::sequenced<mi::tag<seq_tag> >
-		>
-	> Map;
-	typedef mi::index<Map, key_tag>::type::iterator         key_iterator;
-	typedef mi::index<Map, seq_tag>::type::reverse_iterator reverse_iterator;
-
-	Map map;
-	boost::recursive_mutex mutex;
-};
-
-/// List of all PerThreadData data structures (one for each thread)
-boost::unordered_set<PerThreadData *> ptdGlobal;
-/// Lock to protect ptdGlobal
-boost::mutex ptdGlobalLock;
-
-#if defined(__WINDOWS__)
-__declspec(thread) PerThreadData *ptdLocal = NULL;
-#elif defined(__LINUX__)
-__thread PerThreadData *ptdLocal = NULL;
-#elif defined(__OSX__)
-pthread_key_t ptdLocal;
-#endif
-
 struct ThreadLocalBase::ThreadLocalPrivate {
 	ConstructFunctor constructFunctor;
 	DestructFunctor destructFunctor;
 
+	mutable std::mutex mutex;
+	std::vector<void*> tls;
+
 	ThreadLocalPrivate(const ConstructFunctor &constructFunctor,
 			const DestructFunctor &destructFunctor) : constructFunctor(constructFunctor),
-			destructFunctor(destructFunctor) { }
+			destructFunctor(destructFunctor) { compact_thread_table::global_table().register_storage(this); }
 
 	~ThreadLocalPrivate() {
+		compact_thread_table::global_table().unregister_storage(this);
+
 		/* The TLS object was destroyed. Walk through all threads
 		   and clean up where necessary */
-		boost::lock_guard<boost::mutex> guard(ptdGlobalLock);
+		std::lock_guard<std::mutex> lock(mutex);
 
-		for (boost::unordered_set<PerThreadData *>::iterator it = ptdGlobal.begin();
-				it != ptdGlobal.end(); ++it) {
-			PerThreadData *ptd = *it;
-			boost::unique_lock<boost::recursive_mutex> lock(ptd->mutex);
-
-			PerThreadData::Map::iterator it2 = ptd->map.find(this);
-			TLSEntry entry;
-
-			if (it2 != ptd->map.end()) {
-				entry = it2->second;
-				ptd->map.erase(it2);
+		for (int id = (int) tls.size(); id-- > 0; ) {
+			void *data = tls[id];
+			if (data) {
+				destructFunctor(data);
+				compact_thread_table::global_table().free_storage(this, id);
 			}
+		}
+	}
 
-			lock.unlock();
-
-			if (entry.data)
-				destructFunctor(entry.data);
+	void eraseEntry(int id) {
+		std::lock_guard<std::mutex> lock(mutex);
+		if (id < (int) tls.size()) {
+			if (void *data = tls[id]) {
+				tls[id] = nullptr;
+				destructFunctor(data);
+				compact_thread_table::global_table().free_storage(this, id);
+			}
 		}
 	}
 
@@ -134,28 +168,19 @@ struct ThreadLocalBase::ThreadLocalPrivate {
 	std::pair<void *, bool> get() {
 		bool existed = true;
 		void *data;
+		int id = compact_thread_table::thread_id();
 
-#if defined(__OSX__)
-		PerThreadData *ptd = (PerThreadData *) pthread_getspecific(ptdLocal);
-#else
-		PerThreadData *ptd = ptdLocal;
-#endif
-		if (EXPECT_NOT_TAKEN(!ptd))
-			throw std::runtime_error("Internal error: call to ThreadLocalPrivate::get() "
-				" precedes the construction of thread-specific data structures!");
-
-		/* This is an uncontended thread-local lock (i.e. not to worry) */
-		boost::lock_guard<boost::recursive_mutex> guard(ptd->mutex);
-		PerThreadData::key_iterator it = ptd->map.find(this);
-		if (EXPECT_TAKEN(it != ptd->map.end())) {
-			data = it->second.data;
-		} else {
+		std::lock_guard<std::mutex> lock(mutex);
+		if (EXPECT_NOT_TAKEN(id >= (int) tls.size())) {
+			tls.resize(id + 1);
+		}
+		data = tls[id];
+		if (EXPECT_NOT_TAKEN(!data)) {
+			compact_thread_table::global_table().alloc_storage(this, id);
 			/* This is the first access from this thread */
-			TLSEntry entry;
-			entry.data = data = constructFunctor();
-			entry.destructFunctor = destructFunctor;
-			ptd->map.insert(PerThreadData::MapData(this, entry));
+			data = constructFunctor();
 			existed = false;
+			tls[id] = data;
 		}
 
 		return std::make_pair(data, existed);
@@ -189,63 +214,28 @@ const void *ThreadLocalBase::get(bool &existed) const {
 }
 
 void initializeGlobalTLS() {
-#if defined(__OSX__)
-	pthread_key_create(&ptdLocal, NULL);
-#endif
 }
 
 void destroyGlobalTLS() {
-#if defined(__OSX__)
-	pthread_key_delete(ptdLocal);
-	memset(&ptdLocal, 0, sizeof(pthread_key_t));
-#endif
 }
 
 /// A new thread was started -- set up TLS data structures
 void initializeLocalTLS() {
-	boost::lock_guard<boost::mutex> guard(ptdGlobalLock);
-#if defined(__OSX__)
-	PerThreadData *ptd = (PerThreadData *) pthread_getspecific(ptdLocal);
-	if (!ptd) {
-		ptd = new PerThreadData();
-		ptdGlobal.insert(ptd);
-		pthread_setspecific(ptdLocal, ptd);
-	}
-#else
-	if (!ptdLocal) {
-		ptdLocal = new PerThreadData();
-		ptdGlobal.insert(ptdLocal);
-	}
-#endif
+	// todo: currently handled by C++11 auto life time, see how that works
 }
 
 /// A thread has died -- destroy any remaining TLS entries associated with it
 void destroyLocalTLS() {
-	boost::lock_guard<boost::mutex> guard(ptdGlobalLock);
+	if (!has_thread_table_entry)
+		return;
+	compact_thread_table& table = compact_thread_table::global_table();
+	int id = compact_thread_table::thread_id();
 
-#if defined(__OSX__)
-	PerThreadData *ptd = (PerThreadData *) pthread_getspecific(ptdLocal);
-#else
-	PerThreadData *ptd = ptdLocal;
-#endif
-
-	boost::unique_lock<boost::recursive_mutex> lock(ptd->mutex);
-
-	// Destroy the data in reverse order of creation
-	for (PerThreadData::reverse_iterator it = mi::get<PerThreadData::seq_tag>(ptd->map).rbegin();
-		it != mi::get<PerThreadData::seq_tag>(ptd->map).rend(); ++it) {
-		TLSEntry &entry = it->second;
-		entry.destructFunctor(entry.data);
+	std::lock_guard<std::mutex> lock(table.data_mutex);
+	for (int i = (int) table.data.size(); i-- > 0; ) {
+		auto *data = table.data[i];
+		data->eraseEntry(id);
 	}
-
-	lock.unlock();
-	ptdGlobal.erase(ptd);
-	delete ptd;
-#if defined(__OSX__)
-	pthread_setspecific(ptdLocal, NULL);
-#else
-	ptdLocal = NULL;
-#endif
 }
 
 } /* namespace detail */

@@ -23,6 +23,10 @@
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/sched.h>
 #include <mitsuba/core/rfilter.h>
+#ifndef MTS_NO_ATOMIC_SPLAT
+#include <mitsuba/core/atomic.h>
+#include <xmmintrin.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -96,6 +100,9 @@ public:
 	/// Return a pointer to the underlying bitmap representation (const version)
 	inline const Bitmap *getBitmap() const { return m_bitmap.get(); }
 
+	/// Return a pointer to the underlying filter
+	inline const ReconstructionFilter *getFilter() const { return m_filter; }
+
 	/// Clear everything to zero
 	inline void clear() { m_bitmap->clear(); }
 
@@ -129,6 +136,16 @@ public:
 		temp[SPECTRUM_SAMPLES + 1] = 1.0f;
 		return put(pos, temp);
 	}
+#ifndef MTS_NO_ATOMIC_SPLAT
+	FINLINE bool putAtomic(const Point2 &pos, const Spectrum &spec, Float alpha) {
+		alignas(16) Float temp[SPECTRUM_SAMPLES + 2];
+		for (int i=0; i<SPECTRUM_SAMPLES; ++i)
+			temp[i] = spec[i];
+		temp[SPECTRUM_SAMPLES] = alpha;
+		temp[SPECTRUM_SAMPLES + 1] = 1.0f;
+		return putAtomic(pos, temp);
+	}
+#endif
 
 	/**
 	 * \brief Store a single sample inside the block
@@ -202,6 +219,103 @@ public:
 		}
 		return false;
 	}
+#ifndef MTS_NO_ATOMIC_SPLAT
+	FINLINE bool putAtomic(const Point2 &_pos, const Float *aligned_value) {
+		const int channels = m_bitmap->getChannelCount();
+
+		/* Check if all sample values are valid */
+		for (int i=0; i<channels; ++i) {
+			if (EXPECT_NOT_TAKEN((!std::isfinite(aligned_value[i]) || aligned_value[i] < 0) && m_warn))
+				goto bad_sample;
+		}
+
+		{
+			const Float filterRadius = m_filter->getRadius();
+			const Vector2i &size = m_bitmap->getSize();
+
+			/* Convert to pixel coordinates within the image block */
+			const Point2 pos(
+				_pos.x - 0.5f - (m_offset.x - m_borderSize),
+				_pos.y - 0.5f - (m_offset.y - m_borderSize));
+
+			/* Determine the affected range of pixels */
+			const Point2i min(std::max((int) std::ceil (pos.x - filterRadius), 0),
+				std::max((int) std::ceil (pos.y - filterRadius), 0)),
+				max(std::min((int) std::floor(pos.x + filterRadius), size.x - 1),
+					std::min((int) std::floor(pos.y + filterRadius), size.y - 1));
+
+			/* Lookup values from the pre-rasterized filter */
+			for (int x=min.x, idx = 0; x<=max.x; ++x)
+				m_weightsX[idx++] = m_filter->evalDiscretized(x-pos.x);
+			for (int y=min.y, idx = 0; y<=max.y; ++y)
+				m_weightsY[idx++] = m_filter->evalDiscretized(y-pos.y);
+
+			/* Rasterize the filtered sample into the framebuffer */
+			if (channels == 4 && sizeof(Float) == sizeof(float)) {
+				__m128 cs = _mm_load_ps(aligned_value);
+				for (int y=min.y, yr=0; y<=max.y; ++y, ++yr) {
+					const Float weightY = m_weightsY[yr];
+					union U {
+						atomic_int_128 i;
+						__m128 c;
+					} volatile* dest = (volatile U*) m_bitmap->getFloatData()
+						+ (y * (size_t) size.x + min.x);
+
+					for (int x=min.x, xr=0; x<=max.x; ++x, ++xr) {
+						const Float weight = m_weightsX[xr] * weightY;
+						__m128 w = _mm_set1_ps(weight);
+						__m128 c = _mm_mul_ps(cs, w);
+
+						bool success = false;
+						do {
+							// On IA32/x64, adding a PAUSE instruction in compare/exchange loops
+							// is recommended to improve performance.  (And it does!)
+#if (defined(__i386__) || defined(__amd64__))
+							__asm__ __volatile__ ("pause\n");
+#endif
+							U x; x.i = dest->i;
+							U n; n.c = _mm_add_ps(c, x.c);
+							success = atomicCompareAndExchange(&dest->i, n.i, x.i);
+						} while (!success);
+
+						++dest;
+					}
+				}
+			} else {
+				for (int y=min.y, yr=0; y<=max.y; ++y, ++yr) {
+					const Float weightY = m_weightsY[yr];
+					Float volatile *dest = m_bitmap->getFloatData()
+						+ (y * (size_t) size.x + min.x) * channels;
+
+					for (int x=min.x, xr=0; x<=max.x; ++x, ++xr) {
+						const Float weight = m_weightsX[xr] * weightY;
+
+						for (int k=0; k<channels; ++k) {
+							Float s = aligned_value[k] * weight;
+							atomicAdd(dest++, s);
+						}
+					}
+				}
+			}
+		}
+
+		return true;
+
+	bad_sample:
+		{
+			std::ostringstream oss;
+			oss << "Invalid sample value : [";
+			for (int i=0; i<channels; ++i) {
+				oss << aligned_value[i];
+				if (i+1 < channels)
+					oss << ", ";
+			}
+			oss << "]";
+			Log(EWarn, "%s", oss.str().c_str());
+		}
+		return false;
+	}
+#endif
 
 	/// Create a clone of the entire image block
 	ref<ImageBlock> clone() const {

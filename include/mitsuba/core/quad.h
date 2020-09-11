@@ -21,7 +21,7 @@
 #define __MITSUBA_CORE_QUAD_H_
 
 #include <mitsuba/mitsuba.h>
-#include <boost/function.hpp>
+#include <functional>
 
 MTS_NAMESPACE_BEGIN
 
@@ -131,7 +131,7 @@ extern MTS_EXPORT_CORE void gaussLobatto(int n, Float *nodes, Float *weights);
  */
 class MTS_EXPORT_CORE GaussLobattoIntegrator {
 public:
-	typedef boost::function<Float (Float)> Integrand;
+	typedef std::function<Float (Float)> Integrand;
 
 	/**
 	 * Initialize a Gauss-Lobatto integration scheme
@@ -178,14 +178,14 @@ protected:
 	 * \param fb Function evaluated at the upper limit
 	 * \param is Absolute tolerance in epsilons
 	 */
-	Float adaptiveGaussLobattoStep(const boost::function<Float (Float)>& f,
+	Float adaptiveGaussLobattoStep(const std::function<Float (Float)>& f,
 		Float a, Float b, Float fa, Float fb, Float is, size_t &evals) const;
 
 	/**
 	 * Compute the absolute error tolerance using a 13-point
 	 * Gauss-Lobatto rule.
 	 */
-	Float calculateAbsTolerance(const boost::function<Float (Float)>& f,
+	Float calculateAbsTolerance(const std::function<Float (Float)>& f,
 		Float a, Float b, size_t &evals) const;
 protected:
 	Float m_absError, m_relError;
@@ -222,8 +222,8 @@ protected:
  */
 class MTS_EXPORT_CORE NDIntegrator {
 public:
-	typedef boost::function<void (const Float *, Float *)>         Integrand;
-	typedef boost::function<void (size_t, const Float *, Float *)> VectorizedIntegrand;
+	typedef std::function<void (const Float *, Float *)>         Integrand;
+	typedef std::function<void (size_t, const Float *, Float *)> VectorizedIntegrand;
 
 	enum EResult {
 		ESuccess = 0,

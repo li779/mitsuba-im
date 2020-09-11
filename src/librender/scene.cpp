@@ -32,8 +32,10 @@ MTS_NAMESPACE_BEGIN
 Scene::Scene()
  : NetworkedObject(Properties()), m_blockSize(DEFAULT_BLOCKSIZE) {
 	m_kdtree = new ShapeKDTree();
-	m_sourceFile = new fs::path();
-	m_destinationFile = new fs::path();
+	m_sourceFile = new fs::pathstr();
+	m_destinationFile = new fs::pathstr();
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 }
 
 Scene::Scene(const Properties &props)
@@ -76,8 +78,10 @@ Scene::Scene(const Properties &props)
 	   in succession before a leaf node will be created.*/
 	if (props.hasProperty("kdMaxBadRefines"))
 		m_kdtree->setMaxBadRefines(props.getInteger("kdMaxBadRefines"));
-	m_sourceFile = new fs::path();
-	m_destinationFile = new fs::path();
+	m_sourceFile = new fs::pathstr();
+	m_destinationFile = new fs::pathstr();
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 }
 
 Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
@@ -87,8 +91,8 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_environmentEmitter = scene->m_environmentEmitter;
 	m_sensor = scene->m_sensor;
 	m_integrator = scene->m_integrator;
-	m_sourceFile = new fs::path(*scene->m_sourceFile);
-	m_destinationFile = new fs::path(*scene->m_destinationFile);
+	m_sourceFile = new fs::pathstr(*scene->m_sourceFile);
+	m_destinationFile = new fs::pathstr(*scene->m_destinationFile);
 	m_emitterPDF = scene->m_emitterPDF;
 	m_shapes = scene->m_shapes;
 	m_sensors = scene->m_sensors;
@@ -101,6 +105,8 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_specialShapes = scene->m_specialShapes;
 	m_degenerateSensor = scene->m_degenerateSensor;
 	m_degenerateEmitters = scene->m_degenerateEmitters;
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 }
 
 Scene::Scene(Stream *stream, InstanceManager *manager)
@@ -121,8 +127,8 @@ Scene::Scene(Stream *stream, InstanceManager *manager)
 	m_degenerateEmitters = stream->readBool();
 	m_aabb = AABB(stream);
 	m_environmentEmitter = static_cast<Emitter *>(manager->getInstance(stream));
-	m_sourceFile = new fs::path(stream->readString());
-	m_destinationFile = new fs::path(stream->readString());
+	m_sourceFile = new fs::pathstr(stream->readString());
+	m_destinationFile = new fs::pathstr(stream->readString());
 
 	size_t count = stream->readSize();
 	m_shapes.reserve(count);
@@ -160,7 +166,9 @@ Scene::Scene(Stream *stream, InstanceManager *manager)
 	m_netObjects.reserve(count);
 	for (size_t i=0; i<count; ++i)
 		m_netObjects.push_back(static_cast<NetworkedObject *>(manager->getInstance(stream)));
-
+	
+	m_scenePreprocessed = false;
+	m_integratorPreprocessed = false;
 	initialize();
 }
 
@@ -187,8 +195,8 @@ void Scene::serialize(Stream *stream, InstanceManager *manager) const {
 	stream->writeBool(m_degenerateEmitters);
 	m_aabb.serialize(stream);
 	manager->serialize(stream, m_environmentEmitter.get());
-	stream->writeString(m_sourceFile->string());
-	stream->writeString(m_destinationFile->string());
+	stream->writeString(m_sourceFile->s);
+	stream->writeString(m_destinationFile->s);
 
 	stream->writeSize(m_shapes.size());
 	for (size_t i=0; i<m_shapes.size(); ++i)
@@ -419,24 +427,26 @@ bool Scene::preprocess(RenderQueue *queue, const RenderJob *job,
 	initialize();
 
 	/* Pre-process step for the main scene integrator */
-	if (!m_integrator->preprocess(this, queue, job,
+	if (!m_integratorPreprocessed && !m_integrator->preprocess(this, queue, job,
 		sceneResID, sensorResID, samplerResID))
 		return false;
 
-	/* Pre-process step for all sub-surface integrators (each one in independence) */
-	for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
-			it != m_ssIntegrators.end(); ++it)
-		(*it)->setActive(false);
+	if (!m_scenePreprocessed) {
+		/* Pre-process step for all sub-surface integrators (each one in independence) */
+		for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
+				it != m_ssIntegrators.end(); ++it)
+			(*it)->setActive(false);
 
-	for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
-		it != m_ssIntegrators.end(); ++it)
-		if (!(*it)->preprocess(this, queue, job,
-				sceneResID, sensorResID, samplerResID))
-			return false;
-
-	for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
+		for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
 			it != m_ssIntegrators.end(); ++it)
-		(*it)->setActive(true);
+			if (!(*it)->preprocess(this, queue, job,
+					sceneResID, sensorResID, samplerResID))
+				return false;
+
+		for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
+				it != m_ssIntegrators.end(); ++it)
+			(*it)->setActive(true);
+	}
 
 	return true;
 }
@@ -459,11 +469,11 @@ void Scene::flush(RenderQueue *queue, const RenderJob *job) {
 	m_sensor->getFilm()->develop(this, queue->getRenderTime(job));
 }
 
-void Scene::setDestinationFile(const fs::path &name) {
+void Scene::setDestinationFile(const fs::pathstr &name) {
 	*m_destinationFile = name;
 }
 
-void Scene::setSourceFile(const fs::path &name) {
+void Scene::setSourceFile(const fs::pathstr &name) {
 	*m_sourceFile = name;
 }
 
@@ -471,7 +481,7 @@ void Scene::postprocess(RenderQueue *queue, const RenderJob *job,
 		int sceneResID, int sensorResID, int samplerResID) {
 	m_integrator->postprocess(this, queue, job, sceneResID,
 		sensorResID, samplerResID);
-	m_sensor->getFilm()->develop(this, queue->getRenderTime(job));
+	m_sensor->getFilm()->develop(this, (queue) ? queue->getRenderTime(job) : 0);
 }
 
 void Scene::addChild(const std::string &name, ConfigurableObject *child) {
@@ -751,6 +761,7 @@ bool Scene::rayIntersectAll(const Ray &ray, Intersection &its) const {
 
 		if (shape->rayIntersect(ray, mint, maxt, tempT, buffer)) {
 			its.t = tempT;
+			maxt = tempT;
 			shape->fillIntersectionRecord(ray, buffer, its);
 			result = true;
 		}

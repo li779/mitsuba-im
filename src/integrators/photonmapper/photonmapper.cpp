@@ -19,6 +19,8 @@
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/render/common.h>
 #include <mitsuba/render/gatherproc.h>
+#include <mitsuba/render/integrator2.h>
+#include <mitsuba/core/lock.h>
 #include "bre.h"
 
 MTS_NAMESPACE_BEGIN
@@ -134,6 +136,8 @@ public:
 		/* When this flag is set to true, contributions from directly
 		 * visible emitters will not be included in the rendered image */
 		m_hideEmitters = props.getBoolean("hideEmitters", false);
+		/* Minimum number of spp per photon progression */
+		m_sppPerPhotonProgression = props.getFloat("sppPerPhotonProgression", 6.0f);
 
 		if (m_maxDepth == 0) {
 			Log(EError, "maxDepth must be greater than zero!");
@@ -168,6 +172,7 @@ public:
 		m_gatherLocally = stream->readBool();
 		m_autoCancelGathering = stream->readBool();
 		m_hideEmitters = stream->readBool();
+		m_sppPerPhotonProgression = stream->readFloat();
 		m_causticPhotonMapID = m_globalPhotonMapID = m_breID = 0;
 		configure();
 	}
@@ -200,6 +205,7 @@ public:
 		stream->writeBool(m_gatherLocally);
 		stream->writeBool(m_autoCancelGathering);
 		stream->writeBool(m_hideEmitters);
+		stream->writeFloat(m_sppPerPhotonProgression);
 	}
 
 	/// Configure the sampler for a specified amount of direct illumination samples
@@ -230,14 +236,41 @@ public:
 
 	bool preprocess(const Scene *scene, RenderQueue *queue, const RenderJob *job,
 			int sceneResID, int sensorResID, int samplerResID) {
+		ref<Scheduler> sched = Scheduler::getInstance();
+		size_t coreCount = sched->getCoreCount();
+		/* classic mitsuba rendering */
+		Float photonBoost = 1.0f;
+		int photonCountPercent = 100;
+		if (queue) {
+			m_shrinkingFactor = 1.0f;
+			m_haltonScramble = -1;
+		}
+		/* interactive rendering */
+		else {
+			Float sppPerThread = threadSppPerProgression(m_sppPerPhotonProgression, coreCount);
+			Float parallelSppPerProgression = sppPerThread * Float(coreCount);
+			photonBoost = parallelSppPerProgression / m_sppPerPhotonProgression;
+//			photonBoost = std::pow(photonBoost, 1.0f / std::log(Float(coreCount)));
+			photonCountPercent = std::max(int(100.0f * photonBoost), 100);
+		}
+		/* Adapt to shrinking */
+		m_globalLookupSizeScaled = std::max(int(float(m_globalLookupSize) * m_shrinkingFactor * m_shrinkingFactor / photonBoost), 4);
+		m_causticLookupSizeScaled = std::max(int(float(m_causticLookupSize) * m_shrinkingFactor * m_shrinkingFactor / photonBoost), 4);
+		m_volumeLookupSizeScaled = std::max(int(float(m_volumeLookupSize) * m_shrinkingFactor * m_shrinkingFactor / photonBoost), 4);
+
 		SamplingIntegrator::preprocess(scene, queue, job, sceneResID, sensorResID, samplerResID);
 		/* Create a deterministic sampler for the photon gathering step */
-		ref<Scheduler> sched = Scheduler::getInstance();
-		ref<Sampler> sampler = static_cast<Sampler *> (PluginManager::getInstance()->
-			createObject(MTS_CLASS(Sampler), Properties("halton")));
+		ref<Sampler> sampler;
+		{
+			Properties haltonProps("halton");
+			haltonProps.setInteger("scramble", m_haltonScramble++);
+			sampler = static_cast<Sampler *> (PluginManager::getInstance()->
+				createObject(MTS_CLASS(Sampler), haltonProps));
+			sampler->configure();
+		}
 		/* Create a sampler instance for every core */
-		std::vector<SerializableObject *> samplers(sched->getCoreCount());
-		for (size_t i=0; i<sched->getCoreCount(); ++i) {
+		std::vector<SerializableObject *> samplers(coreCount);
+		for (size_t i=0; i<coreCount; ++i) {
 			ref<Sampler> clonedSampler = sampler->clone();
 			clonedSampler->incRef();
 			samplers[i] = clonedSampler.get();
@@ -255,7 +288,7 @@ public:
 		if (m_globalPhotonMap.get() == NULL && m_globalPhotons > 0) {
 			/* Generate the global photon map */
 			ref<GatherPhotonProcess> proc = new GatherPhotonProcess(
-				GatherPhotonProcess::ESurfacePhotons, m_globalPhotons,
+				GatherPhotonProcess::ESurfacePhotons, m_globalPhotons * photonCountPercent / 100,
 				m_granularity, m_maxDepth-1, m_rrDepth, m_gatherLocally,
 				m_autoCancelGathering, job);
 
@@ -286,7 +319,7 @@ public:
 		if (m_causticPhotonMap.get() == NULL && m_causticPhotons > 0) {
 			/* Generate the caustic photon map */
 			ref<GatherPhotonProcess> proc = new GatherPhotonProcess(
-				GatherPhotonProcess::ECausticPhotons, m_causticPhotons,
+				GatherPhotonProcess::ECausticPhotons, m_causticPhotons * photonCountPercent / 100,
 				m_granularity, m_maxDepth-1, m_rrDepth, m_gatherLocally,
 				m_autoCancelGathering, job);
 
@@ -318,7 +351,7 @@ public:
 		if (m_volumePhotonMap.get() == NULL && volumePhotons > 0) {
 			/* Generate the volume photon map */
 			ref<GatherPhotonProcess> proc = new GatherPhotonProcess(
-				GatherPhotonProcess::EVolumePhotons, volumePhotons,
+				GatherPhotonProcess::EVolumePhotons, volumePhotons * photonCountPercent / 100,
 				m_granularity, m_maxDepth-1, m_rrDepth, m_gatherLocally,
 				m_autoCancelGathering, job);
 
@@ -341,14 +374,14 @@ public:
 
 				volumePhotonMap->setScaleFactor(1 / (Float) proc->getShotParticles());
 				volumePhotonMap->build();
-				m_bre = new BeamRadianceEstimator(volumePhotonMap, m_volumeLookupSize);
+				m_bre = new BeamRadianceEstimator(volumePhotonMap, m_volumeLookupSizeScaled);
 				m_breID = sched->registerResource(m_bre);
 			}
 		}
 
 		/* Adapt to scene extents */
-		m_globalLookupRadius = m_globalLookupRadiusRel * scene->getBSphere().radius;
-		m_causticLookupRadius = m_causticLookupRadiusRel * scene->getBSphere().radius;
+		m_globalLookupRadius = m_globalLookupRadiusRel * scene->getBSphere().radius * m_shrinkingFactor / std::sqrt(photonBoost);
+		m_causticLookupRadius = m_causticLookupRadiusRel * scene->getBSphere().radius * m_shrinkingFactor / std::sqrt(photonBoost);
 
 		sched->unregisterResource(qmcSamplerID);
 
@@ -451,11 +484,11 @@ public:
 			if (rRec.type & RadianceQueryRecord::EIndirectSurfaceRadiance && m_globalPhotonMap.get())
 				LiSurf += m_globalPhotonMap->estimateIrradiance(its.p,
 					its.shFrame.n, m_globalLookupRadius, maxDepth,
-					m_globalLookupSize) * bsdf->getDiffuseReflectance(its) * INV_PI;
+					m_globalLookupSizeScaled) * bsdf->getDiffuseReflectance(its) * INV_PI;
 			if (rRec.type & RadianceQueryRecord::ECausticRadiance && m_causticPhotonMap.get())
 				LiSurf += m_causticPhotonMap->estimateIrradiance(its.p,
 					its.shFrame.n, m_causticLookupRadius, maxDepth,
-					m_causticLookupSize) * bsdf->getDiffuseReflectance(its) * INV_PI;
+					m_causticLookupSizeScaled) * bsdf->getDiffuseReflectance(its) * INV_PI;
 		}
 
 		if (hasSpecular && exhaustiveSpecular
@@ -670,6 +703,83 @@ public:
 		return pdfA / (pdfA + pdfB);
 	}
 
+	static Float threadSppPerProgression(Float minSppPerProgression, int threadCount) {
+		return std::max( minSppPerProgression / Float(threadCount), Float(0.25) );
+	}
+
+	class PMRefresh : public ClassicSamplingIntegrator {
+		Barrier barrier;
+		#define InitialShrinkingFactor 0.7f
+
+	public:
+		PMRefresh(PhotonMapIntegrator* classic)
+			: ClassicSamplingIntegrator(classic, classic->getProperties())
+			, barrier(8) { }
+
+		bool preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) override {
+			PhotonMapIntegrator& renderer = *static_cast<PhotonMapIntegrator*>(this->classicIntegrator.get());
+			renderer.m_shrinkingFactor = InitialShrinkingFactor;
+			renderer.m_haltonScramble = 0;
+			return ClassicSamplingIntegrator::preprocess(scene, sensor, sampler);
+		}
+
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+			, Controls controls, int threadIdx, int threadCount) override {
+			PhotonMapIntegrator& renderer = static_cast<PhotonMapIntegrator&>(*this->classicIntegrator);
+			barrier.resize(threadCount);
+
+			struct Interrupt : ResponsiveIntegrator::Interrupt {
+				struct Interface {
+					PhotonMapIntegrator& renderer;
+					ResponsiveIntegrator::Interrupt* nextInterrupt;
+
+					Barrier& barrier;
+					double sppPerProgression;
+				} iface;
+				double lastPhotonSpp = 0;
+
+				Interrupt(Interface iface)
+					: iface(iface) { }
+
+				int progress(mitsuba::ResponsiveIntegrator* integrator, const mitsuba::Scene &scene, const mitsuba::Sensor &sensor, mitsuba::Sampler &sampler, mitsuba::ImageBlock& target, double spp
+					, mitsuba::ResponsiveIntegrator::Controls controls, int threadIdx, int threadCount) override {
+					int returnCode = 0;
+					if (iface.nextInterrupt) {
+						returnCode = iface.nextInterrupt->progress(integrator, scene, sensor, sampler, target, spp, controls, threadIdx, threadCount);
+					}
+					if (iface.barrier.blocking() || returnCode == 0 && spp >= lastPhotonSpp + iface.sppPerProgression) {
+						if (Mutex* m = iface.barrier.waitKeep()) {
+							UniqueLock lock(m, false, true);
+							iface.renderer.m_globalPhotonMap = nullptr;
+							iface.renderer.m_causticPhotonMap = nullptr;
+							iface.renderer.m_volumePhotonMap = nullptr;
+
+							iface.renderer.m_shrinkingFactor = Float( InitialShrinkingFactor / std::max(std::sqrt(std::sqrt(spp * double(threadCount))), 1.0) );
+
+							SchedulerResourceContext ctx(&scene, &sensor, scene.getSampler());
+							if (!iface.renderer.preprocess(&scene, nullptr, nullptr, ctx.sceneID, ctx.sensorID, ctx.samplerID))
+								return 200;
+						}
+						lastPhotonSpp = spp;
+					}
+					return returnCode;
+				}
+			} interrupt = { { renderer, controls.interrupt, this->barrier, renderer.threadSppPerProgression(renderer.m_sppPerPhotonProgression, threadCount) } };
+			controls.interrupt = &interrupt;
+
+			return ClassicSamplingIntegrator::render(scene, sensor, sampler, target, controls, threadIdx, threadCount);
+		}
+
+	};
+
+	ref<ResponsiveIntegrator> makeResponsiveIntegrator() override {
+		if (getProperties().getBoolean("strictConfiguration", true))
+			return nullptr;
+		else
+			Log(EWarn, "Interactive implementation is not identical to the classic implementation!");
+		return new PMRefresh(this);
+	}
+
 	MTS_DECLARE_CLASS()
 private:
 	ref<PhotonMap> m_globalPhotonMap;
@@ -681,11 +791,13 @@ private:
 	int m_globalPhotonMapID, m_causticPhotonMapID, m_breID;
 	size_t m_globalPhotons, m_causticPhotons, m_volumePhotons;
 	int m_globalLookupSize, m_causticLookupSize, m_volumeLookupSize;
+	int m_globalLookupSizeScaled, m_causticLookupSizeScaled, m_volumeLookupSizeScaled;
 	Float m_globalLookupRadiusRel, m_globalLookupRadius;
 	Float m_causticLookupRadiusRel, m_causticLookupRadius;
 	Float m_invEmitterSamples, m_invGlossySamples;
 	int m_granularity, m_directSamples, m_glossySamples;
 	int m_rrDepth, m_maxDepth, m_maxSpecularDepth;
+	Float m_sppPerPhotonProgression, m_shrinkingFactor; int m_haltonScramble;
 	bool m_gatherLocally, m_autoCancelGathering;
 	bool m_hideEmitters;
 };

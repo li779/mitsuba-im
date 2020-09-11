@@ -6,11 +6,25 @@ if (NOT DEFINED MTS_VERSION)
   message(FATAL_ERROR "This file has to be included from the main build file.")
 endif()
 
+# make config 'RelWithDebInfo' debuggable by disabling some inlining optimizations
+if(MSVC)
+  # /MD link against release libs, /Od disable optimizations, /Ob0
+  string(REGEX REPLACE "/Ob2($|[; ])" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "/Ob2($|[; ])" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "/GL($|[; ])" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "/GL($|[; ])" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /Ob1") # cant optimize: /RTC1
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Ob1") # cant optimize: /RTC1
+  list(REMOVE_DUPLICATES CMAKE_C_FLAGS_RELWITHDEBINFO)
+  list(REMOVE_DUPLICATES CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+endif()
+
 # Default initial compiler flags which may be modified by advanced users
 #if (MTS_CMAKE_INIT)
   set(MTS_CXX_FLAGS)
   if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(MTS_CXX_FLAGS "-fvisibility=hidden -pipe -march=nocona -ffast-math -Wall -Winvalid-pch")
+    set(MTS_CXX_FLAGS "-fvisibility=hidden -pipe -march=nocona -ffast-math -Wall -Winvalid-pch -std=c++17 -fPIC")
+    link_libraries(-lstdc++fs)
   endif()
   if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(MTS_CXX_FLAGS "${MTS_CXX_FLAGS} -mfpmath=sse")
@@ -22,9 +36,16 @@ endif()
     set(CMAKE_CXX_FLAGS "${MTS_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
     set(MTS_CXX_FLAGS)
   endif()
-#endif()
+  #endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Top level configuration definitions
+option (MTS_ENABLE_SYSTEM_LIBS "Enable use of system libraries instead of submodules, if present" OFF)
+option (MTS_ENABLE_HW_PREVIEW "Enable HW-accelerated prview rendering" OFF)
+option (MTS_ENABLE_COLLADA "Collada package search can be slow" OFF)
+option (MTS_ENABLE_QTGUI "Enable Qt GUI" OFF)
 option(MTS_DEBUG "Enable assertions etc. Usually a good idea." ON)
 if (MTS_DEBUG)
   add_definitions(-DMTS_DEBUG)

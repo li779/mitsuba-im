@@ -20,7 +20,6 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/track.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -132,7 +131,7 @@ Spectrum Sensor::sampleRayDifferential(RayDifferential &ray,
 }
 
 Float Sensor::pdfTime(const Ray &ray, EMeasure measure) const {
-    if (ray.time < m_shutterOpen || ray.time > m_shutterOpen + m_shutterOpenTime)
+	if (ray.time < m_shutterOpen || ray.time > m_shutterOpen + m_shutterOpenTime)
 		return 0.0f;
 
 	if (m_shutterOpenTime == 0 && measure == EDiscrete)
@@ -245,7 +244,7 @@ void PerspectiveCamera::configure() {
 		Float fov = m_properties.getFloat("fov");
 
 		std::string fovAxis =
-			boost::to_lower_copy(m_properties.getString("fovAxis", "x"));
+			to_lower_copy(m_properties.getString("fovAxis", "x"));
 
 		if (fovAxis == "smaller")
 			fovAxis = m_aspect > 1 ? "y" : "x";
@@ -263,7 +262,7 @@ void PerspectiveCamera::configure() {
 				"to one of 'smaller', 'larger', 'diagonal', 'x', or 'y'!");
 	} else {
 		std::string f = m_properties.getString("focalLength", "50mm");
-		if (boost::ends_with(f, "mm"))
+		if (ends_with(f, "mm"))
 			f = f.substr(0, f.length()-2);
 
 		char *end_ptr = NULL;

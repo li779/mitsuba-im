@@ -20,7 +20,7 @@
 #if !defined(__ANNOTATIONS_H)
 #define __ANNOTATIONS_H
 
-#include <mitsuba/hw/font.h>
+#include <mitsuba/render/font.h>
 #include <mitsuba/render/scene.h>
 
 MTS_NAMESPACE_BEGIN
@@ -39,13 +39,13 @@ void annotate(const Scene *scene, const Properties &properties,
 	for (size_t i=0; i<keys.size(); ++i) {
 		std::string key = keys[i];
 		key.erase(std::remove_if(key.begin(), key.end(), ::isspace), key.end());
-		std::string lkey = boost::to_lower_copy(key);
+		std::string lkey = to_lower_copy(key);
 		Point2i offset(0, 0);
 		bool labelAnnotation = false;
 
-		if (boost::starts_with(lkey, "metadata['") && boost::ends_with(lkey, "']")) {
+		if (starts_with(lkey, "metadata['") && ends_with(lkey, "']")) {
 			key = key.substr(10, key.length()-12);
-		} else if (boost::starts_with(lkey, "label[") && boost::ends_with(lkey, "]")) {
+		} else if (starts_with(lkey, "label[") && ends_with(lkey, "]")) {
 			std::vector<std::string> args = tokenize(key.substr(6, key.length()-7), " ,");
 			if (args.size() != 2)
 				SLog(EError, "Label command '%s' has an invalid number of arguments!", key.c_str());
@@ -86,7 +86,7 @@ void annotate(const Scene *scene, const Properties &properties,
 				propSource.erase(std::remove_if(propSource.begin(), propSource.end(), ::isspace), propSource.end());
 				propKey.erase(std::remove_if(propKey.begin(), propKey.end(), ::isspace), propKey.end());
 
-				if (!boost::starts_with(propKey, "'") || !boost::ends_with(propKey, "'"))
+				if (!starts_with(propKey, "'") || !ends_with(propKey, "'"))
 					SLog(EError, "Encountered invalid key '%s'", propKey.c_str());
 
 				propKey = propKey.substr(1, propKey.length()-2);
@@ -121,9 +121,9 @@ void annotate(const Scene *scene, const Properties &properties,
 					} else if (propKey == "blockSize") {
 						replacement = formatString("%i", scene->getBlockSize());
 					} else if (propKey == "sourceFile") {
-						replacement = scene->getSourceFile().string();
+						replacement = scene->getSourceFile().s;
 					} else if (propKey == "destFile") {
-						replacement = scene->getDestinationFile().string();
+						replacement = scene->getDestinationFile().s;
 					}
 				}
 
