@@ -309,6 +309,7 @@ function(__watch_pch_last_hook variable access value)
 		set(pch_target ${target}.pch)
 		foreach(property
 			# NOTE: this list is likely incomplete
+			LINK_LIBRARIES
 			COMPILE_DEFINITIONS
 			COMPILE_DEFINITIONS_DEBUG
 			COMPILE_DEFINITIONS_MINSIZEREL

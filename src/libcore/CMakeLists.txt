@@ -169,5 +169,10 @@ add_dependencies(mitsuba-core ior_database microfacet_data)
 # implementation of half is automatically replaced by OpenEXR's
 target_link_libraries(mitsuba-core INTERFACE ${ILMBASE_LIBRARIES} ${LIBS_SYS})
 
+# If we are using the system OpenEXR, add its headers which half.h requires
+if (ILMBASE_FOUND)
+  target_include_directories(mitsuba-core PUBLIC ${ILMBASE_INCLUDE_DIRS})
+endif()
+
 mts_install_headers (${MTS_MAIN_HEADER} FOLDER "mitsuba")
 mts_install_headers (${HDRS} FOLDER "mitsuba/core")

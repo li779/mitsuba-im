@@ -484,7 +484,9 @@ if (EIGEN_FOUND)
   link_libraries(${Eigen_LIBRARIES}) # for build order only
 endif()
 
-# If we are using the system OpenEXR, add its headers which half.h requires
+# If we are using the system OpenEXR, add header path to globally used half.h.
+# This should work via PUBLIC/INTERFACE include directories only (see libcore),
+# but PCH still requires an additional global directive.
 if (ILMBASE_FOUND)
   include_directories(${ILMBASE_INCLUDE_DIRS})
 endif()
