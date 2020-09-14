@@ -3,7 +3,7 @@ if (NOT MTS_VERSION)
   message(FATAL_ERROR "Use the top level configuration file")
 endif()
 
-include_directories(${XERCES_INCLUDE_DIRS})
+include_directories(${XML_INCLUDE_DIRS})
 
 add_mts_exe(mtssrv  mtssrv.cpp ${MTS_WINDOWS_STUB}
   RES_DESCRIPTION "Mitsuba compute node application")

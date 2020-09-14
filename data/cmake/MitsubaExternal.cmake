@@ -327,7 +327,20 @@ endif()
 
 ###########################################################################
 
-if (MTS_ENABLE_SYSTEM_LIBS)
+option(MTS_USE_PUGIXML "Use lighter pugixml instead of XercesC" ON)
+if (MTS_USE_PUGIXML)
+  make_external_library(PUGIXML pugixml)
+  # can run in parallel
+	build_externals(pugixml "${PUGIXML_LIBRARIES}")
+
+  set(XML_INCLUDE_DIRS ${PUGIXML_INCLUDE_DIRS})
+  set(XML_LIBRARIES ${PUGIXML_LIBRARIES})
+
+  add_definitions(-DMTS_USE_PUGIXML=1)
+endif()
+
+if (NOT MTS_USE_PUGIXML OR MTS_ENABLE_COLLADA) # converter tools require XercesC
+if (MTS_ENABLE_SYSTEM_LIBS OR MTS_USE_PUGIXML)
 	find_package(XercesC 3.0)
 endif ()
 if (NOT XercesC_FOUND)
@@ -339,13 +352,18 @@ if (NOT XercesC_FOUND)
 	if (NOT WIN32)
 		target_link_libraries(${XercesC_LIBRARY} INTERFACE icuuc icudata)
 	endif ()
+endif ()
+if (NOT MTS_USE_PUGIXML)
+  set(XML_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
+  set(XML_LIBRARIES ${XercesC_LIBRARIES})
+endif()
 
-	set(XERCES_FOUND ${XercesC_FOUND})
-	set(XERCES_DEFINITIONS ${XercesC_DEFINITIONS})
-	set(XERCES_INCLUDE_DIR ${XercesC_INCLUDE_DIR})
-	set(XERCES_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
-	set(XERCES_LIBRARY ${XercesC_LIBRARY})
-	set(XERCES_LIBRARIES ${XercesC_LIBRARIES})
+set(XERCES_FOUND ${XercesC_FOUND})
+set(XERCES_DEFINITIONS ${XercesC_DEFINITIONS})
+set(XERCES_INCLUDE_DIR ${XercesC_INCLUDE_DIR})
+set(XERCES_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
+set(XERCES_LIBRARY ${XercesC_LIBRARY})
+set(XERCES_LIBRARIES ${XercesC_LIBRARIES})
 endif ()
 
 ###########################################################################

@@ -188,6 +188,21 @@ if (MTS_XERCESC_INSTALL_DIR)
 	add_xerces(xerces-c)
 endif ()
 
+if (MTS_PUGIXML_INSTALL_DIR)
+	function (add_pugixml MTS_PUGIXML_DIR)
+		set(CMAKE_INSTALL_PREFIX ${MTS_PUGIXML_INSTALL_DIR})
+		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+		add_library(pugixml STATIC ${MTS_PUGIXML_DIR}/src/pugixml.cpp)
+		set_property(SOURCE ${MTS_PUGIXML_DIR}/src/pugixml.cpp
+			APPEND PROPERTY COMPILE_DEFINITIONS PUGIXML_BUILD_DLL)
+		publish_external_targets(pugixml pugixml)
+
+		install(DIRECTORY ${MTS_PUGIXML_DIR}/src/ DESTINATION ${MTS_PUGIXML_INSTALL_DIR}/include FILES_MATCHING PATTERN *.hpp)
+	endfunction ()
+	add_pugixml(pugixml)
+endif ()
+
 if (MTS_SDL_INSTALL_DIR)
 	function (add_sdl MTS_SDL_DIR)
 		set(SDL_SHARED ON CACHE INTERNAL "")

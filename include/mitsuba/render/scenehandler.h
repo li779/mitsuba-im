@@ -20,22 +20,31 @@
 #if !defined(__MITSUBA_RENDER_SCENEHANDLER_H_)
 #define __MITSUBA_RENDER_SCENEHANDLER_H_
 
+#ifndef MTS_USE_PUGIXML
 #include <xercesc/sax/HandlerBase.hpp>
 #include <xercesc/sax/AttributeList.hpp>
+#else
+#include <pugixml.hpp>
+#endif
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/version.h>
 #include <unordered_map>
 #include <stack>
 #include <map>
+#include <functional>
 
+#ifndef MTS_USE_PUGIXML
 XERCES_CPP_NAMESPACE_BEGIN
 class SAXParser;
 class XMLTranscoder;
 XERCES_CPP_NAMESPACE_END
+#endif
 
 MTS_NAMESPACE_BEGIN
+#ifndef MTS_USE_PUGIXML
 namespace xercesc = XERCES_CPP_NAMESPACE;
+#endif
 
 /// Push a cleanup handler to be executed after loading the scene is done
 extern MTS_EXPORT_RENDER void pushSceneCleanupHandler(void (*cleanup)());
@@ -49,7 +58,18 @@ extern MTS_EXPORT_RENDER void pushSceneCleanupHandler(void (*cleanup)());
  * \ingroup librender
  * \ingroup libpython
  */
-class MTS_EXPORT_RENDER SceneHandler : public xercesc::HandlerBase {
+class MTS_EXPORT_RENDER SceneHandler
+#ifndef MTS_USE_PUGIXML
+	: public xercesc::HandlerBase {
+	typedef xercesc::AttributeList AttributeList;
+#else
+	: public pugi::xml_tree_walker {
+	typedef pugi::xml_attribute AttributeList;
+	typedef pugi::char_t XMLCh;
+	typedef size_t XMLSize_t;
+
+	friend class SceneLoader;
+#endif
 public:
 	typedef std::map<std::string, ConfigurableObject *> NamedObjectMap;
 	typedef std::map<std::string, std::string, SimpleStringOrdering> ParameterMap;
@@ -79,21 +99,29 @@ public:
 	virtual void endDocument();
 	virtual void startElement(
 		const XMLCh* const name,
-		xercesc::AttributeList& attributes
+		AttributeList& attributes
 	);
 	virtual void endElement(const XMLCh* const name);
 	virtual void characters(const XMLCh* const chars, const XMLSize_t length);
-    virtual void setDocumentLocator(const xercesc::Locator* const locator);
+#ifndef MTS_USE_PUGIXML
+    virtual void setDocumentLocator(const Locator* const locator);
+#else
+	virtual bool begin(pugi::xml_node& node);
+	virtual bool for_each(pugi::xml_node& node);
+	virtual bool end(pugi::xml_node& node);
+#endif
 
 	inline const Scene *getScene() const { return m_scene.get(); }
 	inline Scene *getScene() { return m_scene; }
 
+#ifndef MTS_USE_PUGIXML
 	// -----------------------------------------------------------------------
 	//  Implementation of the SAX ErrorHandler interface
 	// -----------------------------------------------------------------------
 	void warning(const xercesc::SAXParseException& exc);
 	void error(const xercesc::SAXParseException& exc);
 	void fatalError(const xercesc::SAXParseException& exc);
+#endif
 protected:
 	std::string transcode(const XMLCh * input) const;
 
@@ -135,8 +163,13 @@ private:
 	typedef std::pair<ETag, const Class *> TagEntry;
 	typedef std::unordered_map<std::string, TagEntry> TagMap;
 
+#ifndef MTS_USE_PUGIXML
 	const xercesc::Locator *m_locator;
 	xercesc::XMLTranscoder* m_transcoder;
+#else
+	ptrdiff_t m_locator;
+	std::function<std::string(ptrdiff_t)> m_locatorCtx;
+#endif
 	ref<Scene> m_scene;
 	ParameterMap m_params;
 	NamedObjectMap *m_namedObjects;
