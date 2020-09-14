@@ -21,7 +21,10 @@
 #include <mitsuba/core/chisquare.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/render/testcase.h>
-#include <boost/bind.hpp>
+#include <functional>
+#include <tuple>
+
+using namespace std::placeholders;
 
 /* Statistical significance level of the test. Set to
    1/4 percent by default -- we want there to be strong
@@ -106,7 +109,7 @@ public:
 //			m_isSymmetric = true;
 		}
 
-		boost::tuple<Vector, Float, EMeasure> generateSample() {
+		std::tuple<Vector, Float, EMeasure> generateSample() {
 			Point2 sample(m_sampler->next2D());
 			BSDFSamplingRecord bRec(m_its, m_fakeSampler);
 			bRec.mode = EImportance;
@@ -130,7 +133,7 @@ public:
 				measure = BSDF::getMeasure(bRec.sampledType);
 
 			if (sampled.isZero() && sampled2.isZero())
-				return boost::make_tuple(Vector(0.0f), 0.0f, measure);
+				return std::make_tuple(Vector(0.0f), 0.0f, measure);
 
 			Spectrum f = m_bsdf->eval(bRec, measure);
 			pdfVal = m_bsdf->pdf(bRec, measure);
@@ -166,7 +169,7 @@ public:
 					sampled2.toString().c_str(), manual.toString().c_str(),
 					sampledPDF, pdfVal, f.toString().c_str(), bRec.toString().c_str(),
 					measure);
-				return boost::make_tuple(bRec.wo, 0.0f, ESolidAngle);
+				return std::make_tuple(bRec.wo, 0.0f, ESolidAngle);
 			}
 
 			bool mismatch = false;
@@ -206,7 +209,7 @@ public:
 				disableFPExceptions();
 			#endif
 
-			return boost::make_tuple(bRec.wo, 1.0f, measure);
+			return std::make_tuple(bRec.wo, 1.0f, measure);
 		}
 
 		Float pdf(const Vector &wo, EMeasure measure) {
@@ -252,7 +255,7 @@ public:
 			m_fakeSampler = new FakeSampler(m_sampler);
 		}
 
-		boost::tuple<Vector, Float, EMeasure> generateSample() {
+		std::tuple<Vector, Float, EMeasure> generateSample() {
 			PhaseFunctionSamplingRecord pRec(m_mRec, m_wi);
 
 			#if defined(MTS_DEBUG_FP)
@@ -274,7 +277,7 @@ public:
 				Log(EWarn, "Oops: sampled=%f, sampled2=%f, manual=%f, sampledPDF=%f, "
 					"pdf=%f, f=%f, pRec=%s", sampled, sampled2, manual,
 					sampledPDF, pdfVal, f, pRec.toString().c_str());
-				return boost::make_tuple(pRec.wo, 0.0f, ESolidAngle);
+				return std::make_tuple(pRec.wo, 0.0f, ESolidAngle);
 			}
 
 			bool mismatch = false;
@@ -307,7 +310,7 @@ public:
 					pdfVal, sampledPDF);
 
 
-			return boost::make_tuple(pRec.wo,
+			return std::make_tuple(pRec.wo,
 				sampled == 0 ? 0.0f : 1.0f, ESolidAngle);
 		}
 
@@ -346,7 +349,7 @@ public:
 			emitter->samplePosition(m_pRec, m_sampler->next2D());
 		}
 
-		boost::tuple<Vector, Float, EMeasure> generateSample() {
+		std::tuple<Vector, Float, EMeasure> generateSample() {
 			#if defined(MTS_DEBUG_FP)
 				enableFPExceptions();
 			#endif
@@ -358,7 +361,7 @@ public:
 				disableFPExceptions();
 			#endif
 
-			return boost::make_tuple(dRec.d, 1.0f, dRec.measure);
+			return std::make_tuple(dRec.d, 1.0f, dRec.measure);
 		}
 
 		Float pdf(const Vector &d, EMeasure measure) const {
@@ -391,8 +394,8 @@ public:
 	void test01_BSDF() {
 		/* Load a set of BSDF instances to be tested from the following XML file */
 		FileResolver *resolver = Thread::getThread()->getFileResolver();
-		const fs::path scenePath =
-			resolver->resolveAbsolute("data/tests/test_bsdf.xml");
+		const fs::pathstr scenePath =
+			resolver->resolveAbsolute(fs::pathstr("data/tests/test_bsdf.xml"));
 		ref<Scene> scene = loadScene(scenePath);
 
 		const ref_vector<ConfigurableObject> &objects = scene->getReferencedObjects();
@@ -429,15 +432,15 @@ public:
 
 				// Initialize the tables used by the chi-square test
 				chiSqr->fill(
-					boost::bind(&BSDFAdapter::generateSample, &adapter),
-					boost::bind(&BSDFAdapter::pdf, &adapter, _1, _2)
+					std::bind(&BSDFAdapter::generateSample, &adapter),
+					std::bind(&BSDFAdapter::pdf, &adapter, _1, _2)
 				);
 
 				// (the following assumes that the distribution has 1 parameter, e.g. exponent value)
 				ChiSquare::ETestResult result = chiSqr->runTest(SIGNIFICANCE_LEVEL);
 				if (result == ChiSquare::EReject) {
 					std::string filename = formatString("failure_%i.m", failureCount++);
-					chiSqr->dumpTables(filename);
+					chiSqr->dumpTables(fs::pathstr(filename));
 					failAndContinue(formatString("Uh oh, the chi-square test indicates a potential "
 						"issue for wi=%s. Dumped the contingency tables to '%s' for user analysis",
 						wi.toString().c_str(), filename.c_str()));
@@ -477,15 +480,15 @@ public:
 
 						// Initialize the tables used by the chi-square test
 						chiSqr->fill(
-							boost::bind(&BSDFAdapter::generateSample, &adapter),
-							boost::bind(&BSDFAdapter::pdf, &adapter, _1, _2)
+							std::bind(&BSDFAdapter::generateSample, &adapter),
+							std::bind(&BSDFAdapter::pdf, &adapter, _1, _2)
 						);
 
 						// (the following assumes that the distribution has 1 parameter, e.g. exponent value)
 						ChiSquare::ETestResult result = chiSqr->runTest(SIGNIFICANCE_LEVEL);
 						if (result == ChiSquare::EReject) {
 							std::string filename = formatString("failure_%i.m", failureCount++);
-							chiSqr->dumpTables(filename);
+							chiSqr->dumpTables(fs::pathstr(filename));
 							failAndContinue(formatString("Uh oh, the chi-square test indicates a potential "
 								"issue for wi=%s. Dumped the contingency tables to '%s' for user analysis",
 								wi.toString().c_str(), filename.c_str()));
@@ -508,8 +511,8 @@ public:
 	void test02_PhaseFunction() {
 		/* Load a set of phase function instances to be tested from the following XML file */
 		FileResolver *resolver = Thread::getThread()->getFileResolver();
-		const fs::path scenePath =
-			resolver->resolveAbsolute("data/tests/test_phase.xml");
+		const fs::pathstr scenePath =
+			resolver->resolveAbsolute(fs::pathstr("data/tests/test_phase.xml"));
 		ref<Scene> scene = loadScene(scenePath);
 
 		const ref_vector<ConfigurableObject> &objects = scene->getReferencedObjects();
@@ -545,15 +548,15 @@ public:
 
 				// Initialize the tables used by the chi-square test
 				chiSqr->fill(
-					boost::bind(&PhaseFunctionAdapter::generateSample, &adapter),
-					boost::bind(&PhaseFunctionAdapter::pdf, &adapter, _1, _2)
+					std::bind(&PhaseFunctionAdapter::generateSample, &adapter),
+					std::bind(&PhaseFunctionAdapter::pdf, &adapter, _1, _2)
 				);
 
 				// (the following assumes that the distribution has 1 parameter, e.g. exponent value)
 				ChiSquare::ETestResult result = chiSqr->runTest(SIGNIFICANCE_LEVEL);
 				if (result == ChiSquare::EReject) {
 					std::string filename = formatString("failure_%i.m", failureCount++);
-					chiSqr->dumpTables(filename);
+					chiSqr->dumpTables(fs::pathstr(filename));
 					failAndContinue(formatString("Uh oh, the chi-square test indicates a potential "
 						"issue for wi=%s. Dumped the contingency tables to '%s' for user analysis",
 						wi.toString().c_str(), filename.c_str()));
@@ -575,8 +578,8 @@ public:
 	void test03_EmitterDirect() {
 		/* Load a set of emitter instances to be tested from the following XML file */
 		FileResolver *resolver = Thread::getThread()->getFileResolver();
-		const fs::path scenePath =
-			resolver->resolveAbsolute("data/tests/test_emitter.xml");
+		const fs::pathstr scenePath =
+			resolver->resolveAbsolute(fs::pathstr("data/tests/test_emitter.xml"));
 		ref<Scene> scene = loadScene(scenePath);
 		scene->initialize();
 
@@ -597,16 +600,16 @@ public:
 
 			// Initialize the tables used by the chi-square test
 			chiSqr->fill(
-				boost::bind(&EmitterAdapter::generateSample, &adapter),
-				boost::bind(&EmitterAdapter::pdf, &adapter, _1, _2)
+				std::bind(&EmitterAdapter::generateSample, &adapter),
+				std::bind(&EmitterAdapter::pdf, &adapter, _1, _2)
 			);
-			chiSqr->dumpTables("test.m");
+			chiSqr->dumpTables(fs::pathstr("test.m"));
 
 			// (the following assumes that the distribution has 1 parameter, e.g. exponent value)
 			ChiSquare::ETestResult result = chiSqr->runTest(SIGNIFICANCE_LEVEL);
 			if (result == ChiSquare::EReject) {
 				std::string filename = formatString("failure_%i.m", failureCount++);
-				chiSqr->dumpTables(filename);
+				chiSqr->dumpTables(fs::pathstr(filename));
 				failAndContinue(formatString("Uh oh, the chi-square test indicates a potential "
 					"issue. Dumped the contingency tables to '%s' for user analysis",
 					filename.c_str()));

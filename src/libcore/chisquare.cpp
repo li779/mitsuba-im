@@ -19,10 +19,12 @@
 #include <mitsuba/core/chisquare.h>
 #include <mitsuba/core/quad.h>
 #include <mitsuba/core/timer.h>
+#include <mitsuba/core/filesystem.h>
 #include <boost/math/distributions/chi_squared.hpp>
 #include <functional>
-//#include <boost/filesystem/fstream.hpp>
+#include <tuple>
 #include <set>
+#include <fstream>
 
 MTS_NAMESPACE_BEGIN
 
@@ -60,8 +62,8 @@ ChiSquare::~ChiSquare() {
 	delete[] m_refTable;
 }
 
-void ChiSquare::dumpTables(const fs::path &filename) {
-	fs::ofstream out(filename);
+void ChiSquare::dumpTables(const fs::pathstr &filename) {
+	std::ofstream out(fs::decode_pathstr(filename).native().c_str());
 	out << "tbl_counts = [ ";
 	for (int i=0; i<m_thetaBins; ++i) {
 		for (int j=0; j<m_phiBins; ++j) {
@@ -88,7 +90,7 @@ void ChiSquare::dumpTables(const fs::path &filename) {
 }
 
 void ChiSquare::fill(
-	const std::function<boost::tuple<Vector, Float, EMeasure>()> &sampleFn,
+	const std::function<std::tuple<Vector, Float, EMeasure>()> &sampleFn,
 	const std::function<Float (const Vector &, EMeasure measure)> &pdfFn) {
 	memset(m_table, 0, m_thetaBins*m_phiBins*sizeof(Float));
 	memset(m_refTable, 0, m_thetaBins*m_phiBins*sizeof(Float));
@@ -101,16 +103,16 @@ void ChiSquare::fill(
 
 	ref<Timer> timer = new Timer();
 	for (size_t i=0; i<m_sampleCount; ++i) {
-		boost::tuple<Vector, Float, EMeasure> sample = sampleFn();
-		Point2 sphCoords = toSphericalCoordinates(boost::get<0>(sample));
+		std::tuple<Vector, Float, EMeasure> sample = sampleFn();
+		Point2 sphCoords = toSphericalCoordinates(std::get<0>(sample));
 
 		int thetaBin = std::min(std::max(0,
 			math::floorToInt(sphCoords.x * factor.x)), m_thetaBins-1);
 		int phiBin = std::min(std::max(0,
 			math::floorToInt(sphCoords.y * factor.y)), m_phiBins-1);
-		m_table[thetaBin * m_phiBins + phiBin] += boost::get<1>(sample);
-		if (boost::get<1>(sample) > 0 && boost::get<2>(sample) == EDiscrete)
-			discreteDirections.insert(boost::get<0>(sample));
+		m_table[thetaBin * m_phiBins + phiBin] += std::get<1>(sample);
+		if (std::get<1>(sample) > 0 && std::get<2>(sample) == EDiscrete)
+			discreteDirections.insert(std::get<0>(sample));
 	}
 
 	if (discreteDirections.size() > 0) {

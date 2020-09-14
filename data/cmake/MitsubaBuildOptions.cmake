@@ -46,6 +46,7 @@ option (MTS_ENABLE_SYSTEM_LIBS "Enable use of system libraries instead of submod
 option (MTS_ENABLE_HW_PREVIEW "Enable HW-accelerated prview rendering" OFF)
 option (MTS_ENABLE_COLLADA "Collada package search can be slow" OFF)
 option (MTS_ENABLE_QTGUI "Enable Qt GUI" OFF)
+option (BUILD_TESTS "Build tests" OFF)
 option(MTS_DEBUG "Enable assertions etc. Usually a good idea." ON)
 if (MTS_DEBUG)
   add_definitions(-DMTS_DEBUG)
