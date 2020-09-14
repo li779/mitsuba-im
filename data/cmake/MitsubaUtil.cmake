@@ -375,7 +375,7 @@ macro (add_mts_exe _exe_name)
   endif ()
 
   set(_exe_core_libraries "mitsuba-core" "mitsuba-render")
-  if (_exe_MTS_HW AND MTS_HAS_HW)
+  if (MTS_HAS_HW) # ignore '_exe_MTS_HW AND ', always required to make linker happy
     list(APPEND _exe_core_libraries "mitsuba-hw")
   endif()
   if (_exe_MTS_BIDIR)

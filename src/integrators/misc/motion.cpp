@@ -20,7 +20,6 @@
 #include <mitsuba/render/renderproc.h>
 #include <mitsuba/core/autodiff.h>
 #include <mitsuba/core/statistics.h>
-#include <boost/algorithm/string.hpp>
 
 DECLARE_DIFFSCALAR_BASE();
 
@@ -139,7 +138,7 @@ public:
 
 	MotionIntegrator(const Properties &props) : SamplingIntegrator(props) {
 		m_time = props.getFloat("time");
-		m_config = boost::to_lower_copy(props.getString("config", "d"));
+		m_config = to_lower_copy(props.getString("config", "d"));
 		if (m_config.length() == 0)
 			Log(EError, "Path configuration string must have at least one entry!");
 		if (m_config[m_config.length()-1] != 'd')

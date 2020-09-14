@@ -18,6 +18,7 @@
 
 #include <mitsuba/render/font.h>
 #include <mitsuba/hw/gputexture.h>
+#include <mitsuba/hw/renderer.h>
 
 MTS_NAMESPACE_BEGIN
 
