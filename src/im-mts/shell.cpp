@@ -105,6 +105,10 @@ struct Config {
 	ProcessConfig process;
 };
 
+static unsigned long long programTimeStamp() {
+	return glfwGetTimerValue() * 1000 / glfwGetTimerFrequency();
+}
+
 struct Document {
 	fs::pathstr filePath = fs::pathstr("../mitsuba/scenes/bitterli/living-room/livingroom_PT.xml");
 	unsigned long long fileTime = 0;
@@ -132,13 +136,9 @@ struct Document {
 				memset(samples.data(), 0, sizeof(samples[0]) * samples.size());
 			}
 
-			static unsigned long long timeStamp() {
-				return glfwGetTimerValue() * 1000 / glfwGetTimerFrequency();
-			}
-
 			void runFrame(mitsuba::Sensor* sensor, InteractiveSceneProcess::Controls controls) {
 				baseTime = glfwGetTime();
-				preview->runGeneration( timeStamp() );
+				preview->runGeneration( programTimeStamp() );
 				process->render(sensor, samples.data(), controls);
 
 				int waitCounter = 0;
@@ -149,13 +149,13 @@ struct Document {
 			}
 
 			void updatePreview() {
-				preview->update(timeStamp(), (float const* const*) process->imageData, samples.data(), (int) samples.size());
+				preview->update(programTimeStamp(), (float const* const*) process->imageData, samples.data(), (int) samples.size());
 			}
 
 			double timeSeconds() const {
 				double time = glfwGetTime();
 				if (baseTime)
-					return double(time - baseTime) / 1000.0f;
+					return double(time - baseTime);
 				return 0.0f;
 			}
 		};
@@ -566,7 +566,7 @@ void run(int argc, char** argv, Window window, ImGuiContext* ui_context) {
 	bool sync_cams = true;
 
 	bool track_file_changes = true;
-	unsigned long long lastTrackerTicks = glfwGetTimerValue();
+	unsigned long long lastTrackerTicks = programTimeStamp();
 
 	// Main loop
 	while (!glfwWindowShouldClose(window.handle)) {
@@ -608,7 +608,7 @@ void run(int argc, char** argv, Window window, ImGuiContext* ui_context) {
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		const unsigned long long currentTicks = glfwGetTimerValue();
+		const unsigned long long currentTicks = programTimeStamp();
 		bool isTrackingFrame = currentTicks >= lastTrackerTicks + 1500;
 		if (isTrackingFrame)
 			lastTrackerTicks = currentTicks;
@@ -728,7 +728,7 @@ void run(int argc, char** argv, Window window, ImGuiContext* ui_context) {
 							selectedSession = openSession(std::move(newDoc));
 					}
 					if (session && !session->scenes.empty()) {
-						ImGui::Selectable("-- replace in session: --", ImGuiSelectableFlags_Disabled);
+						ImGui::Selectable("-- replace in session: --", false, ImGuiSelectableFlags_Disabled);
 						int sceneIdx = 0;
 						for (auto& s : session->scenes) {
 							if (ImGui::Selectable(s->filePath.s.c_str())) {
