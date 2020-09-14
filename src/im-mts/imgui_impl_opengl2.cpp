@@ -39,6 +39,9 @@
 #include <cmath>
 
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#include "../external/GL/glext.h"
+#endif
 
 #define NO_RESTORE_STATE
 

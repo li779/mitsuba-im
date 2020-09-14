@@ -1,5 +1,8 @@
 #include "shell.h"
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#include "../external/GL/glext.h"
+#endif
 
 namespace impl {
 
