@@ -39,8 +39,8 @@ signals:
 class SceneImporter : public Thread {
 public:
 	SceneImporter(FileResolver *resolver,
-		const fs::path &sourceFile, const fs::path &directory,
-		const fs::path &targetScene, const fs::path &adjustmentFile,
+		const fs::pathstr &sourceFile, const fs::pathstr &directory,
+		const fs::pathstr &targetScene, const fs::pathstr &adjustmentFile,
 		bool sRGB);
 
 	void run();
@@ -49,7 +49,7 @@ public:
 
 	inline GUIGeometryConverter *getConverter() { return &m_converter; }
 
-	inline const fs::path &getResult() const { return m_result; }
+	inline const fs::pathstr &getResult() const { return m_result; }
 protected:
 	virtual ~SceneImporter();
 
@@ -57,11 +57,11 @@ private:
 	GUIGeometryConverter m_converter;
 	ref<FileResolver> m_resolver;
 	ref<WaitFlag> m_wait;
-	fs::path m_sourceFile;
-	fs::path m_directory;
-	fs::path m_targetScene;
-	fs::path m_adjustmentFile;
-	fs::path m_result;
+	fs::pathstr m_sourceFile;
+	fs::pathstr m_directory;
+	fs::pathstr m_targetScene;
+	fs::pathstr m_adjustmentFile;
+	fs::pathstr m_result;
 	bool m_srgb;
 };
 

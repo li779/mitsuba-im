@@ -37,37 +37,6 @@ XERCES_CPP_NAMESPACE_END
 MTS_NAMESPACE_BEGIN
 namespace xercesc = XERCES_CPP_NAMESPACE;
 
-#ifdef _MSC_VER
-// Disable warning 4275: non dll-interface used as base for dll-interface class
-// Can be safely ignored when deriving from a type in the Standard C++ Library
-# pragma warning( push )
-# pragma warning( disable : 4275 )
-#endif
-
-/**
- * \brief This exception is thrown when attempting to load an outdated file
- * \ingroup librender
- */
-class MTS_EXPORT_RENDER VersionException : public std::runtime_error {
-public:
-	VersionException(const std::string &str, const Version &version) :
-		std::runtime_error(str), m_version(version) { }
-
-	/* For stupid and subtle reasons when compiling with GCC, it is important
-	   that this class has a virtual member. This will ensure that its typeid
-	   structure is in librender, which is important for throwing exceptions
-	   across DLL boundaries */
-	virtual ~VersionException() noexcept;
-
-	inline const Version &getVersion() const { return m_version; }
-private:
-	Version m_version;
-};
-
-#ifdef _MSC_VER
-# pragma warning( pop )
-#endif
-
 /// Push a cleanup handler to be executed after loading the scene is done
 extern MTS_EXPORT_RENDER void pushSceneCleanupHandler(void (*cleanup)());
 

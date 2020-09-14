@@ -20,6 +20,7 @@
 #include "addserverdlg.h"
 
 #if !defined(__WINDOWS__)
+#include <unistd.h>
 #include <pwd.h>
 #endif
 

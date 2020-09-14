@@ -19,7 +19,7 @@
 #include "upgrade.h"
 #include "save.h"
 #include <mitsuba/core/fresolver.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/filesystem.h>
 #include <QtXmlPatterns/QtXmlPatterns>
 
 struct VersionComparator {
@@ -57,7 +57,7 @@ private:
 
 UpgradeManager::UpgradeManager(const FileResolver *resolver) : m_resolver(resolver){
 	fs::path transformationPath =
-		resolver->resolveAbsolute("data/schema/scene.xsd").parent_path();
+		fs::decode_pathstr(resolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"))).parent_path();
 
 	fs::directory_iterator it(transformationPath), end;
 	SLog(EInfo, "Searching for transformations..");
@@ -66,8 +66,8 @@ UpgradeManager::UpgradeManager(const FileResolver *resolver) : m_resolver(resolv
 		fs::path file = *it;
 		std::string extension = file.extension().string(),
 			filename = file.filename().string();
-		if (boost::to_lower_copy(extension) != ".xsl" ||
-           !boost::starts_with(filename, "upgrade_"))
+		if (to_lower_copy(extension) != ".xsl" ||
+           !starts_with(filename, "upgrade_"))
 			continue;
 		Version version(filename.substr(8, filename.length()-12));
 		m_transformations.push_back(std::make_pair(version, file));
@@ -115,7 +115,7 @@ void UpgradeManager::performUpgrade(const QString &filename, const Version &vers
 
 		SLog(EInfo, "Applying transformation \"%s\" ..",
 			m_transformations[i].second.filename().string().c_str());
-		QString trafoFilename = fromFsPath(m_transformations[i].second);
+		QString trafoFilename = fromFsPath(fs::encode_pathstr(m_transformations[i].second));
 		QFile trafoFile(trafoFilename);
 		if (!trafoFile.open(QIODevice::ReadOnly | QIODevice::Text))
 			SLog(EError, "Unable to open the stylesheet \"%s\" -- stopping "
@@ -173,9 +173,9 @@ void UpgradeManager::performUpgrade(const QString &filename, const Version &vers
 		QDomElement e = n.toElement();
 		if (!e.isNull()) {
 			if (e.tagName() == "include") {
-				fs::path path = m_resolver->resolve(toFsPath(e.attribute("filename")));
+				fs::pathstr path = m_resolver->resolve(toFsPath(e.attribute("filename")));
 				SLog(EInfo, "Recursively upgrading include file \"%s\" ..",
-						path.string().c_str());
+						path.s.c_str());
 				performUpgrade(fromFsPath(path), version);
 			}
 		}

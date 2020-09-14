@@ -402,7 +402,7 @@ if (MTS_ENABLE_QTGUI)
 	# Qt4 (optional)
 	find_package(Qt4 4.7 COMPONENTS
 	  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
-	CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
+	CMAKE_DEPENDENT_OPTION(BUILD_QTGUI "Built the Qt4-based mitsuba GUI." ON
 	  "QT4_FOUND" OFF)
 endif () 
 

@@ -849,6 +849,11 @@ ref<Scene> SceneHandler::loadScene(const fs::pathstr &filename, const ParameterM
 	return scene;
 }
 
+ref<Scene> SceneLoader::loadScene(const fs::pathstr &filename,
+		const ParameterMap &params) {
+	return SceneHandler::loadScene(filename, params);
+}
+
 ref<Scene> SceneHandler::loadSceneFromString(const std::string &content, const ParameterMap &params) {
 	/* Prepare for parsing scene descriptions */
 	FileResolver *resolver = Thread::getThread()->getFileResolver();
@@ -878,6 +883,11 @@ ref<Scene> SceneHandler::loadSceneFromString(const std::string &content, const P
 	delete handler;
 
 	return scene;
+}
+
+ref<Scene> SceneLoader::loadSceneFromString(const std::string &content,
+		const ParameterMap &params) {
+	return SceneHandler::loadSceneFromString(content, params);
 }
 
 SceneLoader::SceneLoader(ParameterMap const& parameters, fs::pathstr const &schemaPathIn) {

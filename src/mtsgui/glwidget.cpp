@@ -30,8 +30,8 @@
 #include <mitsuba/core/mstream.h>
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/qmc.h>
-#include <mitsuba/hw/font.h>
-#include <boost/tuple/tuple.hpp>
+#include <mitsuba/render/font.h>
+#include <tuple>
 
 GLWidget::GLWidget(QWidget *parent) :
 	QGLWidget(parent), m_context(NULL) {
@@ -1320,17 +1320,17 @@ void GLWidget::paintGL() {
 }
 
 void GLWidget::oglRenderKDTree(const KDTreeBase<AABB> *kdtree) {
-	std::stack<boost::tuple<const KDTreeBase<AABB>::KDNode *, AABB, uint32_t> > stack;
+	std::stack<std::tuple<const KDTreeBase<AABB>::KDNode *, AABB, uint32_t> > stack;
 
-	stack.push(boost::make_tuple(kdtree->getRoot(), kdtree->getTightAABB(), 0));
+	stack.push(std::make_tuple(kdtree->getRoot(), kdtree->getTightAABB(), 0));
 	Float brightness = 0.1f;
 
 	glEnable(GL_LINE_SMOOTH);
 	glLineWidth(0.6f);
 	while (!stack.empty()) {
-		const KDTreeBase<AABB>::KDNode *node = boost::get<0>(stack.top());
-		AABB aabb = boost::get<1>(stack.top());
-		int level = boost::get<2>(stack.top());
+		const KDTreeBase<AABB>::KDNode *node = std::get<0>(stack.top());
+		AABB aabb = std::get<1>(stack.top());
+		int level = std::get<2>(stack.top());
 		stack.pop();
 		m_renderer->setColor(Spectrum(brightness));
 		m_renderer->drawAABB(aabb);
@@ -1341,10 +1341,10 @@ void GLWidget::oglRenderKDTree(const KDTreeBase<AABB> *kdtree) {
 			if (level + 1 <= m_context->shownKDTreeLevel) {
 				Float tmp = aabb.max[axis];
 				aabb.max[axis] = split;
-				stack.push(boost::make_tuple(node->getLeft(), aabb, level+1));
+				stack.push(std::make_tuple(node->getLeft(), aabb, level+1));
 				aabb.max[axis] = tmp;
 				aabb.min[axis] = split;
-				stack.push(boost::make_tuple(node->getRight(), aabb, level+1));
+				stack.push(std::make_tuple(node->getRight(), aabb, level+1));
 			} else {
 				aabb.min[axis] = split;
 				aabb.max[axis] = split;
