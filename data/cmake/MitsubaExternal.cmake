@@ -234,6 +234,7 @@ if (NOT Eigen_FOUND)
 endif ()
 
 ###########################################################################
+# Image format support
 
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(JPEG 6)
@@ -243,10 +244,14 @@ if (NOT JPEG_FOUND)
 	# can run in parallel
 	build_externals(libjpeg "${JPEG_LIBRARIES}")
 endif ()
+if (JPEG_FOUND)
+  add_definitions(-DMTS_HAS_LIBJPEG=1)
+endif()
 # legacy fixup
 if (JPEG_INCLUDE_DIR AND NOT JPEG_INCLUDE_DIRS)
 	set (JPEG_INCLUDE_DIRS ${JPEG_INCLUDE_DIR})
 endif ()
+
 
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(ZLIB 1.2)
@@ -267,11 +272,15 @@ if (NOT PNG_FOUND)
 	list(APPEND MTS_EXTERNAL_PROJECT_VARS ZLIB_ROOT)
 	build_externals(libpng "${PNG_LIBRARIES}" zlib)
 endif ()
+if (PNG_FOUND)
+  add_definitions(-DMTS_HAS_LIBPNG=1)
+  add_definitions(${PNG_DEFINITIONS})
+endif()
 # legacy fixups
 if (PNG_INCLUDE_DIR AND NOT PNG_INCLUDE_DIRS)
 	set (PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIR})
 endif ()
-add_definitions(${PNG_DEFINITIONS})
+
 
 if (MTS_ENABLE_SYSTEM_LIBS)
   find_package(IlmBase)
@@ -312,6 +321,9 @@ int main(int argc, char **argv) {
     add_definitions(-DOPENEXR_DLL)
   endif()
 endif()
+if (OPENEXR_FOUND)
+  add_definitions(-DMTS_HAS_OPENEXR=1)
+endif()
 
 ###########################################################################
 
@@ -328,6 +340,7 @@ if (NOT XercesC_FOUND)
 		target_link_libraries(${XercesC_LIBRARY} INTERFACE icuuc icudata)
 	endif ()
 
+	set(XERCES_FOUND ${XercesC_FOUND})
 	set(XERCES_DEFINITIONS ${XercesC_DEFINITIONS})
 	set(XERCES_INCLUDE_DIR ${XercesC_INCLUDE_DIR})
 	set(XERCES_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
@@ -364,7 +377,7 @@ CMAKE_DEPENDENT_OPTION(BUILD_IMGUI "Build the GL-based mitsuba GUI." ON
   "OPENGL_FOUND" OFF)
 
 set (MTS_HAS_HW OFF)
-if (MTS_ENABLE_HW_PREVIEW)
+if (OPENGL_FOUND AND MTS_ENABLE_HW_PREVIEW)
 
 option(GLEW_MX "Enable legacy GLEW MX extension" OFF)
 find_package(GLEW)
@@ -403,7 +416,7 @@ if (MTS_ENABLE_QTGUI)
 	find_package(Qt4 4.7 COMPONENTS
 	  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
 	CMAKE_DEPENDENT_OPTION(BUILD_QTGUI "Built the Qt4-based mitsuba GUI." ON
-	  "QT4_FOUND" OFF)
+	  "QT4_FOUND;MTS_HAS_HW" OFF)
 endif () 
 
 if (MTS_ENABLE_SYSTEM_LIBS)
@@ -491,18 +504,7 @@ if (ILMBASE_FOUND)
   include_directories(${ILMBASE_INCLUDE_DIRS})
 endif()
 
-# Image format definitions
-if (PNG_FOUND)
-  add_definitions(-DMTS_HAS_LIBPNG=1)
-endif()
-if (JPEG_FOUND)
-  add_definitions(-DMTS_HAS_LIBJPEG=1)
-endif()
-if (OPENEXR_FOUND)
-  add_definitions(-DMTS_HAS_OPENEXR=1)
-endif()
-
-# Features
+# Global features
 if (MTS_HAS_HW)
   add_definitions(-DMTS_HAS_HW=1)
 endif()

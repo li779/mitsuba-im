@@ -149,7 +149,7 @@ source_group("Qt Generated" FILES ${MOC_HDRS} ${UI_HDRS} ${RC_SRCS})
 include_directories(${XERCES_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS})
 add_definitions(${GLEW_DEFINITIONS})
 
-set(LIBS ${QT_LIBRARIES} ${GLEW_LIBRARIES})
+set(LIBS ${QT_LIBRARIES} ${GLEW_LIBRARIES} ${X11_LIBRARIES})
 # This static library is built by the mtsimport target (src/converter)
 if (COLLADA_FOUND)
   if (NOT TARGET mtsconverter_lib)

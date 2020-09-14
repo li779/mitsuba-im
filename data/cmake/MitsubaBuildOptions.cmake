@@ -43,7 +43,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Top level configuration definitions
 option (MTS_ENABLE_SYSTEM_LIBS "Enable use of system libraries instead of submodules, if present" OFF)
-option (MTS_ENABLE_HW_PREVIEW "Enable HW-accelerated prview rendering" OFF)
 option (MTS_ENABLE_COLLADA "Collada package search can be slow" OFF)
 option (MTS_ENABLE_QTGUI "Enable Qt GUI" OFF)
 option (BUILD_TESTS "Build tests" OFF)
@@ -106,6 +105,9 @@ if (MTS_DEBUG_FP)
   add_definitions(-DMTS_DEBUG_FP)
 endif()
 
+CMAKE_DEPENDENT_OPTION (MTS_ENABLE_HW_PREVIEW
+  "Enable HW-accelerated preview rendering" OFF
+  "NOT MTS_ENABLE_QTGUI" ON)
 
 # Options to disable MSVC STL debug + security features (slow..!)
 if (MSVC OR (WIN32 AND CMAKE_C_COMPILER_ID MATCHES "Intel"))
