@@ -16,6 +16,9 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// requires Eigen, and never used so far
+#ifdef MTS_HAS_SHVECTOR
+
 #include <mitsuba/core/shvector.h>
 #include <mitsuba/core/transform.h>
 #include <boost/math/special_functions/factorials.hpp>
@@ -555,3 +558,5 @@ Float *SHSampler::legendreIntegrals(Float a, Float b) {
 
 MTS_IMPLEMENT_CLASS(SHSampler, false, Object)
 MTS_NAMESPACE_END
+
+#endif

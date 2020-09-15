@@ -108,7 +108,7 @@ set(SRCS
   sched.cpp
   sched_remote.cpp
   serialization.cpp
-#  shvector.cpp
+  shvector.cpp
   spectrum.cpp
   spline.cpp
   ssemath.cpp
