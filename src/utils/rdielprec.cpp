@@ -20,7 +20,7 @@
 #include <mitsuba/core/quad.h>
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/bind.hpp>
+#include <functional>
 #include <fstream>
 #include <iomanip>
 #include <omp.h>
@@ -34,6 +34,8 @@
 
 #define IOR_START               (1 + 1e-4)
 #define IOR_END                 4
+
+using namespace std::placeholders;
 
 MTS_NAMESPACE_BEGIN
 
@@ -54,6 +56,8 @@ void transmittanceIntegrand(const BSDF *bsdf, const Vector &wi, size_t nPts, con
 			SLog(EError, "%s\n\nNaN!", bRec.toString().c_str());
 	}
 }
+
+// currently missing: Float interpCubic1D(...);
 
 void diffTransmittanceIntegrand(Float *data, size_t resolution, size_t nPts, const Float *in, Float *out) {
 	#pragma omp parallel for
@@ -96,13 +100,13 @@ public:
 
 			Float min[2] = {0, 0}, max[2] = {1, 1};
 			intTransmittance.integrateVectorized(
-				boost::bind(&transmittanceIntegrand, bsdf, wi, _1, _2, _3),
+				std::bind(&transmittanceIntegrand, bsdf, wi, _1, _2, _3),
 				min, max, &transmittances[i], &error, NULL);
 		}
 
 		Float min[1] = { 0 }, max[1] = { 1 };
 		intDiffTransmittance.integrateVectorized(
-			boost::bind(&diffTransmittanceIntegrand, transmittances, resolution, _1, _2, _3),
+			std::bind(&diffTransmittanceIntegrand, transmittances, resolution, _1, _2, _3),
 			min, max, &diffTrans, &error, NULL);
 
 		if (alpha == 0.0f)
@@ -133,7 +137,7 @@ public:
 		os << "iorSteps=" << resolutionIOR << ";" << endl;
 
 		os << "transmittance={" << endl;
-		ref<FileStream> fstream = new FileStream(formatString("data/microfacet/%s.dat", name).c_str(),
+		ref<FileStream> fstream = new FileStream(fs::pathstr(formatString("data/microfacet/%s.dat", name)),
 				inverted ? FileStream::EAppendReadWrite : FileStream::ETruncReadWrite);
 
 		fstream->setByteOrder(Stream::ELittleEndian);

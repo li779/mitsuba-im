@@ -23,7 +23,8 @@
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/version.h>
 #include <mitsuba/render/scene.h>
-#include <boost/filesystem/fstream.hpp>
+#include <mitsuba/core/filesystem.h>
+#include <fstream>
 #include "converter.h"
 
 std::set<std::string> availableTextures;
@@ -36,7 +37,7 @@ void referenceTexture(GeometryConverter *cvt, std::ostream &os, const std::strin
 			filename[i] = '/';
 	}
 
-	fs::path path = fs::path(filename);
+	fs::path path = fs::decode_pathstr(fs::pathstr(filename));
 	fs::path targetPath = textureDir / path.filename();
 	std::string textureName = targetPath.filename().string();
 
@@ -46,7 +47,7 @@ void referenceTexture(GeometryConverter *cvt, std::ostream &os, const std::strin
 		if (!fs::exists(targetPath)) {
 			if (!fs::exists(path)) {
 				ref<FileResolver> fRes = Thread::getThread()->getFileResolver();
-				path = fRes->resolve(path.filename());
+				path = fs::decode_pathstr( fRes->resolve(fs::encode_pathstr(path.filename())) );
 				if (!fs::exists(path)) {
 					SLog(EWarn, "Found neither \"%s\" nor \"%s\"!", filename.c_str(), path.string().c_str());
 					path = cvt->locateResource(path.filename());
@@ -54,13 +55,13 @@ void referenceTexture(GeometryConverter *cvt, std::ostream &os, const std::strin
 					if (path.empty())
 						SLog(EError, "Unable to locate a resource -- aborting conversion.");
 					else
-						fRes->appendPath(path.parent_path());
+						fRes->appendPath(fs::encode_pathstr( path.parent_path() ));
 				}
 			}
 
 			if (fs::absolute(path) != fs::absolute(targetPath)) {
-				ref<FileStream> input = new FileStream(path, FileStream::EReadOnly);
-				ref<FileStream> output = new FileStream(targetPath, FileStream::ETruncReadWrite);
+				ref<FileStream> input = new FileStream(fs::encode_pathstr(path), FileStream::EReadOnly);
+				ref<FileStream> output = new FileStream(fs::encode_pathstr(targetPath), FileStream::ETruncReadWrite);
 				input->copyTo(output);
 				output->close();
 				input->close();
@@ -110,7 +111,7 @@ void addMaterial(GeometryConverter *cvt, std::ostream &os, const std::string &mt
 void parseMaterials(GeometryConverter *cvt, std::ostream &os, const fs::path &texturesDir,
 		const fs::path &mtlFileName, std::set<std::string> &mtlList) {
 	SLog(EInfo, "Loading OBJ materials from \"%s\" ..", mtlFileName.string().c_str());
-	fs::ifstream is(mtlFileName);
+	std::ifstream is(mtlFileName.native().c_str());
 	if (is.bad() || is.fail())
 		SLog(EError, "Unexpected I/O error while accessing material file '%s'!",
 			mtlFileName.string().c_str());
@@ -154,7 +155,7 @@ void GeometryConverter::convertOBJ(const fs::path &inputFile,
 	const fs::path &textureDirectory,
 	const fs::path &meshesDirectory) {
 
-	fs::ifstream is(inputFile);
+	std::ifstream is(inputFile.native().c_str());
 	if (is.bad() || is.fail())
 		SLog(EError, "Could not open OBJ file '%s'!", inputFile.string().c_str());
 
@@ -172,8 +173,8 @@ void GeometryConverter::convertOBJ(const fs::path &inputFile,
 			std::getline(is, line);
 			std::string mtlName = trim(line.substr(1, line.length()-1));
 			ref<FileResolver> fRes = Thread::getThread()->getFileResolver()->clone();
-			fRes->prependPath(fs::absolute(fRes->resolve(inputFile)).parent_path());
-			fs::path fullMtlName = fRes->resolve(mtlName);
+			fRes->prependPath(fs::encode_pathstr( fs::absolute( fs::decode_pathstr(fRes->resolve(fs::encode_pathstr(inputFile))) ).parent_path() ));
+			fs::path fullMtlName = fs::decode_pathstr( fRes->resolve(fs::pathstr(mtlName)) );
 			if (fs::exists(fullMtlName))
 				parseMaterials(this, os, textureDirectory, fullMtlName, mtlList);
 			else
@@ -201,7 +202,7 @@ void GeometryConverter::convertOBJ(const fs::path &inputFile,
 		if (!m_geometryFile) {
 			std::string filename = mesh->getName() + std::string(".serialized");
 			SLog(EInfo, "Saving \"%s\"", filename.c_str());
-			ref<FileStream> stream = new FileStream(meshesDirectory / filename, FileStream::ETruncReadWrite);
+			ref<FileStream> stream = new FileStream(fs::encode_pathstr(meshesDirectory / filename), FileStream::ETruncReadWrite);
 			stream->setByteOrder(Stream::ELittleEndian);
 			mesh->serialize(stream);
 			stream->close();

@@ -7,11 +7,16 @@ include_directories(${COLLADA_INCLUDE_DIRS} ${XERCES_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR})
 
 set(SRCS
-  collada.cpp
   converter.h
   converter.cpp
   obj.cpp
 )
+
+if (COLLADA_FOUND)
+  set(SRCS ${SRCS} collada.cpp)
+else()
+  message(STATUS "Collada DOM was not found. The COLLADA importer will not be built.")
+endif()
 
 # COLLADA-DOM 2.4 introduces namespaces, which are not source-compatible
 if (COLLADA_NAMESPACE)
@@ -22,7 +27,10 @@ endif()
 # libraries will allow transitive linking.
 add_library(mtsconverter_lib STATIC ${SRCS})
 target_link_libraries(mtsconverter_lib
-	${COLLADA_LIBRARIES} ${XERCES_LIBRARIES} ${OPENGL_glu_LIBRARY})
+	${XERCES_LIBRARIES} ${OPENGL_glu_LIBRARY})
+if (COLLADA_FOUND)
+  target_link_libraries(mtsconverter_lib ${COLLADA_LIBRARIES})
+endif ()
 
 add_mts_exe(mtsimport mtsimport.cpp ${SRCS}
   ${MTS_DARWIN_STUB} ${MTS_WINDOWS_STUB} MTS_HW LINK_LIBRARIES mtsconverter_lib

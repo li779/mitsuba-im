@@ -110,10 +110,10 @@ endif()
 add_subdirectory(src/mitsuba)
 
 # Build the COLLADA converter
-if (COLLADA_FOUND)
+if (XERCES_FOUND)
   add_subdirectory(src/converter)
 else()
-  message(STATUS "Collada DOM was not found. The importer will not be built.")
+  message(STATUS "XercesC was not found. The importer will not be built.")
 endif()
 
 # Build the Qt-based GUI binaries
@@ -126,12 +126,14 @@ endif()
 # Build IM-MTS
 if (BUILD_IMGUI)
 	add_subdirectory(src/im-mts)
+elseif(NOT OPENGL_FOUND)
+  message(STATUS "OpenGL was not found. The mitsuba IMGUI will not be built.")
 endif()
 
 # ===== Build the plugins =====
 
 # Utilities
-#add_subdirectory(src/utils) #todo: convert to std c++
+add_subdirectory(src/utils)
 # Surface scattering models
 add_subdirectory(src/bsdfs)
 # Phase functions

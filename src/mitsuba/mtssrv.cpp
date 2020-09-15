@@ -22,7 +22,9 @@
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/core/sshstream.h>
 #include <mitsuba/core/fstream.h>
+#ifdef MTS_HAS_SHVECTOR
 #include <mitsuba/core/shvector.h>
+#endif
 #include <mitsuba/core/appender.h>
 #include <mitsuba/core/version.h>
 #include <mitsuba/core/fresolver.h>
@@ -113,7 +115,7 @@ int mtssrv(int argc, char **argv) {
 				case 'a': {
 						std::vector<std::string> paths = tokenize(optarg, ";");
 						for (int i=(int)paths.size()-1; i>=0; --i)
-							fileResolver->prependPath(paths[i]);
+							fileResolver->prependPath(fs::pathstr(paths[i]));
 					}
 					break;
 				case 'c':
@@ -416,7 +418,9 @@ int mts_main(int argc, char **argv) {
 	Spectrum::staticInitialization();
 	Bitmap::staticInitialization();
 	Scheduler::staticInitialization();
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticInitialization();
+#endif
 
 #if defined(__WINDOWS__)
 	/* Initialize WINSOCK2 */
@@ -434,7 +438,9 @@ int mts_main(int argc, char **argv) {
 	int retval = mtssrv(argc, argv);
 
 	/* Shutdown the core framework */
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticShutdown();
+#endif
 	Scheduler::staticShutdown();
 	Bitmap::staticShutdown();
 	Spectrum::staticShutdown();

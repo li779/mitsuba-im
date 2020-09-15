@@ -36,7 +36,8 @@
 #include <xercesc/util/XMLUni.hpp>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/filesystem.h>
+#include <fstream>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <set>
@@ -119,7 +120,7 @@ void GeometryConverter::convert(const fs::path &inputFile,
 	if (m_packGeometry) {
 		m_geometryFileName = outputDirectory / sceneName;
 		m_geometryFileName.replace_extension(".serialized");
-		m_geometryFile = new FileStream(m_geometryFileName, FileStream::ETruncReadWrite);
+		m_geometryFile = new FileStream(fs::encode_pathstr(m_geometryFileName), FileStream::ETruncReadWrite);
 		m_geometryFile->setByteOrder(Stream::ELittleEndian);
 	}
 
@@ -136,11 +137,14 @@ void GeometryConverter::convert(const fs::path &inputFile,
 	std::ostringstream os;
 	SLog(EInfo, "Beginning conversion ..");
 
-	std::string extension = boost::to_lower_copy(inputFile.extension().string());
+	std::string extension = to_lower_copy(inputFile.extension().string());
 
+#ifdef MTS_HAS_COLLADA
 	if (extension == ".dae" || extension == ".zae") {
 		convertCollada(inputFile, os, textureDirectory, meshesDirectory);
-	} else if (extension == ".obj") {
+	} else
+#endif
+	if (extension == ".obj") {
 		convertOBJ(inputFile, os, textureDirectory, meshesDirectory);
 	} else {
 		SLog(EError, "Unknown input format (must end in either .DAE, .ZAE or .OBJ)");
@@ -279,7 +283,7 @@ void GeometryConverter::convert(const fs::path &inputFile,
 			}
 		}
 
-		fs::ofstream os(outputFile);
+		std::ofstream os(outputFile.native().c_str());
 		os << oss.str();
 		os.close();
 		delete output;
@@ -289,7 +293,7 @@ void GeometryConverter::convert(const fs::path &inputFile,
 		delete serializer;
 		parser->release();
 	} else {
-		fs::ofstream ofile(outputFile);
+		std::ofstream ofile(outputFile.native().c_str());
 		if (ofile.fail())
 			SLog(EError, "Could not write to \"%s\"!", outputFile.string().c_str());
 		ofile << os.str();
