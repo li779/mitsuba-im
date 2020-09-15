@@ -61,7 +61,7 @@ if (MTS_ZLIB_INSTALL_DIR)
 		set(BUILD_SHARED_LIBS FALSE)
 		set(CMAKE_INSTALL_PREFIX ${MTS_ZLIB_INSTALL_DIR})
 		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-		
+
 		set(ZLIB_TARGET_NAME zlibstatic)
 		add_external_package(${MTS_ZLIB_DIR} EXCLUDE_FROM_ALL)
 		publish_external_targets(ZLIB ${ZLIB_TARGET_NAME})
@@ -173,7 +173,7 @@ if (MTS_XERCESC_INSTALL_DIR)
 		set(threads OFF CACHE INTERNAL "")
 		set(CMAKE_INSTALL_PREFIX ${MTS_XERCESC_INSTALL_DIR})
 		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-		
+
 		add_external_package(${MTS_XERCESC_DIR} EXCLUDE_FROM_ALL)
 		publish_external_targets(XercesC xerces-c)
 		# reset
@@ -186,6 +186,21 @@ if (MTS_XERCESC_INSTALL_DIR)
 			DESTINATION ${MTS_XERCESC_INSTALL_DIR}/include/xercesc/util)
 	endfunction ()
 	add_xerces(xerces-c)
+endif ()
+
+if (MTS_PUGIXML_INSTALL_DIR)
+	function (add_pugixml MTS_PUGIXML_DIR)
+		set(CMAKE_INSTALL_PREFIX ${MTS_PUGIXML_INSTALL_DIR})
+		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+		add_library(pugixml STATIC ${MTS_PUGIXML_DIR}/src/pugixml.cpp)
+		set_property(SOURCE ${MTS_PUGIXML_DIR}/src/pugixml.cpp
+			APPEND PROPERTY COMPILE_DEFINITIONS PUGIXML_BUILD_DLL)
+		publish_external_targets(pugixml pugixml)
+
+		install(DIRECTORY ${MTS_PUGIXML_DIR}/src/ DESTINATION ${MTS_PUGIXML_INSTALL_DIR}/include FILES_MATCHING PATTERN *.hpp)
+	endfunction ()
+	add_pugixml(pugixml)
 endif ()
 
 if (MTS_GLFW_INSTALL_DIR)

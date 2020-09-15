@@ -31,9 +31,9 @@
 [submodule "external/openexr"]
 	path = external/openexr
 	url = https://github.com/openexr/openexr
-[submodule "external/xerces-c"]
-	path = external/xerces-c
-	url = https://github.com/apache/xerces-c
+[submodule "external/pugixml"]
+	path = external/pugixml
+	url = https://github.com/zeux/pugixml
 [submodule "external/glfw"]
 	path = external/glfw
 	url = https://github.com/glfw/glfw
