@@ -561,3 +561,10 @@ WorkLane* WorkLane::create(Worker* worker) {
 	return new impl::WorkLane(worker);
 }
 WorkLane::~WorkLane() = default;
+
+void WorkLane::yield() {
+	std::this_thread::yield();
+}
+void WorkLane::sleep(int time) {
+	std::this_thread::sleep_for(std::chrono::milliseconds(time));
+}

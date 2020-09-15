@@ -34,9 +34,9 @@
 [submodule "external/xerces-c"]
 	path = external/xerces-c
 	url = https://github.com/apache/xerces-c
-[submodule "external/SDL"]
-	path = external/SDL
-	url = https://github.com/spurious/SDL-mirror
+[submodule "external/glfw"]
+	path = external/glfw
+	url = https://github.com/glfw/glfw
 [submodule "external/imgui"]
 	path = external/imgui
 	url = https://github.com/ocornut/imgui
