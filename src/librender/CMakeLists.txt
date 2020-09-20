@@ -79,6 +79,7 @@ set(SRCS
   sampler.cpp
   scene.cpp
   scenehandler.cpp
+  sceneversions.cpp
   sensor.cpp
   shader.cpp
   shape.cpp

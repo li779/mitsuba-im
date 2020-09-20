@@ -184,6 +184,37 @@ static std::string file_offset(const fs::pathstr &filename, ptrdiff_t pos);
 #endif
 
 // -----------------------------------------------------------------------
+
+#ifdef MTS_USE_PUGIXML
+void upgrade_to_030(pugi::xml_node& root);
+void upgrade_to_040(pugi::xml_node& root);
+void upgrade_to_050(pugi::xml_node& root);
+void upgrade_to_060(pugi::xml_node& root);
+
+static pugi::xml_node automatic_upgrade(pugi::xml_node scene, char const* filename) {
+	Version version;
+	pugi::xml_attribute va = scene.attribute("version");
+	if (!va) {
+		SLog(EWarn, "Lacking version string, automatically upgrading scene \"%s\" to 0.3.0", filename);
+		upgrade_to_030(scene);
+		version = Version(0, 3, 0);
+	} else
+		version = Version(va.value());
+	if (version < Version(0, 4, 0)) {
+		SLog(EWarn, "Automatically upgrading scene \"%s\" to 0.4.0", filename);
+		upgrade_to_040(scene);
+		version = Version(0, 3, 0);
+	}
+	if (version < Version(0, 5, 0)) {
+		SLog(EWarn, "Automatically upgrading scene \"%s\" to 0.5.0", filename);
+		upgrade_to_050(scene);
+		version = Version(0, 5, 0);
+	}
+	return scene;
+}
+#endif
+
+// -----------------------------------------------------------------------
 //  Implementation of the SAX DocumentHandler interface
 // -----------------------------------------------------------------------
 
@@ -722,7 +753,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 					SLog(EError, "XML parse error. %s (offset %ti): %s", file_offset(path, res.offset).c_str(), res.offset, res.description());
 				else {
 					handler.m_locatorCtx = [&path](ptrdiff_t pos){ return file_offset(path, pos); };
-					doc.first_child().traverse(handler);
+					automatic_upgrade(doc.first_child(), path.s.c_str()).traverse(handler);
 				}
 #endif
 				object = handler.getScene();
@@ -960,7 +991,7 @@ ref<Scene> SceneHandler::loadScene(const fs::pathstr &filename, const ParameterM
 		SLog(EError, "XML parse error. %s (offset %ti): %s", file_offset(filename, res.offset).c_str(), res.offset, res.description());
 	else {
 		handler.m_locatorCtx = [&filename](ptrdiff_t pos){ return file_offset(filename, pos); };
-		doc.first_child().traverse(handler);
+		automatic_upgrade(doc.first_child(), filename.s.c_str()).traverse(handler);
 		return handler.getScene();
 	}
 	SAssert(false);
@@ -1009,7 +1040,7 @@ ref<Scene> SceneHandler::loadSceneFromString(const std::string &content, const P
 		SLog(EError, "XML parse error. %s (offset %ti): %s", string_offset(content, res.offset).c_str(), res.offset, res.description());
 	else {
 		handler.m_locatorCtx = [&content](ptrdiff_t pos){ return string_offset(content, pos); };
-		doc.first_child().traverse(handler);
+		automatic_upgrade(doc.first_child(), "<string input>").traverse(handler);
 		return handler.getScene();
 	}
 	SAssert(false);
@@ -1080,7 +1111,7 @@ ref<Scene> SceneLoader::load(fs::pathstr const &file) {
 		SLog(EError, "XML parse error. %s (offset %ti): %s", file_offset(file, res.offset).c_str(), res.offset, res.description());
 	else {
 		handler->m_locatorCtx = [&file](ptrdiff_t pos){ return file_offset(file, pos); };
-		doc.first_child().traverse(*handler);
+		automatic_upgrade(doc.first_child(), file.s.c_str()).traverse(*handler);
 	}
 #endif
 
