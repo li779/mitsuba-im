@@ -812,9 +812,11 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 						props.setTransform("toWorld", trafo->eval(0));
 
 					object = m_pluginManager->createObject(tag.second, props);
+					object->storeQueriedFlags(props);
 
 					if (!trafo->isStatic()) {
 						object = m_pluginManager->createObject(tag.second, props);
+						object->storeQueriedFlags(props);
 						/* If the object has children, append them */
 						for (std::vector<std::pair<std::string, ConfigurableObject *> >
 								::iterator it = context.children.begin();
@@ -837,12 +839,14 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 						Properties instanceProps("instance");
 						instanceProps.setAnimatedTransform("toWorld", trafo);
 						object = m_pluginManager->createObject(instanceProps);
+						object->storeQueriedFlags(instanceProps);
 						object->addChild(shapeGroup);
 
 					}
 				} else {
 					try {
 						object = m_pluginManager->createObject(tag.second, props);
+						object->storeQueriedFlags(props);
 					} catch (const std::exception &ex) {
 						XMLLog(EError, "Error while creating object: %s", ex.what());
 					}

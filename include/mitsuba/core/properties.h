@@ -250,6 +250,9 @@ public:
 
 	/// Mutate during query to record defaults.
 	void recordQueriesAndDefaults(bool mutateToRecord) { m_mutateToRecord = mutateToRecord; }
+
+	/// Copy queried flags
+	void copyQueriedFlags(const Properties& other);
 private:
 	std::map<std::string, PropertyElement> *m_elements;
 	std::string m_pluginName, m_id;
