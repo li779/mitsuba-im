@@ -67,6 +67,20 @@ typedef void (*CleanupFun) ();
 typedef std::unordered_set<CleanupFun> CleanupSet;
 static PrimitiveThreadLocal<CleanupSet> __cleanup_tls;
 
+struct NestedFileResolver {
+	ref<FileResolver> resolver = Thread::getThread()->getFileResolver();
+	ref<FileResolver> docResolver = resolver->clone();
+
+	NestedFileResolver(fs::pathstr const &file) {
+		fs::path docDir = fs::absolute(fs::decode_pathstr(file)).parent_path();
+		docResolver->appendPath(fs::encode_pathstr(docDir));
+		Thread::getThread()->setFileResolver(docResolver);
+	}
+	~NestedFileResolver() {
+		Thread::getThread()->setFileResolver(resolver);
+	}
+};
+
 SceneHandler::SceneHandler(const ParameterMap &params,
 	NamedObjectMap *namedObjects, bool isIncludedFile) : m_params(params),
 		m_namedObjects(namedObjects), m_isIncludedFile(isIncludedFile) {
@@ -728,6 +742,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 		case EInclude: {
 				FileResolver *resolver = Thread::getThread()->getFileResolver();
 				fs::pathstr path = resolver->resolve(fs::pathstr(context.attributes["filename"]));
+				NestedFileResolver docResolverGuard(path);
 				XMLLog(EInfo, "Parsing included file \"%s\" ..", path.s.c_str());
 
 				SceneHandler handler{m_params, m_namedObjects, true};
@@ -1087,19 +1102,7 @@ SceneLoader::~SceneLoader() {
 }
 
 ref<Scene> SceneLoader::load(fs::pathstr const &file) {
-	struct DocResolver {
-		ref<FileResolver> resolver = Thread::getThread()->getFileResolver();
-		ref<FileResolver> docResolver = resolver->clone();
-
-		DocResolver(fs::pathstr const &file) {
-			fs::path docDir = fs::absolute(fs::decode_pathstr(file)).parent_path();
-			docResolver->appendPath(fs::encode_pathstr(docDir));
-			Thread::getThread()->setFileResolver(docResolver);
-		}
-		~DocResolver() {
-			Thread::getThread()->setFileResolver(resolver);
-		}
-	} docPathGuard(file);
+	NestedFileResolver docResolverGuard(file);
 
 #ifndef MTS_USE_PUGIXML
 	SAXParser* parser = static_cast<SAXParser*>(this->parser);
