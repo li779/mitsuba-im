@@ -772,6 +772,14 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 				}
 #endif
 				object = handler.getScene();
+
+				/* import defaults, if requested */
+				if (context.attributes.find("import") != context.attributes.end()) {
+					if (context.attributes["import"] == "defaults")
+						for (auto& v : handler.m_params)
+							if (m_params.find(v.first) == m_params.end())
+								m_params[v.first] = v.second;
+				}
 			}
 			break;
 

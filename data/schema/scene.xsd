@@ -316,6 +316,7 @@
 
 	<xsd:complexType name="include">
 		<xsd:attribute name="filename" type="xsd:string" use="required"/>
+		<xsd:attribute name="import" type="xsd:string" use="optional"/>
 	</xsd:complexType>
 
 	<xsd:complexType name="alias">
