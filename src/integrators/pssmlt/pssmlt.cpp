@@ -330,9 +330,10 @@ public:
 
 		size_t luminanceSamples = m_config.luminanceSamples;
 		if (luminanceSamples < (size_t) m_config.workUnits * 10) {
-			luminanceSamples = (size_t) m_config.workUnits * 10;
-			Log(EWarn, "Warning: increasing number of luminance samples to " SIZE_T_FMT,
-				luminanceSamples);
+			size_t incrLuminanceSamples = (size_t) m_config.workUnits * 10;
+			Log(EWarn, "Warning: Increasing number of luminance samples to " SIZE_T_FMT ", was " SIZE_T_FMT,
+				incrLuminanceSamples, luminanceSamples);
+			luminanceSamples = incrLuminanceSamples;
 		}
 
 		m_config.nMutations = (cropSize.x * cropSize.y *
