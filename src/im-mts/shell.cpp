@@ -235,6 +235,7 @@ struct Document {
 
 			sensor->applyTo(scene->getSensor());
 
+			scene->setScenePreprocessed(isRestart && skipInit);
 			scene->setIntegratorPreprocessed(true);
 			scene->preprocess(nullptr, nullptr, -1, -1, -1); // todo: this might crash for more advanced subsurf integrators ...?
 			if (!isRestart || !skipInit)
@@ -267,8 +268,7 @@ struct Document {
 		}
 
 		void reallocate() {
-			// todo: assert that scene is actually preprocessed, somehow?
-			processedScene = Scene::clonePreprocessed(*interactiveScene);
+			processedScene = Scene::cloneScene(*interactiveScene);
 			process.reset( process->create(processedScene) );
 			preview.reset( preview->create(process->resolution.x, process->resolution.y) );
 		}

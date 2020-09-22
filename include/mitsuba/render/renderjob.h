@@ -35,6 +35,7 @@ MTS_NAMESPACE_BEGIN
  * \ingroup libpython
  */
 class MTS_EXPORT_RENDER RenderJob : public Thread {
+	friend class Scene;
 public:
 	/**
 	 * \brief Create a new render job for the given scene.

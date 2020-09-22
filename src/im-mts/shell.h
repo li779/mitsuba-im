@@ -22,7 +22,7 @@ struct Scene {
 	static mitsuba::ref<mitsuba::Sensor> cloneSensor(mitsuba::Sensor& sensor, mitsuba::Sampler* sampler = nullptr, mitsuba::Film* film = nullptr);
 	static mitsuba::ref<mitsuba::Integrator> cloneIntegrator(mitsuba::Integrator const& sensor);
 	static mitsuba::ref<mitsuba::Sampler> cloneSampler(mitsuba::Sampler const& sampler, int scramble = 0, float sampleMultiplier = 1.0f);
-	static mitsuba::ref<mitsuba::Scene> clonePreprocessed(mitsuba::Scene& scene);
+	static mitsuba::ref<mitsuba::Scene> cloneScene(mitsuba::Scene& scene);
 
 	static std::vector<std::string> availablePlugins(char const* symbol, bool refresh);
 	static mitsuba::ref<mitsuba::ConfigurableObject> createTemplate(mitsuba::Properties const& properties, mitsuba::Class const* type = nullptr);

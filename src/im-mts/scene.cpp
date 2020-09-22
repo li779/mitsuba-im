@@ -100,7 +100,7 @@ mitsuba::ref<mitsuba::Sampler> Scene::cloneSampler(mitsuba::Sampler const& sampl
 	return newSampler;
 }
 
-mitsuba::ref<mitsuba::Scene> Scene::clonePreprocessed(mitsuba::Scene& oldScene) {
+mitsuba::ref<mitsuba::Scene> Scene::cloneScene(mitsuba::Scene& oldScene) {
 	mitsuba::ref<mitsuba::Integrator> integrator = cloneIntegrator(*oldScene.getIntegrator());
 	mitsuba::ref<mitsuba::Sampler> sampler = cloneSampler(*oldScene.getSampler());
 	mitsuba::ref<mitsuba::Sensor> sensor = cloneSensor(*oldScene.getSensor(), sampler);
@@ -110,7 +110,7 @@ mitsuba::ref<mitsuba::Scene> Scene::clonePreprocessed(mitsuba::Scene& oldScene) 
 	scene->setSensor(sensor);
 	scene->setSampler(sampler);
 	scene->removeSensor(oldScene.getSensor());
-	scene->setScenePreprocessed(true);
+	//scene->setScenePreprocessed(true);
 	scene->configure();
 	return scene;
 }

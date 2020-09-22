@@ -431,7 +431,25 @@ bool Scene::preprocess(RenderQueue *queue, const RenderJob *job,
 		sceneResID, sensorResID, samplerResID))
 		return false;
 
-	if (!m_scenePreprocessed) {
+	if (!m_scenePreprocessed && !m_ssIntegrators.empty()) {
+		struct TmpJop {
+			ref<RenderQueue> tmpQueue;
+			ref<RenderJob> tmpJob;
+			TmpJop(RenderQueue *&queue, const RenderJob *&job, Scene* scene, int &sceneResID, int &sensorResID, int &samplerResID) {
+				if (!job) {
+					tmpQueue = new RenderQueue();
+					tmpJob = new RenderJob("<subsurface>", scene, tmpQueue, -1, -1, -1, false, false);
+					queue = tmpQueue.get();
+					job = tmpJob.get();
+					sceneResID = job->m_sceneResID; sensorResID = job->m_sensorResID; samplerResID = job->m_samplerResID;
+				}
+			}
+			~TmpJop() {
+				tmpQueue->removeJob(tmpJob, false);
+				tmpJob->decRef();
+			}
+		} tmpJob(queue, job, this, sceneResID, sensorResID, samplerResID);
+
 		/* Pre-process step for all sub-surface integrators (each one in independence) */
 		for (ref_vector<Subsurface>::iterator it = m_ssIntegrators.begin();
 				it != m_ssIntegrators.end(); ++it)
