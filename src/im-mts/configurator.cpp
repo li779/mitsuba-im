@@ -20,9 +20,9 @@ namespace impl {
 				std::string fallbackValue;
 
 				Parameter(std::string name_, mitsuba::Properties const& props)
-					: name(std::move(name_))
+					: components(0)
 					, type(-1)
-					, components(0) {
+					, name(std::move(name_)) {
 					auto mtsType = props.getType(name);
 					if (mtsType == mitsuba::Properties::EBoolean) {
 						type = ImGuiDataType_U8;
@@ -97,9 +97,9 @@ namespace impl {
 				void apply(mitsuba::Properties& props) {
 					if (components > 1) {
 						if (props.getType(name) == mitsuba::Properties::EVector)
-							props.setVector(name, (mitsuba::Vector const&) value.f, false);
+							props.setVector(name, mitsuba::Vector(value.f[0], value.f[1], value.f[2]), false);
 						else
-							props.setPoint(name, (mitsuba::Point const&) value.f, false);
+							props.setPoint(name, mitsuba::Point(value.f[0], value.f[1], value.f[2]), false);
 					}
 					else if (components > 0) {
 						if (type == ImGuiDataType_Float || type == ImGuiDataType_Double)

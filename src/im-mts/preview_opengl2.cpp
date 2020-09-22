@@ -106,7 +106,7 @@ namespace impl {
 		}
 		bool ready(unsigned long long timestamp) const {
 			bool hasData = false;
-			int basetime = currentBasetime;
+			unsigned long long basetime = currentBasetime;
 			if (basetime != 0) {
 				for (int i = 0; i < (int) stamps.size(); ++i) {
 					hasData |= (basetime <= (volatile unsigned long long&) stamps[i]);

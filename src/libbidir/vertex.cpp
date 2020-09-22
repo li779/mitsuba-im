@@ -25,7 +25,7 @@ static StatsCounter mediumInconsistencies("Bidirectional layer",
 		"Medium inconsistencies in sampleNext()");
 
 void PathVertex::makeEndpoint(const Scene *scene, Float time, ETransportMode mode) {
-	memset(this, 0, sizeof(PathVertex));
+	memset((void*) this, 0, sizeof(PathVertex));
 	type = (mode == EImportance) ? EEmitterSupernode : ESensorSupernode;
 	getEndpointRecord() = EndpointRecord(time);
 	degenerate = (mode == EImportance)
@@ -38,8 +38,8 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 		ETransportMode mode, bool russianRoulette, Spectrum *throughput) {
 	Ray ray;
 
-	memset(succEdge, 0, sizeof(PathEdge));
-	memset(succ, 0, sizeof(PathVertex));
+	memset((void*) succEdge, 0, sizeof(PathEdge));
+	memset((void*) succ, 0, sizeof(PathVertex));
 
 	succEdge->medium = (predEdge == NULL) ? NULL : predEdge->medium;
 	rrWeight = 1.0f;
@@ -316,8 +316,8 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 	const Sensor *sensor = scene->getSensor();
 	Point2 pixelPosition(pixelPosition_);
 
-	memset(e0, 0, sizeof(PathEdge));
-	memset(v1, 0, sizeof(PathVertex));
+	memset((void*) e0, 0, sizeof(PathEdge));
+	memset((void*) v1, 0, sizeof(PathVertex));
 
 	Point2 pixelSample = sampler->next2D(),
 		   apertureSample = sensor->needsApertureSample() ? sampler->next2D() : Point2(0.5f);
@@ -349,8 +349,8 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 	if (result.isZero())
 		return 1;
 
-	memset(e1, 0, sizeof(PathEdge));
-	memset(v2, 0, sizeof(PathVertex));
+	memset((void*) e1, 0, sizeof(PathEdge));
+	memset((void*) v2, 0, sizeof(PathVertex));
 
 	v1->weight[EImportance] = result * dRec.pdf * (
 		sensor->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
@@ -489,8 +489,8 @@ bool PathVertex::perturbDirection(const Scene *scene, const PathVertex *pred,
 	const Vector &d, Float dist, EVertexType desiredType, ETransportMode mode) {
 	Ray ray(getPosition(), d, pred->getTime());
 
-	memset(succEdge, 0, sizeof(PathEdge));
-	memset(succ, 0, sizeof(PathVertex));
+	memset((void*) succEdge, 0, sizeof(PathEdge));
+	memset((void*) succ, 0, sizeof(PathVertex));
 
 	succ->measure = EInvalidMeasure;
 	succEdge->medium = (predEdge == NULL) ? NULL : predEdge->medium;
@@ -687,8 +687,8 @@ bool PathVertex::propagatePerturbation(const Scene *scene, const PathVertex *pre
 	if (!(bsdf->getType() & BSDF::EDelta))
 		return false;
 
-	memset(succEdge, 0, sizeof(PathEdge));
-	memset(succ, 0, sizeof(PathVertex));
+	memset((void*) succEdge, 0, sizeof(PathEdge));
+	memset((void*) succ, 0, sizeof(PathVertex));
 
 	Vector wi = normalize(pred->getPosition() - its.p);
 
@@ -1025,9 +1025,9 @@ Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 	if (isDegenerate() || isAbsorbing())
 		return Spectrum(0.0f);
 
-	memset(edge, 0, sizeof(PathEdge));
-	memset(endpoint, 0, sizeof(PathVertex));
-	memset(sample, 0, sizeof(PathVertex));
+	memset((void*) edge, 0, sizeof(PathEdge));
+	memset((void*) endpoint, 0, sizeof(PathVertex));
+	memset((void*) sample, 0, sizeof(PathVertex));
 
 	bool emitter = (mode == EImportance);
 	DirectSamplingRecord dRec;

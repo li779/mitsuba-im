@@ -620,7 +620,7 @@ public:
 			Log(EInfo, "Precomputing shading normals ..");
 			size_t size = (size_t) m_dataSize.x * (size_t) m_dataSize.y * sizeof(Normal);
 			m_normals = (Normal *) allocAligned(size);
-			memset(m_normals, 0, size);
+			memset((void*) m_normals, 0, size);
 			storageSize += size;
 
 			for (int offset=0; offset<2; ++offset) {

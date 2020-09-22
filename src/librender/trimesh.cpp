@@ -631,7 +631,7 @@ void TriMesh::computeNormals(bool force) {
 		} else {
 			if (!m_normals)
 				m_normals = new Normal[m_vertexCount];
-			memset(m_normals, 0, sizeof(Normal)*m_vertexCount);
+			memset((void*) m_normals, 0, sizeof(Normal)*m_vertexCount);
 
 			/* Well-behaved vertex normal computation based on
 			   "Computing Vertex Normals from Polygonal Facets"
@@ -696,7 +696,7 @@ void TriMesh::computeUVTangents() {
 		return;
 
 	m_tangents = new TangentSpace[m_triangleCount];
-	memset(m_tangents, 0, sizeof(TangentSpace)*m_triangleCount);
+	memset((void*) m_tangents, 0, sizeof(TangentSpace)*m_triangleCount);
 
 	for (size_t i=0; i<m_triangleCount; i++) {
 		uint32_t idx0 = m_triangles[i].idx[0],

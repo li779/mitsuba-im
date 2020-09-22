@@ -805,10 +805,10 @@ void Bitmap::convolve(const Bitmap *_kernel) {
 		(fftw_complex *) kernel, (fftw_complex *) kernelS, FFTW_FORWARD, FFTW_ESTIMATE);
 	__fftw_lock.unlock();
 
-	memset(kernel, 0, sizeof(complex)*paddedSize);
+	memset((void*) kernel, 0, sizeof(complex)*paddedSize);
 
 	for (int ch=0; ch<m_channelCount; ++ch) {
-		memset(data, 0, sizeof(complex)*paddedSize);
+		memset((void*) data, 0, sizeof(complex)*paddedSize);
 		switch (m_componentFormat) {
 			case EFloat16:
 				/* Copy and zero-pad the convolution kernel in a wraparound fashion */
