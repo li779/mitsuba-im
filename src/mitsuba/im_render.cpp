@@ -8,6 +8,7 @@
 #include <mitsuba/core/thread.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/statistics.h>
+#include <mitsuba/core/timer.h>
 #include <cstdlib>
 
 int ProcessConfig::recommendedThreads() {
@@ -47,6 +48,8 @@ namespace impl {
 
 		mitsuba::ref_vector<mitsuba::Thread> workers;
 
+		double lastWriteSpp = 0.0f;
+
 		bool updateSamplersAndIntegrator() {
 			for (auto& s : samplers) {
 				s = this->samplerPrototype->clone();
@@ -74,7 +77,7 @@ namespace impl {
 				this->uniqueTargets = 0;
 				for (int i = 0; i < maxThreads; ++i) {
 					if (i % CORES_PER_FRAMEBUFFER == 0) {
-						framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, filmSize, scene->getFilm()->getReconstructionFilter());
+						framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ESpectrumAlpha, filmSize, scene->getFilm()->getReconstructionFilter());
 						++this->uniqueTargets;
 					}
 					else
@@ -82,7 +85,7 @@ namespace impl {
 				}
 #else
 				for (int i = 0; i < maxThreads; ++i)
-					framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, filmSize, scene->getFilm()->getReconstructionFilter());
+					framebuffers[i] = new mitsuba::ImageBlock(mitsuba::Bitmap::ESpectrumAlpha, filmSize, scene->getFilm()->getReconstructionFilter());
 				this->uniqueTargets = maxThreads;
 #endif
 			}
@@ -102,6 +105,7 @@ namespace impl {
 				numThreads = this->maxThreads;
 
 			this->numActiveThreads = numThreads;
+			this->lastWriteSpp = 0.0f;
 			
 #ifdef ATOMIC_SPLAT
 			for (int i = 0; i < numThreads; ++i)
@@ -132,8 +136,14 @@ namespace impl {
 						volatile float *volatile& imageDataTarget;
 						double volatile& sppTarget;
 						int maxSpp;
+						int timeout, flushTimer;
 					} m;
-					Interrupt(InterruptM const & m) : m(m) { }
+					mitsuba::ref<mitsuba::Timer> timer;
+					Interrupt(InterruptM const & m)
+						: m(m) {
+						if (m.timeout > 0 || m.flushTimer > 0)
+							timer = new mitsuba::Timer();
+					}
 
 					int progress(mitsuba::ResponsiveIntegrator* integrator, const mitsuba::Scene &scene, const mitsuba::Sensor &sensor, mitsuba::Sampler &sampler, mitsuba::ImageBlock& target, double spp
 						, mitsuba::ResponsiveIntegrator::Controls controls, int threadIdx, int threadCount) override {
@@ -141,13 +151,32 @@ namespace impl {
 							m.imageDataTarget = m.imageData;
 							m.sppTarget = spp;
 						}
+						// max spp reached
 						if (spp * threadCount >= (double) m.maxSpp) {
 							SLog(mitsuba::EInfo, "Integrator keeps going, halting at max sample count");
 							return 100;
 						}
+						if (timer) {
+							unsigned totalTime = timer->getMilliseconds();
+							// timeout reached
+							if (m.timeout > 0 && totalTime >= m.timeout * 1000U) {
+								SLog(mitsuba::EInfo, "Integrator keeps going, halting at %u ms of timeout %i s", totalTime, m.timeout);
+								return 101;
+							}
+							// intermediate output
+							else if (threadIdx == 0 && timer->getSecondsSinceStart() >= m.flushTimer) {
+								timer->stop();
+								m.proc->develop(&m.sppTarget, threadCount, totalTime, true);
+								timer->start();
+							}
+						}
 						return 0;
 					}
-				} interrupt = { { this, block->getBitmap()->getFloatData(), this->imageData[tid], spp, (int) sampler->getSampleCount() } };
+				} interrupt = {
+					  { this, block->getBitmap()->getFloatData(), this->imageData[tid], spp, (int) sampler->getSampleCount()
+						, timeout
+						, tid == 0 ? flushTimer : -1
+					} };
 
 				struct mitsuba::ResponsiveIntegrator::Controls icontrols = {
 					controls.continu,
@@ -193,6 +222,50 @@ namespace impl {
 			}
 		}
 
+		void develop(const volatile double* spps, int numThreads, long long milliseconds = 0, bool flush = false) {
+			double spp = 0.0f;
+			for (int i = 0; i < numThreads; ++i)
+				spp += spps[i];
+			SLog(mitsuba::EInfo, "SPP: %lf", spp);
+			if (milliseconds)
+				SLog(mitsuba::EInfo, "Milliseconds: %lld", milliseconds);
+
+//			if (intermediate && !(spp > 512.0f && spp > lastWriteSpp * 1.5f))
+//				return;
+
+			mitsuba::ref<mitsuba::ImageBlock> developBuffer = new mitsuba::ImageBlock(
+				  mitsuba::Bitmap::ESpectrumAlpha, scene->getFilm()->getCropSize());
+			developBuffer->clear();
+			for (int i = 0; i < numThreads; ++i)
+				if (i % CORES_PER_FRAMEBUFFER == 0)
+					developBuffer->put(framebuffers[i]);
+			float* data = developBuffer->getBitmap()->getFloatData();
+			for (size_t i = 0, ie = developBuffer->getBitmap()->getPixelCount() * developBuffer->getBitmap()->getChannelCount(); i < ie; ++i) {
+				*data = float(*data / spp);
+				++data;
+			}
+			scene->getFilm()->setBitmap(developBuffer->getBitmap());
+
+			if (flush) {
+				fs::pathstr destFile;
+				// progression file names
+				if (writeProgression) {
+					destFile = scene->getDestinationFile();
+					char postfix[128];
+					sprintf(postfix, "_spp%d_s%lld", int(spp), milliseconds / 1000);
+					auto stem = fs::filestem(destFile);
+					stem.s += postfix;
+					auto progressionFile = fs::replace_filestem(destFile, stem);
+					scene->getFilm()->setDestinationFile(progressionFile, scene->getBlockSize());
+				}
+				scene->getFilm()->develop(scene, mitsuba::Float(milliseconds));
+				lastWriteSpp = spp;
+				// reset
+				if (!destFile.s.empty())
+					scene->getFilm()->setDestinationFile(destFile, scene->getBlockSize());
+			}
+		}
+
 		void render(int numThreads) override {
 			scene->getFilm()->setDestinationFile(scene->getDestinationFile(), scene->getBlockSize());
 			scene->preprocess(nullptr, nullptr, -1, -1, -1); // todo: this might crash for more advanced subsurf integrators ...?
@@ -202,25 +275,7 @@ namespace impl {
 			render(scene->getSensor(), spps.data(), ctrl, numThreads);
 			numThreads = this->numActiveThreads;
 
-			{
-				double spp = 0.0f;
-				for (double s : spps)
-					spp += s;
-
-				SLog(mitsuba::EInfo, "SPP: %f", spp);
-
-				mitsuba::ref<mitsuba::ImageBlock> developBuffer = new mitsuba::ImageBlock(mitsuba::Bitmap::ERGBA, scene->getFilm()->getCropSize());
-				developBuffer->clear();
-				for (int i = 0; i < numThreads; ++i)
-					if (i % CORES_PER_FRAMEBUFFER == 0)
-						developBuffer->put(framebuffers[i]);
-				float* data = developBuffer->getBitmap()->getFloatData();
-				for (size_t i = 0, ie = developBuffer->getBitmap()->getPixelCount() * developBuffer->getBitmap()->getChannelCount(); i < ie; ++i) {
-					*data = float(*data / spp);
-					++data;
-				}
-				scene->getFilm()->setBitmap(developBuffer->getBitmap());
-			}
+			develop(spps.data(), numThreads);
 
 			scene->postprocess(nullptr, nullptr, -1, -1, -1); // todo: this might crash for more advanced subsurf integrators ...?
 		}
