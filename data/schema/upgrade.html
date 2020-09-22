@@ -2,7 +2,7 @@
 <head><title>mitsuba XSLT upgrader</title></head>
 <body>
 <div>
-	<label>XSLT:</label><input id="xslt-button" type="file" multiple="true" name="xslt" value="C:/Development/Code/mitsuba/data/schema/upgrade_0.5.0.xsl"><br>
+	<label>XSLT:</label><input id="xslt-button" type="file" multiple="true" name="xslt" value="data/schema/upgrade_0.5.0.xsl"><br>
 	<label>Scene:</label><input id="input-button" type="file" name="scene">
 	<div id="output-area"></div>
 </div>
@@ -98,7 +98,7 @@ document.body.onload = function() {
 	setTimeout(function() {
 		xsltButton.click();
 	}, 0); 
-	printMsg('<p>Select XSLTs ...<br>');
+	printMsg('<p>Select XSLT(s) (e.g. "data/schema/upgrade_0.5.0.xsl") ...<br>');
 }
 </script>
 </body>

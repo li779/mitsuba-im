@@ -165,7 +165,7 @@ struct Document {
 		Integration integration;
 		volatile int restart;
 		InteractiveSceneProcess::Controls controls = { };
-		bool skipInit, reconfig;
+		bool skipInit = false, reconfig;
 
 		std::unique_ptr<SceneConfigurator::Changes> pendingChanges;
 		ProcessConfig nextConfig;
@@ -173,8 +173,7 @@ struct Document {
 		Renderer(mitsuba::Scene* scene, InteractiveSensor* sensor, Config const& config)
 			: scene(scene)
 			, sensor(sensor)
-			, restart(false)
-			, skipInit(false) {
+			, restart(false) {
 			reconfigure(config.process);
 		}
 
@@ -311,6 +310,7 @@ struct Document {
 
 	std::unique_ptr<WorkLane> workLane;
 	bool autoPaused = false;
+	bool wasShown = false;
 
 	std::unique_ptr<SceneConfigurator> configurator;
 
@@ -351,6 +351,11 @@ struct Document {
 	void updatePreview() {
 		this->renderer.integration.updatePreview();
 		this->classic.updatePreview();
+	}
+	Preview* activePreview(bool show_final) {
+		bool finalPreview = (show_final && classic.preview);
+		Preview& preview = finalPreview ? (Preview&) *classic.preview : (Preview&) *renderer.integration.preview;
+		return &preview;
 	}
 
 	void autoPause(bool pause) {
@@ -633,11 +638,10 @@ void run(int argc, char** argv, Window window, ImGuiContext* ui_context) {
 				if (io.MousePos.x >= cx && io.MousePos.y >= cy)
 					mouseSceneIdx = sceneIdx;
 
-				bool finalPreview = (show_final_render && s->classic.preview);
-				Preview& preview = finalPreview ? (Preview&) *s->classic.preview : (Preview&) *s->renderer.integration.preview;
+				Preview& preview = *s->activePreview(show_final_render);
 
 				// Normalize
-				if (finalPreview) {
+				if (&preview == s->classic.preview.get()) {
 					for (int j = 0; j < 3; ++j)
 						s->renderer.integration.exposureMultiplier[j] = exposure;
 					s->renderer.integration.exposureMultiplier[3] = (alpha_transparent) ? 1.0f : 0.0f;
@@ -695,16 +699,21 @@ void run(int argc, char** argv, Window window, ImGuiContext* ui_context) {
 
 		Session* selectedSession = nullptr;
 		std::unique_ptr<Document> addedDoc; int docReplacementIdx = -1;
-		for (int sceneIdx = 0; sceneIdx < int(session && !session->scenes.empty() ? session->scenes.size() : 1) && show_ui; ++sceneIdx) {
+		for (int sceneIdx = 0, sceneCount = int(session && !session->scenes.empty() ? session->scenes.size() : 1); sceneIdx < sceneCount && show_ui; ++sceneIdx) {
 			Document* document = session && sceneIdx < (int) session->scenes.size() ? session->scenes[sceneIdx].get() : nullptr;
 			
-			if (sceneIdx) {
-				char buf[128];
-				sprintf(buf, "Scene (%d)", sceneIdx + 1);
-				ImGui::Begin(buf);
+			char buf[1024];
+			sprintf(buf, "%s (%d)###Scene (%d)"
+				, document ? document->filePath.s.c_str() : "Ready"
+				, (sceneIdx - scene_rotation_offset % sceneCount + sceneCount) % sceneCount + 1
+				, sceneIdx + 1);
+			ImGui::Begin(buf);
+			// auto resize on first appearance
+			if (document && !document->wasShown) {
+				if (ImGui::GetScrollMaxX() || ImGui::GetScrollMaxY())
+					ImGui::SetWindowSize(ImVec2(0, 0), ImGuiCond_Appearing);
+				document->wasShown = true;
 			}
-			else
-				ImGui::Begin("Interactive Preview", 0, ImGuiWindowFlags_AlwaysAutoResize);
 
 			// session selector
 			if (!sceneIdx)
@@ -762,7 +771,12 @@ void run(int argc, char** argv, Window window, ImGuiContext* ui_context) {
 				}
 				double sppPerS = spp / document->renderer.integration.timeSeconds();
 
-				ImGui::Text("%dx%d @ %.1f spp (%.2f spp/s)", document->renderer.integration.preview->resX, document->renderer.integration.preview->resY, spp, sppPerS);
+				ImGui::TextWrapped("%dx%d @ %.1f spp (%.2f spp/s in %d threads)"
+					, document->renderer.integration.preview->resX
+					, document->renderer.integration.preview->resY
+					, spp
+					, sppPerS
+					, document->renderer.integration.process ? document->renderer.integration.process->numActiveThreads : 0 );
 				if (mitsuba::ResponsiveIntegrator* igr = document->renderer.integration.process->integrator) {
 					if (char const* stats = igr->getRealtimeStatistics())
 						ImGui::Text("Stats: %s", stats);
