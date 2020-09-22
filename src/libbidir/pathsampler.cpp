@@ -736,9 +736,8 @@ void SplatList::normalize(const Bitmap *importanceMap) {
 
 	if (luminance > 0) {
 		/* Normalize the contributions */
-		Float invLuminance = 1.0f / luminance;
 		for (size_t i=0; i<splats.size(); ++i)
-			splats[i].second *= invLuminance;
+			splats[i].second /= luminance;
 	}
 }
 

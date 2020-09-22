@@ -418,9 +418,8 @@ public:
 		if (f == 0)
 			SLog(EWarn, "TSpectrum: Division by zero!");
 #endif
-		Scalar recip = 1.0f / f;
 		for (int i=0; i<N; i++)
-			value.s[i] *= recip;
+			value.s[i] /= f;
 		return value;
 	}
 
@@ -449,9 +448,8 @@ public:
 		if (f == 0)
 			SLog(EWarn, "TTSpectrum: Division by zero!");
 #endif
-		Scalar recip = 1.0f / f;
 		for (int i=0; i<N; i++)
-			s[i] *= recip;
+			s[i] /= f;
 		return *this;
 	}
 

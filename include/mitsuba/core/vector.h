@@ -332,8 +332,7 @@ template <typename T> struct TVector2 {
 		if (f == 0)
 			SLog(EWarn, "Vector2: Division by zero!");
 #endif
-		T recip = (T) 1 / f;
-		return TVector2(x * recip, y * recip);
+		return TVector2(x / f, y / f);
 	}
 
 	/// Divide the vector by the given scalar
@@ -342,8 +341,7 @@ template <typename T> struct TVector2 {
 		if (f == 0)
 			SLog(EWarn, "Vector2: Division by zero!");
 #endif
-		T recip = (T) 1 / f;
-		x *= recip; y *= recip;
+		x /= f; y /= f;
 		return *this;
 	}
 
@@ -537,8 +535,7 @@ template <typename T> struct TVector3 {
 		if (f == 0)
 			SLog(EWarn, "Vector3: Division by zero!");
 #endif
-		T recip = (T) 1 / f;
-		return TVector3(x * recip, y * recip, z * recip);
+		return TVector3(x / f, y / f, z / f);
 	}
 
 	/// Divide the vector by the given scalar
@@ -547,8 +544,7 @@ template <typename T> struct TVector3 {
 		if (f == 0)
 			SLog(EWarn, "Vector3: Division by zero!");
 #endif
-		T recip = (T) 1 / f;
-		x *= recip; y *= recip; z *= recip;
+		x /= f; y /= f; z /= f;
 		return *this;
 	}
 
@@ -750,8 +746,7 @@ template <typename T> struct TVector4 {
 		if (f == 0)
 			SLog(EWarn, "Vector4: Division by zero!");
 #endif
-		T recip = (T) 1 / f;
-		return TVector4(x * recip, y * recip, z * recip, w * recip);
+		return TVector4(x / f, y / f, z / f, w / f);
 	}
 
 	/// Divide the vector by the given scalar
@@ -760,8 +755,7 @@ template <typename T> struct TVector4 {
 		if (f == 0)
 			SLog(EWarn, "Vector4: Division by zero!");
 #endif
-		T recip = (T) 1 / f;
-		x *= recip; y *= recip; z *= recip; w *= recip;
+		x /= f; y /= f; z /= f; w /= f;
 		return *this;
 	}
 

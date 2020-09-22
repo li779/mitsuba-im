@@ -203,8 +203,7 @@ public:
 	friend DScalar1 operator/(const DScalar1 &lhs, const Scalar &rhs) {
 		if (rhs == 0)
 			throw std::runtime_error("DScalar1: Division by zero!");
-		Scalar inv = 1.0f / rhs;
-		return DScalar1(lhs.value*inv, lhs.grad*inv);
+		return DScalar1(lhs.value/rhs, lhs.grad/rhs);
 	}
 
 	friend DScalar1 operator/(const Scalar &lhs, const DScalar1 &rhs) {
@@ -544,8 +543,7 @@ public:
 	friend DScalar2 operator/(const DScalar2 &lhs, const Scalar &rhs) {
 		if (rhs == 0)
 			throw std::runtime_error("DScalar2: Division by zero!");
-		Scalar inv = 1.0f / rhs;
-		return DScalar2(lhs.value*inv, lhs.grad*inv, lhs.hess*inv);
+		return DScalar2(lhs.value/rhs, lhs.grad/rhs, lhs.hess/rhs);
 	}
 
 	friend DScalar2 operator/(const Scalar &lhs, const DScalar2 &rhs) {
