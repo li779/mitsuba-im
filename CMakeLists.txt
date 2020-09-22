@@ -7,38 +7,42 @@ cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
 if (NOT DEFINED MTS_PROJECT_NAME)
   set(MTS_PROJECT_NAME "mitsuba")
 endif()
+
+# Set CMAKE_BUILD_TYPE to Release by default
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+    "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
+endif()
+
 if (NOT DEFINED MTS_TARGET_BINARIES_DIR)
   set(MTS_TARGET_BINARIES_DIR ${CMAKE_CURRENT_BINARY_DIR}/binaries/$<CONFIG>)
 endif()
 
-# Set CMAKE_BUILD_TYPE to RelWithDebInfo by default
-if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
-    "Choose the type of build, options are: Debug, Release, RelWithDebInfo, MinSizeRel." FORCE)
-endif()
+option(MTS_USE_PCH "Use precompiled headers (PCH)." ON)
+if (MTS_USE_PCH)
+  # Pre-compiled header support
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake/CMakePCHCompiler")
+  project(${MTS_PROJECT_NAME} C CXX CXXPCH)
+else ()
+  project(${MTS_PROJECT_NAME})
+endif ()
 
-# Enable folders for projects in Visual Studio
-if (CMAKE_GENERATOR MATCHES "Visual Studio")
-  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-endif()
-
-# Pre-compiled header support
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/CMakePCHCompiler")
-
-project(${MTS_PROJECT_NAME} C CXX CXXPCH)
-
-# ===== Build configuration =====
-
-include (CMakeDependentOption)
-include (CMakeParseArguments)
-include (CheckCXXSourceCompiles)
- 
 # Tell cmake where to find the additional modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/data/cmake")
 # Make sure the cmake-provided modules use the versions they expect
 cmake_policy(SET CMP0017 NEW)
 # Allow for quoted macro variable checks :-////
 cmake_policy(SET CMP0054 NEW)
+
+# Enable folders for projects in Visual Studio
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+endif()
+
+# Load the required modules
+include (CMakeParseArguments)
+include (CheckCXXSourceCompiles)
+include (CMakeDependentOption)
 
 include (MtsGetVersionInfo)
 # Read the version information
@@ -49,20 +53,16 @@ else()
   message(STATUS "mitsuba ${MTS_VERSION} (${MTS_DATE})")
 endif()
 
-# By default, keep module code separate to simplify debugging
-cmake_policy(SET CMP0069 OLD)
-
 include (MitsubaUtil)
 include (MitsubaBuildOptions)
 
-# ===== 3rd party dependencies =====
-
-include(MitsubaExternal)
-
-# ===== Prerequisite resources =====
+# Find the external libraries and setup the paths
+include (MitsubaExternal)
 
 # Main mitsuba include directory
 include_directories("include")
+
+# ===== Prerequisite resources =====
 
 # Process the XML schemas
 add_subdirectory(data/schema)
@@ -110,14 +110,14 @@ endif()
 add_subdirectory(src/mitsuba)
 
 # Build the COLLADA converter
-if (COLLADA_FOUND)
+if (XERCES_FOUND)
   add_subdirectory(src/converter)
 else()
-  message(STATUS "Collada DOM was not found. The importer will not be built.")
+  message(STATUS "XercesC was not found. The importer will not be built.")
 endif()
 
 # Build the Qt-based GUI binaries
-if (BUILD_GUI)
+if (BUILD_QTGUI)
   add_subdirectory(src/mtsgui)
 elseif(NOT QT4_FOUND)
   message(STATUS "Qt4 was not found. The mitsuba gui will not be built.")
@@ -126,12 +126,14 @@ endif()
 # Build IM-MTS
 if (BUILD_IMGUI)
 	add_subdirectory(src/im-mts)
+elseif(NOT OPENGL_FOUND)
+  message(STATUS "OpenGL was not found. The mitsuba IMGUI will not be built.")
 endif()
 
 # ===== Build the plugins =====
 
 # Utilities
-#add_subdirectory(src/utils) #todo: convert to std c++
+add_subdirectory(src/utils)
 # Surface scattering models
 add_subdirectory(src/bsdfs)
 # Phase functions

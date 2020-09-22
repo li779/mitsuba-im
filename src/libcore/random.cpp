@@ -63,7 +63,7 @@
 #endif
 
 #include <limits>
-
+#include <ctime>
 
 /************************ SFMT-19937 Parameters *******************************/
 
@@ -473,18 +473,14 @@ void Random::State::init_by_array(const uint32_t *init_key, int key_length) {
 Random::Random() : mt(NULL) {
 	mt = (State *) allocAligned(sizeof(State));
 	Assert(mt != NULL);
-#if defined(__WINDOWS__)
-	seed();
+#if defined(__WINDOWS__) || 1
+	seed(time(nullptr) * (uint64_t) CLOCKS_PER_SEC + clock());
 #else
-#if 0
 	uint64_t buf[N64];
 	memset(buf, 0, N64 * sizeof(uint64_t)); /* Make GCC happy */
 	ref<FileStream> urandom = new FileStream("/dev/urandom", FileStream::EReadOnly);
 	urandom->readULongArray(buf, N64);
 	seed(buf, N64);
-#else
-	seed();
-#endif
 #endif
 }
 

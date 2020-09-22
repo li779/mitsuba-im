@@ -6,6 +6,7 @@
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/thread.h>
 #include <mitsuba/core/statistics.h>
+#include <tinyfiledialogs.h>
 #include <cstdlib>
 
 int ProcessConfig::recommendedThreads() {
@@ -27,7 +28,14 @@ namespace impl {
 
 		Scene(fs::pathstr const& path) {
 			std::unique_ptr<mitsuba::SceneLoader> loader( new mitsuba::SceneLoader(mitsuba::SceneLoader::ParameterMap()) );
-			this->scene = loader->load(path);
+			try {
+				this->scene = loader->load(path);
+			}
+			catch (mitsuba::VersionException const& v) {
+				if (!tinyfd_messageBox("Warning", "Scene file must be upgraded to the current version first (you can use \"data/schema/upgrade.html\"). Retry?", "yesno", "question", 1))
+					throw;
+				this->scene = loader->load(path);
+			}
 		}
 	};
 
@@ -561,3 +569,10 @@ WorkLane* WorkLane::create(Worker* worker) {
 	return new impl::WorkLane(worker);
 }
 WorkLane::~WorkLane() = default;
+
+void WorkLane::yield() {
+	std::this_thread::yield();
+}
+void WorkLane::sleep(int time) {
+	std::this_thread::sleep_for(std::chrono::milliseconds(time));
+}

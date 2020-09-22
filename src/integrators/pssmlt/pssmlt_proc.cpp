@@ -336,12 +336,14 @@ public:
 		}
 
 		struct MeanBrightness {
+			double valueAcc = 0;
+			long long samples = 0;
 			Float value = 0;
-			Float samples = 0;
 
-			void addSample(Float newValue, Float weight = 1.0f) {
-				samples += weight;
-				value += (newValue - value) * (weight / samples);
+			void addSample(Float newValue, Float /*weight*/ = 1.0f) {
+				samples++;
+				valueAcc += (newValue - valueAcc) / double(samples);
+				value = Float(valueAcc);
 			}
 		};
 
@@ -360,7 +362,8 @@ public:
 			config.firstStage = false;
 			config.importanceMap = NULL;
 			config.workUnits = 0;
-			config.nMutations = std::max(4 * pixels.x * pixels.y / threadCount, 300000);
+			config.nMutations = 4 * pixels.x * pixels.y / threadCount;
+			config.nMutations = std::max(config.nMutations, (size_t) 150000);
 			config.nMutations = std::min(config.nMutations, sampler.getSampleCount() * pixels.x * pixels.y / threadCount);
 			if (threadIdx == 0)
 				config.dump();
@@ -409,6 +412,9 @@ public:
 				renderer->m_control = interact;
 
 				{
+					// refresh seeds
+					if (pathSeeds.size() > 4 * SeedSamplesPerChain)
+						pathSeeds.erase(pathSeeds.begin(), pathSeeds.begin() + pathSeeds.size() / 4);
 					renderer->m_sensorSampler->setRandom(seedSampler->getRandom());
 					renderer->m_emitterSampler->setRandom(seedSampler->getRandom());
 					renderer->m_directSampler->setRandom(seedSampler->getRandom());

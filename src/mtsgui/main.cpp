@@ -19,14 +19,16 @@
 #include <mitsuba/core/platform.h>
 #include <QtGui/QtGui>
 #include <QtOpenGL/QGLFormat>
+#ifdef MTS_HAS_SHVECTOR
 #include <mitsuba/core/shvector.h>
+#endif
 #include <mitsuba/core/sched.h>
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/appender.h>
 #include <mitsuba/core/statistics.h>
-#include <mitsuba/render/scenehandler.h>
+#include <mitsuba/render/sceneloader.h>
 
 #if defined(__OSX__)
 #include <ApplicationServices/ApplicationServices.h>
@@ -178,8 +180,10 @@ int main(int argc, char *argv[]) {
 	Spectrum::staticInitialization();
 	Bitmap::staticInitialization();
 	Scheduler::staticInitialization();
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticInitialization();
-	SceneHandler::staticInitialization();
+#endif
+	SceneLoader::staticInitialization();
 
 #if defined(__LINUX__)
 	XInitThreads();
@@ -211,7 +215,7 @@ int main(int argc, char *argv[]) {
 #endif
 
 	qRegisterMetaType<ELogLevel>("ELogLevel");
-	qRegisterMetaType<fs::path>("fs::path");
+	qRegisterMetaType<fs::pathstr>("fs::pathstr");
 
 	MitsubaApplication app(argc, argv);
 	try {
@@ -307,8 +311,10 @@ int main(int argc, char *argv[]) {
 #endif
 
 	/* Shutdown the core framework */
-	SceneHandler::staticShutdown();
+	SceneLoader::staticShutdown();
+#ifdef MTS_HAS_SHVECTOR
 	SHVector::staticShutdown();
+#endif
 	Scheduler::staticShutdown();
 	Bitmap::staticShutdown();
 	Spectrum::staticShutdown();

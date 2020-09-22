@@ -2,6 +2,10 @@
 #                EXTERNAL LIBRARIES DETECTION                                 #
 ###############################################################################
 
+if (NOT DEFINED MTS_VERSION)
+  message(FATAL_ERROR "This file has to be included from the main build file.")
+endif()
+
 # Set up CMake to use the Mitsuba bundled libraries. Set the variable
 # "MTS_NO_DEPENDENCIES" to a value which evaluates to TRUE to avoid
 # using the Mitsuba dependencies even if they are present.
@@ -46,16 +50,13 @@ export DYLD_FALLBACK_FRAMEWORK_PATH=\"${MTS_DEPS_DIR}/frameworks\":$DYLD_FALLBAC
 export DYLD_FALLBACK_LIBRARY_PATH=\"${MTS_DEPS_DIR}/lib\":$DYLD_FALLBACK_LIBRARY_PATH
 ")
   endif()
-  # Check the standard configurations
-  # NO Debug! Does not work under windows as dependencies do not include debug libraries
-  mts_check_configurations (Release MinSizeRel RelWithDebInfo)
 else()
   set(MTS_DEPENDENCIES OFF)
   unset(MTS_DEPS_DIR)
 endif()
 
 ###########################################################################
-# Embed external projects
+# Build tools for external projects
 include (ExternalProject)
 set (MTS_EXTERNAL_PROJECT_VARS )
 
@@ -83,14 +84,6 @@ function (build_externals EXTERNALS_NAME DEPENDEES)
 	# flushed ...
 	set(MTS_EXTERNAL_PROJECT_VARS PARENT_SCOPE)
 endfunction ()
-
-###########################################################################
-# Required
-set (MTS_EXTERNAL_INTERFACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/interface) 
-
-# System threading library, used for custom options
-set(CMAKE_THREAD_PREFER_PTHREAD ON)
-find_package(Threads REQUIRED)
 
 function (decorate_external_libraries OUT_VAR INSTALL_DIR)
 	set (DECORATED_TARGETS )
@@ -131,20 +124,106 @@ macro (make_external_library PREFIX MAIN_TARGET)
 	set(${PREFIX}_LIBRARIES ${${PREFIX}_LIBRARY})
 endmacro()
 
-# Boost
+###########################################################################
+# Include externals
+set (MTS_EXTERNAL_INTERFACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/interface) 
+
+# System threading library, used for custom options
+set(CMAKE_THREAD_PREFER_PTHREAD ON)
+find_package(Threads REQUIRED)
+
+###########################################################################
+# Boost 
 if (MTS_ENABLE_SYSTEM_LIBS)
-	find_package(Boost 1.44)
-	mark_as_advanced(Boost_LIB_DIAGNOSTIC_DEFINITIONS)
+  find_package(Boost 1.44 COMPONENTS "filesystem" "system" "thread")
+  mark_as_advanced(Boost_LIB_DIAGNOSTIC_DEFINITIONS)
 endif ()
 if (NOT Boost_FOUND)
+  ###set(BOOST_ROOT "" CACHE PATH
+  ###  "Preferred installation prefix for searching for Boost.")
+  ###message(FATAL_ERROR
+  ###  "Boost is missing. The required modules are math, filesystem and system.")
+
+  # Resort to header-only library
 	make_external_library(Boost boost HEADER_ONLY)
 	# can run in parallel
 	build_externals(boost "${Boost_LIBRARIES}")
-endif()
-# boost python disabled for now (todo: replace by sth else)
-set (mts_boost_PYTHON_FOUND OFF)
 
-# Eigen
+  set(BOOST_SPIRIT_WORKS FALSE)
+  set(mts_boost_PYTHON_FOUND FALSE)
+else ()
+###########################################################################
+# Legacy boost system component fixups
+###########################################################################
+
+
+# Check if spirit works: the version of Clang in Ubuntu 11.04 does not support
+# the system version of Boost Spirit
+set(CMAKE_REQUIRED_INCLUDES ${Boost_INCLUDE_DIRS})
+set(CMAKE_REQUIRED_LIBRARIES ${Boost_LIBRARIES})
+CHECK_CXX_SOURCE_COMPILES("
+#include <boost/spirit/include/qi.hpp>
+int main (int argc, char **argv) {
+    return 0;
+}
+" BOOST_SPIRIT_WORKS)
+
+
+# Try to figure out if this boost distro has Boost::python. If we include
+# python in the main boost components list above, CMake will abort if it
+# is not found. So we resort to checking for the boost_python library's
+# existence to get a soft failure
+if ((APPLE OR WIN32) AND MTS_DEPENDENCIES)
+  set(mts_boost_python_names boost_python boost_python27
+    boost_python32 boost_python33 boost_python)
+else()
+  set(mts_boost_python_names boost_python)
+endif()
+find_library (mts_boost_python_lib NAMES ${mts_boost_python_names}
+              HINTS ${Boost_LIBRARY_DIRS} NO_DEFAULT_PATH)
+mark_as_advanced (mts_boost_python_lib)
+if (NOT mts_boost_python_lib AND Boost_SYSTEM_LIBRARY_RELEASE)
+    get_filename_component (mts_boost_SYSTEM_rel
+                            ${Boost_SYSTEM_LIBRARY_RELEASE} NAME)
+    set(mts_boost_PYTHON_rel_names "")
+    foreach (name ${mts_boost_python_names})
+      string (REGEX REPLACE "^(.*)boost_system(.+)$" "\\1${name}\\2"
+              mts_boost_PYTHON_rel ${mts_boost_SYSTEM_rel})
+      list(APPEND mts_boost_PYTHON_rel_names ${mts_boost_PYTHON_rel})
+    endforeach()
+    find_library (mts_boost_PYTHON_LIBRARY_RELEASE
+                  NAMES ${mts_boost_PYTHON_rel_names}
+                  HINTS ${Boost_LIBRARY_DIRS}
+                  NO_DEFAULT_PATH)
+    mark_as_advanced (mts_boost_PYTHON_LIBRARY_RELEASE)
+endif ()
+if (NOT mts_boost_python_lib AND Boost_SYSTEM_LIBRARY_DEBUG)
+    get_filename_component (mts_boost_SYSTEM_dbg
+                            ${Boost_SYSTEM_LIBRARY_DEBUG} NAME)
+    set(mts_boost_PYTHON_dbg_names "")
+    foreach (name ${mts_boost_python_names})
+      string (REGEX REPLACE "^(.*)boost_system(.+)$" "\\1${name}\\2"
+              mts_boost_PYTHON_dbg ${mts_boost_SYSTEM_dbg})
+      list(APPEND mts_boost_PYTHON_dbg_names ${mts_boost_PYTHON_dbg})
+    endforeach()
+    find_library (mts_boost_PYTHON_LIBRARY_DEBUG
+                  NAMES ${mts_boost_PYTHON_dbg_names}
+                  HINTS ${Boost_LIBRARY_DIRS}
+                  NO_DEFAULT_PATH)
+    mark_as_advanced (mts_boost_PYTHON_LIBRARY_DEBUG)
+endif ()
+if (mts_boost_python_lib OR
+    mts_boost_PYTHON_LIBRARY_RELEASE OR mts_boost_PYTHON_LIBRARY_DEBUG)
+    set (mts_boost_PYTHON_FOUND ON)
+else ()
+    set (mts_boost_PYTHON_FOUND OFF)
+endif ()
+
+
+endif ()
+
+###########################################################################
+
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(Eigen 3.0)
 endif ()
@@ -154,7 +233,9 @@ if (NOT Eigen_FOUND)
 	build_externals(eigen "${Eigen_LIBRARIES}")
 endif ()
 
-# JPEG
+###########################################################################
+# Image format support
+
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(JPEG 6)
 endif ()
@@ -163,12 +244,15 @@ if (NOT JPEG_FOUND)
 	# can run in parallel
 	build_externals(libjpeg "${JPEG_LIBRARIES}")
 endif ()
+if (JPEG_FOUND)
+  add_definitions(-DMTS_HAS_LIBJPEG=1)
+endif()
 # legacy fixup
 if (JPEG_INCLUDE_DIR AND NOT JPEG_INCLUDE_DIRS)
 	set (JPEG_INCLUDE_DIRS ${JPEG_INCLUDE_DIR})
 endif ()
 
-# ZLIB
+
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(ZLIB 1.2)
 endif ()
@@ -177,7 +261,6 @@ if (NOT ZLIB_FOUND)
 	# can run in parallel
 	build_externals(zlib "${ZLIB_LIBRARIES}")
 endif ()
-# PNG
 if (MTS_ENABLE_SYSTEM_LIBS)
 	find_package(PNG 1.2)
 endif ()
@@ -189,15 +272,19 @@ if (NOT PNG_FOUND)
 	list(APPEND MTS_EXTERNAL_PROJECT_VARS ZLIB_ROOT)
 	build_externals(libpng "${PNG_LIBRARIES}" zlib)
 endif ()
-# legacy fixup
+if (PNG_FOUND)
+  add_definitions(-DMTS_HAS_LIBPNG=1)
+  add_definitions(${PNG_DEFINITIONS})
+endif()
+# legacy fixups
 if (PNG_INCLUDE_DIR AND NOT PNG_INCLUDE_DIRS)
 	set (PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIR})
 endif ()
-add_definitions(${PNG_DEFINITIONS})
-# OpenEXR
+
+
 if (MTS_ENABLE_SYSTEM_LIBS)
-	find_package(IlmBase)
-	find_package(OpenEXR)
+  find_package(IlmBase)
+  find_package(OpenEXR)
 endif ()
 if (NOT ILMBASE_FOUND OR NOT OPENEXR_FOUND)
 	if (NOT ILMBASE_FOUND)
@@ -210,34 +297,50 @@ if (NOT ILMBASE_FOUND OR NOT OPENEXR_FOUND)
 	# can run in parallel
 	list(APPEND MTS_EXTERNAL_PROJECT_VARS ZLIB_ROOT)
 	build_externals(openexr "${ILMBASE_LIBRARIES};${OPENEXR_LIBRARIES}" zlib)
-else ()
-	if (WIN32)
-	  set(CMAKE_REQUIRED_INCLUDES ${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
-	  set(CMAKE_REQUIRED_LIBRARIES ${ILMBASE_LIBRARIES} ${OPENEXR_LIBRARIES})
 
-	  CHECK_CXX_SOURCE_COMPILES("
-	#define OPENEXR_DLL
-	#include <OpenEXR/half.h>
-	#include <OpenEXR/ImfRgbaFile.h>
-	int main(int argc, char **argv) {
-		half x = 1.5f;
-		Imf::RgbaInputFile file(static_cast<const char*>(0));
-		file.readPixels(0,0);
-		return x > 0 ? 0 : 1;
-	}
-	" OPENEXR_IS_DLL)
+elseif (OPENEXR_FOUND AND WIN32)
+  set(CMAKE_REQUIRED_INCLUDES ${ILMBASE_INCLUDE_DIRS} ${OPENEXR_INCLUDE_DIRS})
+  set(CMAKE_REQUIRED_LIBRARIES ${ILMBASE_LIBRARIES} ${OPENEXR_LIBRARIES})
 
-	  unset (CMAKE_REQUIRED_INCLUDES)
-	  unset (CMAKE_REQUIRED_LIBRARIES)
-	  
-	  if (OPENEXR_IS_DLL)
-		add_definitions(-DOPENEXR_DLL)
-	  endif()
-	endif()
+  CHECK_CXX_SOURCE_COMPILES("
+#define OPENEXR_DLL
+#include <OpenEXR/half.h>
+#include <OpenEXR/ImfRgbaFile.h>
+int main(int argc, char **argv) {
+    half x = 1.5f;
+    Imf::RgbaInputFile file(static_cast<const char*>(0));
+    file.readPixels(0,0);
+    return x > 0 ? 0 : 1;
+}
+" OPENEXR_IS_DLL)
+
+  unset (CMAKE_REQUIRED_INCLUDES)
+  unset (CMAKE_REQUIRED_LIBRARIES)
+  
+  if (OPENEXR_IS_DLL)
+    add_definitions(-DOPENEXR_DLL)
+  endif()
+endif()
+if (OPENEXR_FOUND)
+  add_definitions(-DMTS_HAS_OPENEXR=1)
 endif()
 
-# XercesC
-if (MTS_ENABLE_SYSTEM_LIBS)
+###########################################################################
+
+option(MTS_USE_PUGIXML "Use lighter pugixml instead of XercesC" ON)
+if (MTS_USE_PUGIXML)
+  make_external_library(PUGIXML pugixml)
+  # can run in parallel
+	build_externals(pugixml "${PUGIXML_LIBRARIES}")
+
+  set(XML_INCLUDE_DIRS ${PUGIXML_INCLUDE_DIRS})
+  set(XML_LIBRARIES ${PUGIXML_LIBRARIES})
+
+  add_definitions(-DMTS_USE_PUGIXML=1)
+endif()
+
+if (NOT MTS_USE_PUGIXML OR MTS_ENABLE_COLLADA) # converter tools require XercesC
+if (MTS_ENABLE_SYSTEM_LIBS OR MTS_USE_PUGIXML)
 	find_package(XercesC 3.0)
 endif ()
 if (NOT XercesC_FOUND)
@@ -249,16 +352,21 @@ if (NOT XercesC_FOUND)
 	if (NOT WIN32)
 		target_link_libraries(${XercesC_LIBRARY} INTERFACE icuuc icudata)
 	endif ()
+endif ()
+if (NOT MTS_USE_PUGIXML)
+  set(XML_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
+  set(XML_LIBRARIES ${XercesC_LIBRARIES})
+endif()
 
-	set(XERCES_DEFINITIONS ${XercesC_DEFINITIONS})
-	set(XERCES_INCLUDE_DIR ${XercesC_INCLUDE_DIR})
-	set(XERCES_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
-	set(XERCES_LIBRARY ${XercesC_LIBRARY})
-	set(XERCES_LIBRARIES ${XercesC_LIBRARIES})
+set(XERCES_FOUND ${XercesC_FOUND})
+set(XERCES_DEFINITIONS ${XercesC_DEFINITIONS})
+set(XERCES_INCLUDE_DIR ${XercesC_INCLUDE_DIR})
+set(XERCES_INCLUDE_DIRS ${XercesC_INCLUDE_DIRS})
+set(XERCES_LIBRARY ${XercesC_LIBRARY})
+set(XERCES_LIBRARIES ${XercesC_LIBRARIES})
 endif ()
 
 ###########################################################################
-# Optional
 
 # ColladaDOM (optional)
 if (MTS_ENABLE_COLLADA)
@@ -270,6 +378,7 @@ endif()
 
 endif()
 
+
 # FFTW3 (optional)
 find_package(FFTW3)
 CMAKE_DEPENDENT_OPTION(MTS_FFTW "Enable FFTW3 for fast image convolution support." ON
@@ -278,47 +387,17 @@ if (MTS_FFTW)
   add_definitions(-DMTS_HAS_FFTW=1)
 endif()
 
-# todo: python bindings disabled, depend on boost python right now
-if (mts_boost_PYTHON_FOUND)
-# The Python libraries. When using the built-in dependencies we need
-# to specify the include directory, otherwise CMake finds the one
-# from the local installation using the Windows registry / OSX Frameworks
-if (MTS_DEPENDENCIES AND NOT PYTHON_INCLUDE_DIR AND
-    EXISTS "${MTS_DEPS_DIR}/include/python27")
-  set(PYTHON_INCLUDE_DIR "${MTS_DEPS_DIR}/include/python27"
-      CACHE STRING "Path to the Python include directory.")
-endif()
-find_package (PythonLibs "2.6")
-CMAKE_DEPENDENT_OPTION(BUILD_PYTHON "Build the Python bindings." ON
-  "PYTHONLIBS_FOUND;mts_boost_PYTHON_FOUND" OFF)
-if (PYTHONLIBS_FOUND AND mts_boost_PYTHON_FOUND)
-  set (PYTHON_FOUND TRUE)
-endif ()
-endif ()
-
 ###########################################################################
 # Frontends & HW-accelerated rendering
 
-# Qt frontend unsupported for now
-if (MTS_ENABLE_QT)
-	# Qt4 (optional)
-	find_package(Qt4 4.7 COMPONENTS
-	  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
-	CMAKE_DEPENDENT_OPTION(BUILD_GUI "Built the Qt4-based mitsuba GUI." ON
-	  "QT4_FOUND" OFF)
-endif () 
-
-# OpenGL
 find_package(OpenGL)
 CMAKE_DEPENDENT_OPTION(BUILD_IMGUI "Build the GL-based mitsuba GUI." ON
   "OPENGL_FOUND" OFF)
 
-set (MTS_HAS_HW FALSE)
+set (MTS_HAS_HW OFF)
+if (OPENGL_FOUND AND MTS_ENABLE_HW_PREVIEW)
 
-# disable HW-accelerated VPL preview for now
-if (MTS_ENABLE_HW_PREVIEW)
-
-set (GLEW_MX ON)
+option(GLEW_MX "Enable legacy GLEW MX extension" OFF)
 find_package(GLEW)
 if (GLEW_FOUND)
   set (GLEW_STATE_VARS ${GLEW_INCLUDE_DIRS} ${GLEW_LIBRARIES})
@@ -348,18 +427,30 @@ int main (int argc, char **argv) {
 endif ()
 
 set (MTS_HAS_HW ${GLEW_FOUND})
-
 endif ()
+
+if (MTS_ENABLE_QTGUI)
+	# Qt4 (optional)
+	find_package(Qt4 4.7 COMPONENTS
+	  QtCore QtGui QtXml QtXmlPatterns QtNetwork QtOpenGL)
+	CMAKE_DEPENDENT_OPTION(BUILD_QTGUI "Built the Qt4-based mitsuba GUI." ON
+	  "QT4_FOUND;MTS_HAS_HW" OFF)
+endif () 
 
 if (MTS_ENABLE_SYSTEM_LIBS)
-	find_package(SDL 2.0)
+	find_package(glfw3)
+	set(GLFW_DEFINITIONS ${GLFW3_DEFINITIONS})
+	set(GLFW_INCLUDE_DIR ${GLFW3_INCLUDE_DIR})
+	set(GLFW_INCLUDE_DIRS ${GLFW3_INCLUDE_DIRS})
+	set(GLFW_LIBRARY ${GLFW3_LIBRARY})
+	set(GLFW_LIBRARIES ${GLFW3_LIBRARIES})
 endif ()
-if (NOT SDL_FOUND)
-	make_external_library(SDL SDL2 SDL2main)
+if (NOT GLFW3_FOUND)
+	make_external_library(GLFW glfw)
 endif ()
 
 # can run in parallel
-build_externals(sdl "${SDL_LIBRARIES}")
+build_externals(glfw "${GLFW_LIBRARIES}")
 
 ###########################################################################
 # System libraries
@@ -398,6 +489,25 @@ if (APPLE)
 endif()
 
 ###########################################################################
+# Python libraries
+
+
+# The Python libraries. When using the built-in dependencies we need
+# to specify the include directory, otherwise CMake finds the one
+# from the local installation using the Windows registry / OSX Frameworks
+if (MTS_DEPENDENCIES AND NOT PYTHON_INCLUDE_DIR AND
+    EXISTS "${MTS_DEPS_DIR}/include/python27")
+  set(PYTHON_INCLUDE_DIR "${MTS_DEPS_DIR}/include/python27"
+      CACHE STRING "Path to the Python include directory.")
+endif()
+find_package (PythonLibs "2.6")
+CMAKE_DEPENDENT_OPTION(BUILD_PYTHON "Build the Python bindings." ON
+  "PYTHONLIBS_FOUND;mts_boost_PYTHON_FOUND" OFF)
+if (PYTHONLIBS_FOUND AND mts_boost_PYTHON_FOUND)
+  set (PYTHON_FOUND TRUE)
+endif ()
+
+###########################################################################
 # Global configuration
 
 # Includes for the common libraries
@@ -410,23 +520,14 @@ if (EIGEN_FOUND)
   link_libraries(${Eigen_LIBRARIES}) # for build order only
 endif()
 
-# If we are using the system OpenEXR, add its headers which half.h requires
+# If we are using the system OpenEXR, add header path to globally used half.h.
+# This should work via PUBLIC/INTERFACE include directories only (see libcore),
+# but PCH still requires an additional global directive.
 if (ILMBASE_FOUND)
   include_directories(${ILMBASE_INCLUDE_DIRS})
 endif()
 
-# Image format definitions
-if (PNG_FOUND)
-  add_definitions(-DMTS_HAS_LIBPNG=1)
-endif()
-if (JPEG_FOUND)
-  add_definitions(-DMTS_HAS_LIBJPEG=1)
-endif()
-if (OPENEXR_FOUND)
-  add_definitions(-DMTS_HAS_OPENEXR=1)
-endif()
-
-# Features
+# Global features
 if (MTS_HAS_HW)
   add_definitions(-DMTS_HAS_HW=1)
 endif()

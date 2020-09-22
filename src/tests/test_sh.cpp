@@ -17,16 +17,23 @@
 */
 
 #include <mitsuba/render/testcase.h>
+#ifdef MTS_HAS_SHVECTOR
 #include <mitsuba/core/shvector.h>
+#endif
 
 MTS_NAMESPACE_BEGIN
 
 class TestSphericalHarmonics : public TestCase {
 public:
 	MTS_BEGIN_TESTCASE()
+#ifdef MTS_HAS_SHVECTOR
 	MTS_DECLARE_TEST(test01_shRotation)
 	MTS_DECLARE_TEST(test02_shSampler)
+#endif
 	MTS_END_TESTCASE()
+
+// requires Eigen, and never used so far
+#ifdef MTS_HAS_SHVECTOR
 
 	void test01_shRotation() {
 		/* Generate a random SH expansion, rotate it and
@@ -96,6 +103,8 @@ public:
 		}
 		assertTrue(accum / nInAvg < 0.01);
 	}
+
+#endif
 };
 
 MTS_EXPORT_TESTCASE(TestSphericalHarmonics, "Testcase for Spherical Harmonics code")

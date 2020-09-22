@@ -20,8 +20,11 @@
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/plugin.h>
+#include <mitsuba/core/filesystem.h>
 #if defined(WIN32)
 #include <mitsuba/core/getopt.h>
+#else
+#include <unistd.h>
 #endif
 
 MTS_NAMESPACE_BEGIN
@@ -154,17 +157,17 @@ public:
 		ref<ShapeKDTree> kdtree;
 
 		std::string lowercase = to_lower_copy(std::string(argv[optind]));
-		if (boost::ends_with(lowercase, ".xml")) {
+		if (ends_with(lowercase, ".xml")) {
 			fs::path
-				filename = fileResolver->resolve(argv[optind]),
+				filename = fs::decode_pathstr( fileResolver->resolve(fs::pathstr(argv[optind])) ),
 				filePath = fs::absolute(filename).parent_path(),
 				baseName = filename.stem();
 			ref<FileResolver> frClone = fileResolver->clone();
-			frClone->prependPath(filePath);
+			frClone->prependPath(fs::encode_pathstr(filePath));
 			Thread::getThread()->setFileResolver(frClone);
-			scene = loadScene(argv[optind]);
+			scene = loadScene(fs::pathstr(argv[optind]));
 			kdtree = scene->getKDTree();
-		} else if (boost::ends_with(lowercase, ".ply")) {
+		} else if (ends_with(lowercase, ".ply")) {
 			Properties props("ply");
 			props.setString("filename", argv[optind]);
 			ref<TriMesh> mesh;

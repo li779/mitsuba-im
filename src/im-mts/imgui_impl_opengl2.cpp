@@ -38,8 +38,10 @@
 #endif
 #include <cmath>
 
-#include <SDL2/SDL_video.h>
-#include <SDL2/SDL_opengl.h>
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#include "../external/GL/glext.h"
+#endif
 
 #define NO_RESTORE_STATE
 
@@ -53,8 +55,8 @@ bool	ImGui_ImplOpenGL2_Init()
 {
 	ImGuiIO& io = ImGui::GetIO();
 	io.BackendRendererName = "imgui_impl_opengl2";
-	glClampColor = (PFNGLCLAMPCOLORARBPROC) SDL_GL_GetProcAddress("glClampColorARB");
-	glBlendEquationEXT = (PFNGLBLENDEQUATIONEXTPROC) SDL_GL_GetProcAddress("glBlendEquationEXT");
+	glClampColor = (PFNGLCLAMPCOLORARBPROC) glfwGetProcAddress("glClampColorARB");
+	glBlendEquationEXT = (PFNGLBLENDEQUATIONEXTPROC) glfwGetProcAddress("glBlendEquationEXT");
 	return true;
 }
 

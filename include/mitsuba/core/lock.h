@@ -243,6 +243,7 @@ public:
 	explicit Barrier(int iCount) :
 		mThreshold(0),
 		mCond(&mMutex) {
+		mMutex.incRef();
 		resize(iCount);
 	}
 

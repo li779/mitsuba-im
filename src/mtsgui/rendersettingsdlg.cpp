@@ -20,6 +20,7 @@
 #include "ui_rendersettingsdlg.h"
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/fresolver.h>
+#include <mitsuba/core/filesystem.h>
 
 class BetterSpinBox : public QSpinBox {
 public:
@@ -414,7 +415,7 @@ void RenderSettingsDialog::apply(SceneContext *ctx) {
 	ref<Thread> thread = Thread::getThread();
 	ref<FileResolver> oldResolver = thread->getFileResolver();
 	ref<FileResolver> newResolver = oldResolver->clone();
-	newResolver->prependPath(fs::absolute(scene->getSourceFile()).parent_path());
+	newResolver->prependPath(fs::encode_pathstr( fs::absolute(fs::decode_pathstr(scene->getSourceFile())).parent_path() ));
 	thread->setFileResolver(newResolver);
 
 	/* Configure the reconstruction filter */

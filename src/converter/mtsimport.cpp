@@ -39,6 +39,8 @@
 #include <mitsuba/core/version.h>
 #if defined(__WINDOWS__)
 #include <mitsuba/core/getopt.h>
+#else
+#include <unistd.h>
 #endif
 
 class ConsoleGeometryConverter : public GeometryConverter {
@@ -86,7 +88,7 @@ int importMain(int argc, char **argv) {
 			case 'a': {
 					std::vector<std::string> paths = tokenize(optarg, ";");
 					for (int i=(int) paths.size()-1; i>=0; --i)
-						fileResolver->prependPath(paths[i]);
+						fileResolver->prependPath(fs::pathstr(paths[i]));
 				}
 				break;
 			case 's':
@@ -189,6 +191,7 @@ int mts_main(int argc, char **argv) {
 #endif
 
 	try {
+#ifdef MTS_HAS_HW
 		/* An OpenGL context may be required for the GLU tesselator */
 		ref<Session> session = Session::create();
 		ref<Device> device = Device::create(session);
@@ -201,6 +204,9 @@ int mts_main(int argc, char **argv) {
 		renderer->init(device);
 
 		device->makeCurrent(renderer);
+#else
+		SLog(EWarn, "Built without HW support library, may fail due to lacking GLU tesselator!");
+#endif
 		ref<Timer> timer = new Timer();
 
 		retval = importMain(argc, argv);
@@ -208,9 +214,11 @@ int mts_main(int argc, char **argv) {
 		if (retval != -1)
 			cout << "Finished conversion (took " << timer->getMilliseconds() << " ms)" << endl;
 
+#ifdef MTS_HAS_HW
 		renderer->shutdown();
 		device->shutdown();
 		session->shutdown();
+#endif
 	} catch(const XMLException &toCatch) {
 		cout << "Caught a Xerces exception: " <<
 			XMLString::transcode(toCatch.getMessage()) << endl;

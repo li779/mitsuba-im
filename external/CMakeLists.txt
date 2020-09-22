@@ -61,7 +61,7 @@ if (MTS_ZLIB_INSTALL_DIR)
 		set(BUILD_SHARED_LIBS FALSE)
 		set(CMAKE_INSTALL_PREFIX ${MTS_ZLIB_INSTALL_DIR})
 		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-		
+
 		set(ZLIB_TARGET_NAME zlibstatic)
 		add_external_package(${MTS_ZLIB_DIR} EXCLUDE_FROM_ALL)
 		publish_external_targets(ZLIB ${ZLIB_TARGET_NAME})
@@ -173,7 +173,7 @@ if (MTS_XERCESC_INSTALL_DIR)
 		set(threads OFF CACHE INTERNAL "")
 		set(CMAKE_INSTALL_PREFIX ${MTS_XERCESC_INSTALL_DIR})
 		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-		
+
 		add_external_package(${MTS_XERCESC_DIR} EXCLUDE_FROM_ALL)
 		publish_external_targets(XercesC xerces-c)
 		# reset
@@ -188,24 +188,33 @@ if (MTS_XERCESC_INSTALL_DIR)
 	add_xerces(xerces-c)
 endif ()
 
-if (MTS_SDL_INSTALL_DIR)
-	function (add_sdl MTS_SDL_DIR)
-		set(SDL_SHARED ON CACHE INTERNAL "")
-		set(SDL_STATIC OFF CACHE INTERNAL "") # avoid linker nightmare
-		set(SDL_TEST OFF CACHE INTERNAL "")
-		set(SDL_AUDIO OFF CACHE INTERNAL "")
-		# these seem obligatory for now
-		#set(SDL_HAPTIC OFF CACHE INTERNAL "")
-		#set(SDL_JOYSTICK OFF CACHE INTERNAL "")
-		#set(SDL_POWER OFF CACHE INTERNAL "")
-		#set(SDL_SENSOR OFF CACHE INTERNAL "")
-		set(CMAKE_INSTALL_PREFIX ${MTS_SDL_INSTALL_DIR})
-		
-		add_external_package(${MTS_SDL_DIR} EXCLUDE_FROM_ALL)
-		publish_external_targets(SDL SDL2 SDL2main)
+if (MTS_PUGIXML_INSTALL_DIR)
+	function (add_pugixml MTS_PUGIXML_DIR)
+		set(CMAKE_INSTALL_PREFIX ${MTS_PUGIXML_INSTALL_DIR})
+		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-		install(DIRECTORY ${MTS_SDL_DIR}/include/ DESTINATION ${MTS_SDL_INSTALL_DIR}/include/SDL2 FILES_MATCHING PATTERN *.h PATTERN SDL_config.h EXCLUDE)
-		install(FILES ${external_subdir_bin}/include/SDL_config.h DESTINATION ${MTS_SDL_INSTALL_DIR}/include/SDL2)
+		add_library(pugixml STATIC ${MTS_PUGIXML_DIR}/src/pugixml.cpp)
+		publish_external_targets(pugixml pugixml)
+
+		install(DIRECTORY ${MTS_PUGIXML_DIR}/src/ DESTINATION ${MTS_PUGIXML_INSTALL_DIR}/include FILES_MATCHING PATTERN *.hpp)
 	endfunction ()
-	add_sdl(SDL)
+	add_pugixml(pugixml)
 endif ()
+
+if (MTS_GLFW_INSTALL_DIR)
+	function (add_glfw MTS_GLFW_DIR)
+		set(BUILD_SHARED_LIBS ON)
+		set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "")
+		set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "")
+		set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "")
+		set(CMAKE_INSTALL_PREFIX ${MTS_GLFW_INSTALL_DIR})
+
+		add_external_package(${MTS_GLFW_DIR} EXCLUDE_FROM_ALL)
+		publish_external_targets(GLFW glfw)
+
+		install(DIRECTORY ${MTS_GLFW_DIR}/include/ DESTINATION ${MTS_GLFW_INSTALL_DIR}/include)
+		install(FILES ${external_subdir_bin}/src/glfw_config.h DESTINATION ${MTS_GLFW_INSTALL_DIR}/include/GLFW)
+	endfunction ()
+	add_glfw(glfw)
+endif ()
+

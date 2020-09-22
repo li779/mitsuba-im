@@ -199,6 +199,12 @@ namespace fs {
 		MTS_EXPORT_CORE bool copy_file(const pathstr& from, const pathstr& to);
 		MTS_EXPORT_CORE bool rename(const pathstr& from, const pathstr& to);
 		MTS_EXPORT_CORE bool remove(const pathstr& what);
+		
+		MTS_EXPORT_CORE pathstr dirname(const pathstr& what);
+		MTS_EXPORT_CORE pathstr filename(const pathstr& what);
+		MTS_EXPORT_CORE pathstr filestem(const pathstr& what);
+		MTS_EXPORT_CORE pathstr replace_filename(const pathstr& where, const pathstr& what);
+		MTS_EXPORT_CORE pathstr replace_filestem(const pathstr& where, const pathstr& what);
 	}
 	using namespace mts_fs_util;
 }

@@ -22,7 +22,7 @@
 
 #include <mitsuba/render/util.h>
 #include <mitsuba/hw/renderer.h>
-#include <mitsuba/hw/font.h>
+#include <mitsuba/render/font.h>
 
 MTS_NAMESPACE_BEGIN
 

@@ -492,4 +492,24 @@ namespace fs {
 		remove(decode_pathstr(what), ec);
 		return !ec;
 	}
+
+	pathstr mts_fs_util::dirname(const pathstr& what) {
+		return encode_pathstr(decode_pathstr(what).parent_path());
+	}
+	pathstr mts_fs_util::filename(const pathstr& what) {
+		return encode_pathstr(decode_pathstr(what).filename());
+	}
+	pathstr mts_fs_util::filestem(const pathstr& what) {
+		return encode_pathstr(decode_pathstr(what).stem());
+	}
+	pathstr mts_fs_util::replace_filename(const pathstr& where, const pathstr& what) {
+		return encode_pathstr(decode_pathstr(where).replace_filename(decode_pathstr(what)));
+	}
+	pathstr mts_fs_util::replace_filestem(const pathstr& where, const pathstr& what) {
+		auto path = decode_pathstr(where);
+		auto filename = decode_pathstr(what);
+		if (path.has_extension())
+			filename += path.extension();
+		return encode_pathstr(path.replace_filename(filename));
+	}
 }

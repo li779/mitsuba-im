@@ -57,7 +57,7 @@ set(HDRS
   ${INCLUDE_DIR}/sched_remote.h
   ${INCLUDE_DIR}/serialization.h
   ${INCLUDE_DIR}/sfcurve.h
-#  ${INCLUDE_DIR}/shvector.h
+  ${INCLUDE_DIR}/shvector.h
   ${INCLUDE_DIR}/spectrum.h
   ${INCLUDE_DIR}/spline.h
   ${INCLUDE_DIR}/sse.h
@@ -108,7 +108,7 @@ set(SRCS
   sched.cpp
   sched_remote.cpp
   serialization.cpp
-#  shvector.cpp
+  shvector.cpp
   spectrum.cpp
   spline.cpp
   ssemath.cpp
@@ -168,6 +168,11 @@ add_mts_corelib(mitsuba-core ${MTS_MAIN_HEADER} ${HDRS} ${SRCS}
 add_dependencies(mitsuba-core ior_database microfacet_data)
 # implementation of half is automatically replaced by OpenEXR's
 target_link_libraries(mitsuba-core INTERFACE ${ILMBASE_LIBRARIES} ${LIBS_SYS})
+
+# If we are using the system OpenEXR, add its headers which half.h requires
+if (ILMBASE_FOUND)
+  target_include_directories(mitsuba-core PUBLIC ${ILMBASE_INCLUDE_DIRS})
+endif()
 
 mts_install_headers (${MTS_MAIN_HEADER} FOLDER "mitsuba")
 mts_install_headers (${HDRS} FOLDER "mitsuba/core")

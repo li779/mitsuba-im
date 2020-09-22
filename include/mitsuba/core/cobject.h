@@ -76,6 +76,9 @@ public:
 	 */
 	inline const Properties &getProperties() const { return m_properties; }
 
+	/// Store queried flags of the actual source porperty object.
+	inline void storeQueriedFlags(const Properties& other) { m_properties.copyQueriedFlags(other); }
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor

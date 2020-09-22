@@ -107,9 +107,9 @@ if (MTS_SSE)
   # there are problems when using PCHs: simdtonemap.cpp gets a file-level
   # dependency on the mtsgui later on. This causes a conflict with the
   # target-level PCH on the test case
-  if (APPLE)
+  #if (APPLE)
     set(test_simdtonemap_PCH "NO_MTS_PCH")
-  endif()
+  #endif() # currently incompatible with Qt CMake tools ...
   add_mts_plugin(test_simdtonemap ${test_simdtonemap_PCH} 
     test_simdtonemap.cpp ${SSE_SRCS} TYPE testcase)
 endif()
@@ -128,7 +128,7 @@ QT4_WRAP_UI(UI_HDRS ${UI_FILES})
 source_group("UI Files" FILES ${UI_FILES})
 
 # Add the directory where the generated headers are
-include_directories(. ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 # Process the resource files through rcc and store the generated cxx files
 QT4_ADD_RESOURCES(RC_SRCS ${RC_FILES})
@@ -149,7 +149,7 @@ source_group("Qt Generated" FILES ${MOC_HDRS} ${UI_HDRS} ${RC_SRCS})
 include_directories(${XERCES_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS})
 add_definitions(${GLEW_DEFINITIONS})
 
-set(LIBS ${QT_LIBRARIES} ${GLEW_LIBRARIES})
+set(LIBS ${QT_LIBRARIES} ${GLEW_LIBRARIES} ${X11_LIBRARIES})
 # This static library is built by the mtsimport target (src/converter)
 if (COLLADA_FOUND)
   if (NOT TARGET mtsconverter_lib)
@@ -166,11 +166,11 @@ endif()
 add_mts_exe(mtsgui ${MTS_EXE_TYPE} ${SRCS} ${HDRS}
   ${HDRS_UI} ${HDRS_QOBJECT}
   ${UI_HDRS} ${RC_SRCS} ${MOC_HDRS}
-  PCH "${CMAKE_CURRENT_SOURCE_DIR}/pch/mtsgui_precompiled.hpp"
+  NO_MTS_PCH
   RES_ICON "${PROJECT_SOURCE_DIR}/data/windows/mitsuba.ico"
   RES_DESCRIPTION "Mitsuba interactive Qt-based frontend"
   MTS_HW LINK_LIBRARIES ${LIBS})
-  
+# Currently incompatible with CMake Qt Tools: PCH "${CMAKE_CURRENT_SOURCE_DIR}/pch/mtsgui_precompiled.hpp"
  
 # Custom targets to copy the bundle files and the PreviewSettings objects
 # into the build directory. Also adds the special symlinks_install tool

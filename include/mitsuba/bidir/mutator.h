@@ -167,7 +167,7 @@ protected:
 
 /// Allows tracking of large step proposals.
 struct LargeStepTracker {
-	virtual void proposedLargeStep(Float weight, Path const &path) = 0;
+	virtual void proposedLargeStep(Float weight, Path const &path, bool newSample = true) = 0;
 };
 
 MTS_NAMESPACE_END

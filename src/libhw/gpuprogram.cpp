@@ -17,7 +17,8 @@
 */
 
 #include <mitsuba/hw/gpuprogram.h>
-#include <boost/filesystem/fstream.hpp>
+#include <mitsuba/core/filesystem.h>
+#include <fstream>
 
 MTS_NAMESPACE_BEGIN
 
@@ -30,11 +31,11 @@ GPUProgram::GPUProgram(const std::string &name)
 GPUProgram::~GPUProgram() {
 }
 
-void GPUProgram::setSourceFile(EType type, const fs::path &path) {
-	fs::ifstream ifs(path);
+void GPUProgram::setSourceFile(EType type, const fs::pathstr &path) {
+	std::ifstream ifs(fs::decode_pathstr(path).native().c_str());
 	if (ifs.fail() || ifs.bad())
 		Log(EError, "Unable to load GPU program \"%s\"",
-			path.string().c_str());
+			path.s.c_str());
 	std::string code, line;
 
 	while (getline(ifs, line)) {

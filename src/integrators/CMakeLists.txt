@@ -9,11 +9,15 @@ endmacro()
 
 macro(add_integrator name)
   add_integrator_(${name} ${ARGN})
-  target_sources(${name} PRIVATE mark_integrator.cpp)
+  if (TARGET ${name})
+    target_sources(${name} PRIVATE mark_integrator.cpp)
+  endif ()
 endmacro()
 macro(add_integrator2 name)
   add_integrator_(${name} ${ARGN})
-  target_sources(${name} PRIVATE mark_integrator2.cpp)
+  if (TARGET ${name})
+    target_sources(${name} PRIVATE mark_integrator2.cpp)
+  endif ()
 endmacro()
 
 macro(add_bidir)
@@ -34,7 +38,9 @@ add_integrator(ppm          photonmapper/ppm.cpp)
 add_integrator(sppm         photonmapper/sppm.cpp)
 
 # Miscellaneous
-#add_integrator(vpl          vpl/vpl.cpp MTS_HW)
+if (MTS_HAS_HW)
+add_integrator(vpl          vpl/vpl.cpp MTS_HW)
+endif()
 add_integrator(adaptive     misc/adaptive.cpp)
 add_integrator(irrcache     misc/irrcache.cpp
                             misc/irrcache_proc.h misc/irrcache_proc.cpp)

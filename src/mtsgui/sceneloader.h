@@ -26,11 +26,11 @@ struct SceneContext;
 
 using namespace mitsuba;
 
-class SceneLoader : public Thread {
+class GuiSceneLoader : public Thread {
 public:
-	SceneLoader(FileResolver *resolver,
-			const fs::path &filename,
-			const fs::path &destFile,
+	GuiSceneLoader(FileResolver *resolver,
+			const fs::pathstr &filename,
+			const fs::pathstr &destFile,
 			const std::map<std::string, std::string, SimpleStringOrdering> &parameters);
 	void run();
 
@@ -41,14 +41,14 @@ public:
 	inline bool isVersionError() const { return m_versionError; }
 	inline const Version &getVersion() const { return m_version; }
 protected:
-	virtual ~SceneLoader();
+	virtual ~GuiSceneLoader();
 private:
 	ref<FileResolver> m_resolver;
 	ref<WaitFlag> m_wait;
 	SceneContext *m_result;
 	std::string m_error;
 	const QString m_filename;
-	fs::path m_destFile;
+	fs::pathstr m_destFile;
 	bool m_versionError;
 	Version m_version;
 	const std::map<std::string, std::string, SimpleStringOrdering> &m_parameters;

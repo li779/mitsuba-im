@@ -426,6 +426,16 @@ void Properties::merge(const Properties &p, const Properties *defaults, bool exi
 	}
 }
 
+void Properties::copyQueriedFlags(const Properties& other) {
+	std::map<std::string, PropertyElement>::const_iterator it = other.m_elements->begin();
+	for (; it != other.m_elements->end(); ++it) {
+		std::map<std::string, PropertyElement>::iterator iit = m_elements->find(it->first);
+		if (iit != m_elements->end()) {
+			iit->second.queried = it->second.queried;
+		}
+	}
+}
+
 ConfigurableObject::ConfigurableObject(Stream *stream, InstanceManager *manager)
  : SerializableObject(stream, manager) {
 }

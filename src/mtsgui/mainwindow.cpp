@@ -39,6 +39,7 @@
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/filesystem.h>
 
 #if !defined(WIN32)
 #include <QtGui/QX11Info>
@@ -284,7 +285,7 @@ bool MainWindow::initWorkersProcessArgv() {
 			QString value = args[i].mid(2);
 			if (value.length() == 0 && i+1<args.count())
 				value = args[++i];
-			resolver->appendPath(value.toStdString());
+			resolver->appendPath(toFsPath(value));
 		} else if (args[i].startsWith("-o")) {
 			outputFile = args[i].mid(2);
 			if (outputFile.length() == 0 && i+1<args.count())
@@ -702,22 +703,22 @@ void MainWindow::onClearRecent() {
 SceneContext *MainWindow::loadScene(const QString &qFileName, const QString &destFile) {
 	ref<FileResolver> resolver = Thread::getThread()->getFileResolver();
 	ref<Logger> logger = Thread::getThread()->getLogger();
-	fs::path filename = resolver->resolve(toFsPath(qFileName));
+	fs::path filename = fs::decode_pathstr( resolver->resolve(toFsPath(qFileName)) );
 	fs::path filePath = fs::absolute(filename).parent_path();
 	ref<FileResolver> newResolver = resolver->clone();
 	for (int i=(int) m_searchPaths.size()-1; i>=0; --i)
 		newResolver->prependPath(toFsPath(m_searchPaths[i]));
-	newResolver->prependPath(filePath);
+	newResolver->prependPath(fs::encode_pathstr(filePath));
 	LoadDialog *loaddlg = new LoadDialog(this);
 	SceneContext *result = NULL;
-	ref<SceneLoader> loadingThread;
+	ref<GuiSceneLoader> loadingThread;
 	loaddlg->setAttribute(Qt::WA_DeleteOnClose);
 	loaddlg->setWindowModality(Qt::ApplicationModal);
 	loaddlg->setWindowTitle("Loading ...");
 	loaddlg->show();
 
 retry:
-	loadingThread = new SceneLoader(newResolver, filename, toFsPath(destFile), m_parameters);
+	loadingThread = new GuiSceneLoader(newResolver, fs::encode_pathstr(filename), toFsPath(destFile), m_parameters);
 	loadingThread->start();
 
 	while (loadingThread->isRunning()) {
@@ -757,7 +758,7 @@ retry:
 
 				UpgradeManager upgradeMgr(newResolver);
 				try {
-					upgradeMgr.performUpgrade(fromFsPath(filename), version);
+					upgradeMgr.performUpgrade(fromFsPath(fs::encode_pathstr(filename)), version);
 					goto retry;
 				} catch (const std::exception &ex) {
 					QMessageBox::critical(this, tr("Unable to update %1").arg(qFileName),
@@ -1749,15 +1750,15 @@ void MainWindow::saveSceneAs(const QString &fileName) {
 		SceneContext *context = m_context[currentIndex];
 
 		saveScene(this, context, fileName);
-		fs::path pathName = toFsPath(fileName),
+		fs::path pathName = fs::decode_pathstr( toFsPath(fileName) ),
 		         complete = fs::absolute(pathName),
 		         baseName = pathName.stem();
 		context->fileName = fileName;
 		context->shortName = QFileInfo(fileName).fileName();
-		context->scene->setSourceFile(pathName);
-		context->scene->setDestinationFile(baseName);
+		context->scene->setSourceFile(fs::encode_pathstr(pathName));
+		context->scene->setDestinationFile(fs::encode_pathstr(baseName));
 		ui->tabBar->setTabText(currentIndex, context->shortName);
-		addRecentFile(fromFsPath(complete));
+		addRecentFile(fromFsPath(fs::encode_pathstr(complete)));
 	}
 }
 
@@ -2087,7 +2088,7 @@ SceneContext::SceneContext(SceneContext *ctx) {
 		ref<Thread> thread = Thread::getThread();
 		ref<FileResolver> oldResolver = thread->getFileResolver();
 		ref<FileResolver> newResolver = oldResolver->clone();
-		newResolver->prependPath(fs::absolute(ctx->scene->getSourceFile()).parent_path());
+		newResolver->prependPath(fs::encode_pathstr( fs::absolute(fs::decode_pathstr(ctx->scene->getSourceFile())).parent_path() ));
 		thread->setFileResolver(newResolver);
 
 		scene = new Scene(ctx->scene);

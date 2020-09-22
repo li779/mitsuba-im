@@ -39,9 +39,9 @@ public:
 		if (*end_ptr != '\0')
 			SLog(EError, "Could not parse floating point value");
 
-		ref<FileStream> aFile   = new FileStream(argv[2], FileStream::EReadOnly);
-		ref<FileStream> bFile   = new FileStream(argv[4], FileStream::EReadOnly);
-		ref<FileStream> outFile = new FileStream(argv[5], FileStream::ETruncReadWrite);
+		ref<FileStream> aFile   = new FileStream(fs::pathstr(argv[2]), FileStream::EReadOnly);
+		ref<FileStream> bFile   = new FileStream(fs::pathstr(argv[4]), FileStream::EReadOnly);
+		ref<FileStream> outFile = new FileStream(fs::pathstr(argv[5]), FileStream::ETruncReadWrite);
 
 		ref<Bitmap> aBitmap = new Bitmap(Bitmap::EOpenEXR, aFile);
 		ref<Bitmap> bBitmap = new Bitmap(Bitmap::EOpenEXR, bFile);

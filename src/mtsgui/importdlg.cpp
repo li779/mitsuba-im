@@ -165,9 +165,9 @@ void ImportDialog::accept() {
 	dialog->show();
 	progressBar->show();
 
-	fs::path filePath = fs::absolute(toFsPath(sourceFile)).parent_path();
+	fs::path filePath = fs::absolute(fs::decode_pathstr(toFsPath(sourceFile))).parent_path();
 	ref<FileResolver> resolver = m_resolver->clone();
-	resolver->prependPath(filePath);
+	resolver->prependPath(fs::encode_pathstr(filePath));
 
 	const Logger *logger = Thread::getThread()->getLogger();
 	size_t initialWarningCount = logger->getWarningCount();
@@ -193,7 +193,7 @@ void ImportDialog::accept() {
 	dialog->hide();
 	delete dialog;
 
-	if (!importingThread->getResult().empty()) {
+	if (!importingThread->getResult().s.empty()) {
 		size_t warningCount = logger->getWarningCount() - initialWarningCount;
 		if (warningCount > 0)
 			QMessageBox::warning(this, tr("Scene Import"),
@@ -207,11 +207,11 @@ void ImportDialog::accept() {
 	}
 }
 
-void ImportDialog::onLocateResource(const fs::path &path, fs::path *target) {
+void ImportDialog::onLocateResource(const fs::pathstr &path, fs::pathstr *target) {
 	LocateResourceDialog locateResource(this, fromFsPath(path));
 	locateResource.setWindowModality(Qt::ApplicationModal);
 	if (locateResource.exec()) {
-		fs::path newPath(toFsPath(locateResource.getFilename()));
+		fs::pathstr newPath = toFsPath(locateResource.getFilename());
 		if (fs::exists(newPath))
 			*target = newPath;
 	}

@@ -21,10 +21,42 @@
 #define __MITSUBA_RENDER_SCENELOADER_H_
 
 #include <mitsuba/render/scene.h>
+#include <mitsuba/core/version.h>
 
 MTS_NAMESPACE_BEGIN
 
 class SceneHandler;
+
+#ifdef _MSC_VER
+// Disable warning 4275: non dll-interface used as base for dll-interface class
+// Can be safely ignored when deriving from a type in the Standard C++ Library
+# pragma warning( push )
+# pragma warning( disable : 4275 )
+#endif
+
+/**
+ * \brief This exception is thrown when attempting to load an outdated file
+ * \ingroup librender
+ */
+class MTS_EXPORT_RENDER VersionException : public std::runtime_error {
+public:
+	VersionException(const std::string &str, const Version &version) :
+		std::runtime_error(str), m_version(version) { }
+
+	/* For stupid and subtle reasons when compiling with GCC, it is important
+	   that this class has a virtual member. This will ensure that its typeid
+	   structure is in librender, which is important for throwing exceptions
+	   across DLL boundaries */
+	virtual ~VersionException() noexcept;
+
+	inline const Version &getVersion() const { return m_version; }
+private:
+	Version m_version;
+};
+
+#ifdef _MSC_VER
+# pragma warning( pop )
+#endif
 
 /**
  * \brief Loads scenes using the given parameters
@@ -40,6 +72,13 @@ public:
 
 	/// Loads a scene from the given file path into this loader.
 	ref<Scene> load(fs::pathstr const &file);
+
+	/// Load a scene from an external file
+	static ref<Scene> loadScene(const fs::pathstr &fname,
+		const ParameterMap &params= ParameterMap());
+	/// Load a scene from a string
+	static ref<Scene> loadSceneFromString(const std::string &content,
+		const ParameterMap &params= ParameterMap());
 
 	/// Initialize Xerces-C++ (alis for SceneHandler methods, needs to be called once at program startup)
 	static void staticInitialization();

@@ -26,7 +26,6 @@
 #include <mitsuba/render/vpl.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/version.h>
-#include <boost/filesystem/path.hpp>
 #include <set>
 
 using namespace mitsuba;
@@ -235,23 +234,12 @@ public:
 
 #define QStringToUTF8(str) str.toUtf8().data()
 
-inline QString fromFsPath(const fs::path &path) {
-#if defined(__WINDOWS__)
-# if defined(_MSC_VER) && _MSC_VER >= 1600
-	static_assert(sizeof(QChar) == sizeof(fs::path::value_type), "Incompatible!");
-# endif
-	return QString(reinterpret_cast<const QChar*>(path.c_str()));
-#else
-	return QString::fromUtf8(path.c_str());
-#endif
+inline QString fromFsPath(const fs::pathstr &path) {
+	return QString::fromUtf8(path.s.c_str());
 }
 
-inline fs::path toFsPath(const QString &str) {
-#if defined(__WINDOWS__)
-	return fs::path(reinterpret_cast<const fs::path::value_type*>(str.constData()));
-#else
-	return fs::path(QStringToUTF8(str));
-#endif
+inline fs::pathstr toFsPath(const QString &str) {
+	return fs::pathstr(QStringToUTF8(str));
 }
 
 #endif // QTGUI_COMMON_H

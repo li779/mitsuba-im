@@ -107,6 +107,7 @@ public:
 			m_config.separateDirect, true);
 
 		m_pool = &m_pathSampler->getMemoryPool();
+		m_nMutationsCompleted = 0;
 
 		/* Jump sizes recommended by Eric Veach */
 		Float minJump = 0.1f, coveredArea = 0.05f;
@@ -146,9 +147,10 @@ public:
 		const SeedWorkUnit *wu = static_cast<const SeedWorkUnit *>(workUnit);
 		Path *current = new Path(), *proposed = new Path();
 		Spectrum relWeight(0.0f);
+
 		Float* currentImageWeight = m_currentImageWeight;
 
-		// classic mitusba mode
+		// classic mitsuba mode
 		if (m_config.luminanceSamples != 0) {
 			result->clear();
 		}
@@ -288,13 +290,14 @@ public:
 
 				/* Accept with probability 'a' */
 				if (a == 1 || m_sampler->next1D() < a) {
-					current->release(muRec.l, muRec.m+1, *m_pool);
 					Spectrum value = relWeight * accumulatedWeight;
 					if (currentImageWeight)
 						value *= *currentImageWeight;
 					float alphaWeight = accumulatedWeight;
 					if (!value.isZero())
 						result->putAtomic(current->getSamplePosition(), value, alphaWeight);
+
+					current->release(muRec.l, muRec.m+1, *m_pool);
 
 					/* The mutation was accepted */
 					std::swap(current, proposed);
@@ -306,8 +309,6 @@ public:
 					++statsAccepted;
 				} else {
 					/* The mutation was rejected */
-					proposed->release(muRec.l, muRec.l + muRec.ka + 1, *m_pool);
-					consecRejections++;
 					if (a > 0) {
 						Spectrum value = proposed->getRelativeWeight() * a;
 						if (currentImageWeight)
@@ -315,6 +316,8 @@ public:
 						float alphaWeight = a;
 						result->putAtomic(proposed->getSamplePosition(), value, alphaWeight);
 					}
+					proposed->release(muRec.l, muRec.l + muRec.ka + 1, *m_pool);
+					consecRejections++;
 				}
 			} else {
 				accumulatedWeight += 1;
@@ -357,6 +360,7 @@ public:
 
 	class MLTResponsive : public ResponsiveIntegrator {
 		#define SeedSamplesPerChain 64
+		#define CorrelatedSeedSamplesPerChain 10000
 
 		ref<Integrator> m_integrator;
 		MLTConfiguration const* m_config;
@@ -432,8 +436,15 @@ public:
 			}
 
 			struct MeanBrightness {
+				double valueAcc = 0;
+				long long samples = 0;
 				Float value = 0;
-				Float samples = 0;
+
+				void addSample(Float newValue, Float /*weight*/ = 1.0f) {
+					samples++;
+					valueAcc += (newValue - valueAcc) / double(samples);
+					value = Float(valueAcc);
+				}
 			} meanImage;
 
 			ref<MLTRenderer> renderer = new MLTRenderer(config);
@@ -441,14 +452,23 @@ public:
 
 			struct LargeStepEstimator : LargeStepTracker {
 				MeanBrightness &meanImage;
+				Float currentWeight = -1.0f;
 
 				LargeStepEstimator(MeanBrightness &meanImage)
 					: meanImage(meanImage) { }
 
-				void proposedLargeStep(Float weight, Path const &path) override {
+				void proposedLargeStep(Float weight, Path const &path, bool newSample) override {
+
 					float const onlineWeight = .1f; // higher variance
-					meanImage.samples += onlineWeight;
-					meanImage.value += (weight - meanImage.value) * onlineWeight / meanImage.samples;
+					if (newSample) {
+						if (currentWeight >= 0.0f)
+							meanImage.addSample(currentWeight, onlineWeight);
+						currentWeight = weight;
+					}
+					else {
+						BDAssert(currentWeight >= 0.0f);
+						currentWeight += weight;
+					}
 				}
 			} largeStepEstimator = { meanImage };
 			for (Mutator* m : renderer->m_mutators)
@@ -487,6 +507,7 @@ public:
 				renderer->m_control = interact;
 
 				{
+					int seedSampleCount = pathSeeds.empty() ? CorrelatedSeedSamplesPerChain : SeedSamplesPerChain;
 					size_t sampleIndex;
 					Float totalSplat;
 					PathSampler::PathCallback callback = [&pathSeeds, &sampleIndex, &totalSplat](int s, int t, Float w, Path &p) {
@@ -496,13 +517,15 @@ public:
 							// todo: insert into dbor
 						}
 					};
-					for (int i = 0; i < SeedSamplesPerChain; ) {
+					if (pathSeeds.size() > 4 * seedSampleCount)
+						pathSeeds.erase(pathSeeds.begin(), pathSeeds.begin() + pathSeeds.size() / 4);
+					// sample more
+					for (int i = 0; i < seedSampleCount; ) {
 						size_t seedIndex = pathSeeds.size();
 						sampleIndex = seedSampler->getSampleIndex();
 						totalSplat = 0.0f;
 						pathSampler->samplePaths(Point2i(-1), callback);
-						meanImage.samples += 1.f;
-						meanImage.value += (totalSplat - meanImage.value) / meanImage.samples;
+						meanImage.addSample(totalSplat);
 						i += int(pathSeeds.size() - seedIndex);
 					}
 				}

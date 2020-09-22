@@ -15,11 +15,14 @@ endif()
 set (SCHEMA_DIR "${PROJECT_BINARY_DIR}/binaries/${CMAKE_CFG_INTDIR}/${SCHEMA_DESTINATION}")
 add_custom_command (
   OUTPUT "${SCHEMA_DIR}/scene.xsd"
+         "${SCHEMA_DIR}/upgrade.html"
          "${SCHEMA_DIR}/upgrade_0.3.0.xsl"
          "${SCHEMA_DIR}/upgrade_0.4.0.xsl"
          "${SCHEMA_DIR}/upgrade_0.5.0.xsl"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
           "${CMAKE_CURRENT_SOURCE_DIR}/scene.xsd" "${SCHEMA_DIR}/scene.xsd"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+          "${CMAKE_CURRENT_SOURCE_DIR}/upgrade.html" "${SCHEMA_DIR}/upgrade.html"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
           "${CMAKE_CURRENT_SOURCE_DIR}/upgrade_0.3.0.xsl" "${SCHEMA_DIR}/upgrade_0.3.0.xsl"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -28,16 +31,19 @@ add_custom_command (
           "${CMAKE_CURRENT_SOURCE_DIR}/upgrade_0.5.0.xsl" "${SCHEMA_DIR}/upgrade_0.5.0.xsl"
   MAIN_DEPENDENCY "scene.xsd"
   DEPENDS "scene.xsd" "upgrade_0.3.0.xsl" "upgrade_0.4.0.xsl" "upgrade_0.5.0.xsl"
+          "upgrade.html"
   COMMENT "Copying XML data: scene schema and upgrade XSL files"
 )
 add_custom_target (scene_schema
   DEPENDS "${SCHEMA_DIR}/scene.xsd"
+          "${SCHEMA_DIR}/upgrade.html"
           "${SCHEMA_DIR}/upgrade_0.3.0.xsl" "${SCHEMA_DIR}/upgrade_0.4.0.xsl" "${SCHEMA_DIR}/upgrade_0.5.0.xsl"
 )
 set_target_properties (scene_schema PROPERTIES FOLDER "data")
 
 # Actual installation
 install(FILES "scene.xsd" "upgrade_0.3.0.xsl" "upgrade_0.4.0.xsl" "upgrade_0.5.0.xsl"
+              "upgrade.html"
   DESTINATION ${SCHEMA_DESTINATION}
   PERMISSIONS "OWNER_READ" "GROUP_READ" "WORLD_READ"
   COMPONENT Runtime

@@ -1,10 +1,9 @@
 #include "shell.h"
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/integrator2.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl.h>
+#include <GLFW/glfw3.h>
 #include <imgui.h>
-#include <examples/imgui_impl_sdl.h>
+#include <examples/imgui_impl_glfw.h>
 #include "imgui_impl_opengl2.h"
 #include <tinyfiledialogs.h>
 #include <cstdio>
@@ -51,27 +50,27 @@ struct InteractiveTransform {
 		if (!io.WantCaptureKeyboard) {
 			float dx = this->speed * io.DeltaTime;
 
-			if (io.KeysDown[SDL_SCANCODE_W]) {
+			if (io.KeysDown[GLFW_KEY_W]) {
 				trafo = trafo * trafo.translate( mitsuba::Vector3(0, 0, 1) * dx );
 				changed = true;
 			}
-			if (io.KeysDown[SDL_SCANCODE_S]) {
+			if (io.KeysDown[GLFW_KEY_S]) {
 				trafo = trafo * trafo.translate( mitsuba::Vector3(0, 0, -1) * dx );
 				changed = true;
 			}
-			if (io.KeysDown[SDL_SCANCODE_A]) {
+			if (io.KeysDown[GLFW_KEY_A]) {
 				trafo = trafo * trafo.translate( mitsuba::Vector3(1, 0, 0) * dx);
 				changed = true;
 			}
-			if (io.KeysDown[SDL_SCANCODE_D]) {
+			if (io.KeysDown[GLFW_KEY_D]) {
 				trafo = trafo * trafo.translate( mitsuba::Vector3(-1, 0, 0) * dx );
 				changed = true;
 			}
-			if (io.KeysDown[SDL_SCANCODE_LSHIFT] || io.KeysDown[SDL_SCANCODE_Q]) {
+			if (io.KeysDown[GLFW_KEY_LEFT_SHIFT] || io.KeysDown[GLFW_KEY_Q]) {
 				trafo = trafo * trafo.translate( mitsuba::Vector3(0, -1, 0) * dx );
 				changed = true;
 			}
-			if (io.KeysDown[SDL_SCANCODE_SPACE] || io.KeysDown[SDL_SCANCODE_E]) {
+			if (io.KeysDown[GLFW_KEY_SPACE] || io.KeysDown[GLFW_KEY_E]) {
 				trafo = trafo * trafo.translate( mitsuba::Vector3(0, 1, 0) * dx );
 				changed = true;
 			}
@@ -106,6 +105,10 @@ struct Config {
 	ProcessConfig process;
 };
 
+static unsigned long long programTimeStamp() {
+	return glfwGetTimerValue() * 1000 / glfwGetTimerFrequency();
+}
+
 struct Document {
 	fs::pathstr filePath = fs::pathstr("../mitsuba/scenes/bitterli/living-room/livingroom_PT.xml");
 	unsigned long long fileTime = 0;
@@ -118,7 +121,7 @@ struct Document {
 			std::vector<double> samples;
 			std::unique_ptr<StackedPreview> preview;
 			float exposureMultiplier[4];
-			unsigned long long baseTime = ~0;
+			double baseTime = 0;
 
 			Integration() { }
 
@@ -134,23 +137,25 @@ struct Document {
 			}
 
 			void runFrame(mitsuba::Sensor* sensor, InteractiveSceneProcess::Controls controls) {
-				baseTime = SDL_GetTicks();
-				preview->runGeneration( baseTime );
+				baseTime = glfwGetTime();
+				preview->runGeneration( programTimeStamp() );
 				process->render(sensor, samples.data(), controls);
 
 				int waitCounter = 0;
-				while (!preview->upToDate((float const* const*) process->imageData, samples.data(), (int) samples.size()) && waitCounter < 160)
-					SDL_Delay(waitCounter += std::min(std::max(waitCounter, 5), 16));
+				while (!preview->upToDate((float const* const*) process->imageData, samples.data(), (int) samples.size()) && waitCounter < 160) {
+					waitCounter += std::min(std::max(waitCounter, 5), 16);
+					WorkLane::sleep(waitCounter);
+				}
 			}
 
 			void updatePreview() {
-				preview->update(SDL_GetTicks(), (float const* const*) process->imageData, samples.data(), (int) samples.size());
+				preview->update(programTimeStamp(), (float const* const*) process->imageData, samples.data(), (int) samples.size());
 			}
 
 			double timeSeconds() const {
-				unsigned long long ticks = SDL_GetTicks();
-				if (ticks > baseTime)
-					return double(ticks - baseTime) / 1000.0f;
+				double time = glfwGetTime();
+				if (baseTime)
+					return double(time - baseTime);
 				return 0.0f;
 			}
 		};
@@ -160,7 +165,7 @@ struct Document {
 		Integration integration;
 		volatile int restart;
 		InteractiveSceneProcess::Controls controls = { };
-		bool skipInit, reconfig;
+		bool skipInit = false, reconfig;
 
 		std::unique_ptr<SceneConfigurator::Changes> pendingChanges;
 		ProcessConfig nextConfig;
@@ -168,8 +173,7 @@ struct Document {
 		Renderer(mitsuba::Scene* scene, InteractiveSensor* sensor, Config const& config)
 			: scene(scene)
 			, sensor(sensor)
-			, restart(false)
-			, skipInit(false) {
+			, restart(false) {
 			reconfigure(config.process);
 		}
 
@@ -306,6 +310,7 @@ struct Document {
 
 	std::unique_ptr<WorkLane> workLane;
 	bool autoPaused = false;
+	bool wasShown = false;
 
 	std::unique_ptr<SceneConfigurator> configurator;
 
@@ -346,6 +351,11 @@ struct Document {
 	void updatePreview() {
 		this->renderer.integration.updatePreview();
 		this->classic.updatePreview();
+	}
+	Preview* activePreview(bool show_final) {
+		bool finalPreview = (show_final && classic.preview);
+		Preview& preview = finalPreview ? (Preview&) *classic.preview : (Preview&) *renderer.integration.preview;
+		return &preview;
 	}
 
 	void autoPause(bool pause) {
@@ -477,7 +487,52 @@ std::unique_ptr<Document> browseForScene(Config const& config) {
 	return {};
 }
 
-void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, ImGuiContext* ui_context) {
+struct Window {
+	GLFWwindow* handle;
+
+	bool null_render = false;
+	bool had_localized_event = false;
+
+	Window(GLFWwindow* window) : handle(window) {
+		glfwSetWindowUserPointer(handle, this);
+		ImGui_ImplGlfw_InitForOpenGL(handle, true);
+	}
+	~Window() {
+		glfwSetWindowUserPointer(handle, nullptr);
+	}
+
+	bool hidden = false;
+	bool was_hidden = hidden;
+
+	void updateWindowVisibility() {
+		hidden = !glfwGetWindowAttrib(handle, GLFW_VISIBLE) || glfwGetWindowAttrib(handle, GLFW_ICONIFIED);
+		if (hidden != was_hidden)
+			std::cout << "Window visibility was " << !was_hidden << ", now " << !hidden << std::endl;
+		was_hidden = hidden;
+	};
+
+#if 0
+	void preempt() {
+			// things that can depend on mouse position or state
+			had_localized_event |= (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP || event.type == SDL_MOUSEWHEEL);
+			had_localized_event |= (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP);
+			if (had_localized_event) {
+				if (1 == SDL_PeepEvents(&nextEvent, 1, SDL_PEEKEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT)) {
+					// things that change meaning of previous state
+					if (nextEvent.type == SDL_MOUSEMOTION || nextEvent.type == SDL_MOUSEBUTTONDOWN || nextEvent.type == SDL_MOUSEBUTTONUP) {
+						null_render = true; // fast round
+						break;
+					}
+					// todo: maybe record any key changes?
+				}
+				// no more events (that we were able to analyze), handle events so far
+				else
+					break;
+	}
+#endif
+};
+
+void run(int argc, char** argv, Window window, ImGuiContext* ui_context) {
 	Config config;
 	std::vector< std::unique_ptr<Session> > sessions;
 	Session* session = nullptr;
@@ -515,61 +570,30 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 	bool show_final_render = false;
 	bool sync_cams = true;
 
-	bool window_hidden = false;
-	bool was_window_hidden = window_hidden;
-	auto updateWindowVisibility = [window, &was_window_hidden, &window_hidden]() {
-		window_hidden = !(SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN) || (SDL_GetWindowFlags(window) & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED));
-		if (window_hidden != was_window_hidden)
-			std::cout << "Window visibility was " << !was_window_hidden << ", now " << !window_hidden << std::endl;
-		was_window_hidden = window_hidden;
-	};
-
 	bool track_file_changes = true;
-	unsigned long long lastTrackerTicks = SDL_GetTicks();
+	unsigned long long lastTrackerTicks = programTimeStamp();
 
 	// Main loop
-	while (true) {
+	while (!glfwWindowShouldClose(window.handle)) {
 		ImGui::SetCurrentContext(ui_context);
 		ImGuiIO& io = ImGui::GetIO();
+
+		// always make sure window not silently revealed, react to events to see if hidden
+		if (window.hidden)
+			window.updateWindowVisibility();
 
 		// Poll and handle events (inputs, window resize, etc.)
 		// You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
 		// - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
 		// - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
 		// Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-		if (window_hidden)
-			updateWindowVisibility();
-		bool null_render = false;
-		SDL_Event event = { }, nextEvent = { };
-		bool had_localized_event = false;
-		while (window_hidden ? SDL_WaitEvent(&event) : SDL_PollEvent(&event)) {
-			ImGui_ImplSDL2_ProcessEvent(&event);
-			if (event.type == SDL_QUIT)
-				break;
-			// always make sure window not silently revealed, react to events to see if hidden
-			if (window_hidden || event.type == SDL_DISPLAYEVENT || event.type == SDL_WINDOWEVENT) {
-				updateWindowVisibility();
-			}
-			// things that can depend on mouse position or state
-			had_localized_event |= (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP || event.type == SDL_MOUSEWHEEL);
-			had_localized_event |= (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP);
-			if (had_localized_event) {
-				if (1 == SDL_PeepEvents(&nextEvent, 1, SDL_PEEKEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT)) {
-					// things that change meaning of previous state
-					if (nextEvent.type == SDL_MOUSEMOTION || nextEvent.type == SDL_MOUSEBUTTONDOWN || nextEvent.type == SDL_MOUSEBUTTONUP) {
-						null_render = true; // fast round
-						break;
-					}
-					// todo: maybe record any key changes?
-				}
-				// no more events (that we were able to analyze), handle events so far
-				else
-					break;
-			}
-		}
-		if (event.type == SDL_QUIT)
+		if (window.hidden)
+			glfwWaitEvents();
+		else
+			glfwPollEvents();
+		if (glfwWindowShouldClose(window.handle))
 			break;
-
+		
 		// apply configuration & scene changes
 		if (session) {
 			session->prepareFrame();
@@ -584,18 +608,18 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 		}
 
 		// Start the Dear ImGui frame
-		if (!null_render)
+		if (!window.null_render)
 			ImGui_ImplOpenGL2_NewFrame();
-		ImGui_ImplSDL2_NewFrame(window);
+		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		const unsigned long long currentTicks = SDL_GetTicks();
+		const unsigned long long currentTicks = programTimeStamp();
 		bool isTrackingFrame = currentTicks >= lastTrackerTicks + 1500;
 		if (isTrackingFrame)
 			lastTrackerTicks = currentTicks;
 
 		int mouseSceneIdx = -1;
-		if (session && !null_render) {
+		if (session && !window.null_render) {
 			int cols = (int) std::ceil( std::sqrt( (float) session->scenes.size() ) );
 			int rows = ((int) session->scenes.size() + (cols - 1)) / cols;
 			if (show_diff) {
@@ -614,11 +638,10 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 				if (io.MousePos.x >= cx && io.MousePos.y >= cy)
 					mouseSceneIdx = sceneIdx;
 
-				bool finalPreview = (show_final_render && s->classic.preview);
-				Preview& preview = finalPreview ? (Preview&) *s->classic.preview : (Preview&) *s->renderer.integration.preview;
+				Preview& preview = *s->activePreview(show_final_render);
 
 				// Normalize
-				if (finalPreview) {
+				if (&preview == s->classic.preview.get()) {
 					for (int j = 0; j < 3; ++j)
 						s->renderer.integration.exposureMultiplier[j] = exposure;
 					s->renderer.integration.exposureMultiplier[3] = (alpha_transparent) ? 1.0f : 0.0f;
@@ -676,16 +699,21 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 
 		Session* selectedSession = nullptr;
 		std::unique_ptr<Document> addedDoc; int docReplacementIdx = -1;
-		for (int sceneIdx = 0; sceneIdx < int(session && !session->scenes.empty() ? session->scenes.size() : 1) && show_ui; ++sceneIdx) {
+		for (int sceneIdx = 0, sceneCount = int(session && !session->scenes.empty() ? session->scenes.size() : 1); sceneIdx < sceneCount && show_ui; ++sceneIdx) {
 			Document* document = session && sceneIdx < (int) session->scenes.size() ? session->scenes[sceneIdx].get() : nullptr;
 			
-			if (sceneIdx) {
-				char buf[128];
-				sprintf(buf, "Scene (%d)", sceneIdx + 1);
-				ImGui::Begin(buf);
+			char buf[1024];
+			sprintf(buf, "%s (%d)###Scene (%d)"
+				, document ? document->filePath.s.c_str() : "Ready"
+				, (sceneIdx - scene_rotation_offset % sceneCount + sceneCount) % sceneCount + 1
+				, sceneIdx + 1);
+			ImGui::Begin(buf);
+			// auto resize on first appearance
+			if (document && !document->wasShown) {
+				if (ImGui::GetScrollMaxX() || ImGui::GetScrollMaxY())
+					ImGui::SetWindowSize(ImVec2(0, 0), ImGuiCond_Appearing);
+				document->wasShown = true;
 			}
-			else
-				ImGui::Begin("Interactive Preview", 0, ImGuiWindowFlags_AlwaysAutoResize);
 
 			// session selector
 			if (!sceneIdx)
@@ -709,7 +737,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 							selectedSession = openSession(std::move(newDoc));
 					}
 					if (session && !session->scenes.empty()) {
-						ImGui::Selectable("-- replace in session: --", ImGuiSelectableFlags_Disabled);
+						ImGui::Selectable("-- replace in session: --", false, ImGuiSelectableFlags_Disabled);
 						int sceneIdx = 0;
 						for (auto& s : session->scenes) {
 							if (ImGui::Selectable(s->filePath.s.c_str())) {
@@ -728,7 +756,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 				bool reload = ImGui::Button("reload");
 				ImGui::SameLine();
 				ImGui::Checkbox("track file changes", &track_file_changes);
-				reload |= mouseSceneIdx == sceneIdx && !io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_F5] && !io.KeysDownDuration[SDL_SCANCODE_F5];
+				reload |= mouseSceneIdx == sceneIdx && !io.WantCaptureKeyboard && io.KeysDown[GLFW_KEY_F5] && !io.KeysDownDuration[GLFW_KEY_F5];
 				reload |= track_file_changes && isTrackingFrame && document->fileChanged();
 				if (reload) {
 					addedDoc.reset( new Document(document->filePath, config) );
@@ -743,7 +771,12 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 				}
 				double sppPerS = spp / document->renderer.integration.timeSeconds();
 
-				ImGui::Text("%dx%d @ %.1f spp (%.2f spp/s)", document->renderer.integration.preview->resX, document->renderer.integration.preview->resY, spp, sppPerS);
+				ImGui::TextWrapped("%dx%d @ %.1f spp (%.2f spp/s in %d threads)"
+					, document->renderer.integration.preview->resX
+					, document->renderer.integration.preview->resY
+					, spp
+					, sppPerS
+					, document->renderer.integration.process ? document->renderer.integration.process->numActiveThreads : 0 );
 				if (mitsuba::ResponsiveIntegrator* igr = document->renderer.integration.process->integrator) {
 					if (char const* stats = igr->getRealtimeStatistics())
 						ImGui::Text("Stats: %s", stats);
@@ -837,17 +870,17 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 					document->configurator.reset();
 			}
 		}
-		if (!io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_PERIOD] && !io.KeysDownDuration[SDL_SCANCODE_PERIOD])
+		if (!io.WantCaptureKeyboard && io.KeysDown[GLFW_KEY_PERIOD] && !io.KeysDownDuration[GLFW_KEY_PERIOD])
 			show_ui = !show_ui;
-		if (!io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_COMMA] && !io.KeysDownDuration[SDL_SCANCODE_COMMA])
+		if (!io.WantCaptureKeyboard && io.KeysDown[GLFW_KEY_COMMA] && !io.KeysDownDuration[GLFW_KEY_COMMA])
 			show_diff = !show_diff;
-		if (!io.WantCaptureKeyboard && io.KeysDown[SDL_SCANCODE_BACKSLASH] && !io.KeysDownDuration[SDL_SCANCODE_BACKSLASH])
+		if (!io.WantCaptureKeyboard && io.KeysDown[GLFW_KEY_BACKSLASH] && !io.KeysDownDuration[GLFW_KEY_BACKSLASH])
 			diff_flip = !diff_flip;
-		if (diff_flip || !io.WantCaptureKeyboard && (io.KeysDown[SDL_SCANCODE_SLASH] && !io.KeysDownDuration[SDL_SCANCODE_SLASH] || io.KeysDown[SDL_SCANCODE_SEMICOLON]))
+		if (diff_flip || !io.WantCaptureKeyboard && (io.KeysDown[GLFW_KEY_SLASH] && !io.KeysDownDuration[GLFW_KEY_SLASH] || io.KeysDown[GLFW_KEY_SEMICOLON]))
 			++scene_rotation_offset;
 
 		// Rendering
-		if (!null_render) {
+		if (!window.null_render) {
 			ImGui::Render();
 			glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
 			glScissor(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
@@ -855,7 +888,7 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 			glClear(GL_COLOR_BUFFER_BIT);
 
 			ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-			SDL_GL_SwapWindow(window);
+			glfwSwapBuffers(window.handle);
 		}
 		else
 			ImGui::EndFrame();
@@ -903,25 +936,23 @@ void run(int argc, char** argv, SDL_Window* window, SDL_GLContext gl_context, Im
 
 int main(int argc, char** argv) {
 	// Setup SDL
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0)
+	if (!glfwInit())
 	{
-		printf("Error: %s\n", SDL_GetError());
+		char const* error = "error"; glfwGetError(&error);
+		printf("Error: %s\n", error);
 		return -1;
 	}
 
 	mitsuba_start(argc, argv);
 
 	// Setup window
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-//	SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1); // breaks X forwarding, on by default anyways
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-	SDL_Window* window = SDL_CreateWindow("im-mitsuba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
-	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-	SDL_GL_SetSwapInterval(1); // Enable vsync
+	glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
+	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
+	glfwWindowHint(GLFW_DEPTH_BITS, 0);
+	glfwWindowHint(GLFW_STENCIL_BITS, 0);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+	GLFWwindow* window = glfwCreateWindow(1280, 720, "im-mitsuba", nullptr, nullptr);
+	glfwSwapInterval(1); // Enable vsync
 
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -935,7 +966,7 @@ int main(int argc, char** argv) {
 	//ImGui::StyleColorsLight();
 
 	// Setup Platform/Renderer bindings
-	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+	glfwMakeContextCurrent(window);
 	ImGui_ImplOpenGL2_Init();
 	ImGui_ImplOpenGL2_NewFrame(); // init fonts
 
@@ -947,19 +978,18 @@ int main(int argc, char** argv) {
 #endif
 
 	// Run
-	run(argc, argv, window, gl_context, ui_context);
+	run(argc, argv, window, ui_context);
 
 	// Cleanup
+	ImGui_ImplGlfw_Shutdown();
 	ImGui_ImplOpenGL2_Shutdown();
-	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
 
-	SDL_GL_DeleteContext(gl_context);
-	SDL_DestroyWindow(window);
+	glfwDestroyWindow(window);
 
 	mitsuba_shutdown();
 
-	SDL_Quit();
+	glfwTerminate();
 
 	return 0;
 }

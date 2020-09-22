@@ -25,9 +25,9 @@ MTS_NAMESPACE_BEGIN
 class JoinRGB : public Utility {
 public:
 	void joinRGB(const std::string &s1, const std::string &s2, const std::string &s3, const std::string &s4) {
-		ref<FileStream> rFile   = new FileStream(s1, FileStream::EReadOnly);
-		ref<FileStream> gFile   = new FileStream(s2, FileStream::EReadOnly);
-		ref<FileStream> bFile   = new FileStream(s3, FileStream::EReadOnly);
+		ref<FileStream> rFile   = new FileStream(fs::pathstr(s1), FileStream::EReadOnly);
+		ref<FileStream> gFile   = new FileStream(fs::pathstr(s2), FileStream::EReadOnly);
+		ref<FileStream> bFile   = new FileStream(fs::pathstr(s3), FileStream::EReadOnly);
 
 		ref<Bitmap> rBitmap = new Bitmap(Bitmap::EOpenEXR, rFile);
 		ref<Bitmap> gBitmap = new Bitmap(Bitmap::EOpenEXR, gFile);
@@ -42,7 +42,7 @@ public:
 		sourceBitmaps.push_back(bBitmap);
 
 		ref<Bitmap> result = Bitmap::join(Bitmap::ERGBA, sourceBitmaps);
-		ref<FileStream> outFile = new FileStream(s4, FileStream::ETruncReadWrite);
+		ref<FileStream> outFile = new FileStream(fs::pathstr(s4), FileStream::ETruncReadWrite);
 		result->write(Bitmap::EOpenEXR, outFile);
 	}
 

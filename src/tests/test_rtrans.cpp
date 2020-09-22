@@ -20,8 +20,10 @@
 #include <mitsuba/core/quad.h>
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/plugin.h>
-#include <boost/bind.hpp>
+#include <functional>
 #include "../bsdfs/rtrans.h"
+
+using namespace std::placeholders;
 
 MTS_NAMESPACE_BEGIN
 
@@ -77,14 +79,14 @@ public:
 
 			Float min[2] = {0, 0}, max[2] = {1, 1};
 			intTransmittance.integrateVectorized(
-				boost::bind(&transmittanceIntegrand, bsdf, wi, _1, _2, _3),
+				std::bind(&transmittanceIntegrand, bsdf, wi, _1, _2, _3),
 				min, max, &transmittances[i], &error, NULL);
 		}
 
 		Float Fdr;
 		Float min[1] = { 0 }, max[1] = { 1 };
 		intDiffTransmittance.integrateVectorized(
-			boost::bind(&diffTransmittanceIntegrand, transmittances, resolution, _1, _2, _3),
+			std::bind(&diffTransmittanceIntegrand, transmittances, resolution, _1, _2, _3),
 			min, max, &Fdr, &error, NULL);
 
 		delete[] transmittances;
@@ -117,7 +119,7 @@ public:
 
 		Float min[2] = {0, 0}, max[2] = {1, 1};
 		intTransmittance.integrateVectorized(
-			boost::bind(&transmittanceIntegrand, bsdf, wi, _1, _2, _3),
+			std::bind(&transmittanceIntegrand, bsdf, wi, _1, _2, _3),
 			min, max, &transmittance, &error, NULL);
 
 		return transmittance;

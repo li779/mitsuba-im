@@ -1,40 +1,9 @@
 # Macros to build the mitsuba targets. They are to be used by the CMake scripts
 # only, otherwise they don't make any sense at all.
 
-# Function to check that the assumed configurations exist
-function (mts_check_configurations)
-  if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    message(WARNING "The build type is not set. Set the value of CMAKE_BUILD_TYPE.")
-    return ()
-  endif ()
-  if (CMAKE_BUILD_TYPE)
-    set (configs ${ARGN})
-    list (FIND configs ${CMAKE_BUILD_TYPE} idx)
-    if (idx LESS 0)
-      message (AUTHOR_WARNING "Unexpected configuration '${CMAKE_BUILD_TYPE}' Check the value of CMAKE_BUILD_TYPE.")
-    endif ()
-    return ()
-  endif ()
-  set (configs "")
-  foreach (cfg ${CMAKE_CONFIGURATION_TYPES})
-    set (configs ${configs} ${cfg})
-  endforeach ()
-  set (myconfigs "")
-  foreach (cfg ${ARGN})
-    set (myconfigs ${myconfigs} ${cfg})
-    list (FIND configs ${cfg} idx)
-    if (idx LESS 0)
-      message (AUTHOR_WARNING "The assumed configuration '${cfg}' is not available.")
-    endif ()
-  endforeach ()
-  foreach (cfg ${configs})
-    list (FIND myconfigs ${cfg} idx)
-    if (idx LESS 0)
-      message (AUTHOR_WARNING "Unexpected configuration '${cfg}' found.")
-    endif ()
-  endforeach ()
-endfunction()
-
+if(POLICY CMP0069) # IPO warnings
+  cmake_policy(SET CMP0069 NEW)
+endif()
 
 
 # Option to enable interprocedural optimizations
@@ -55,20 +24,22 @@ endmacro()
 macro (mts_msvc_mp target)
   if (MSVC_IDE AND MSVC_VERSION GREATER 1400)
     set_property (TARGET ${target} APPEND_STRING
-      PROPERTY COMPILE_FLAGS " /MP")
+      PROPERTY COMPILE_FLAGS " /MP ")
   endif ()
 endmacro()
 
 
 
 # Option for precompiled headers
-if (PCH_MSVC OR PCH_GCC)
+if (CMAKE_CXXPCH_COMPILER_WORKS)
   set (MTS_PCH_DEFAULT ON)
 else ()
   set (MTS_PCH_DEFAULT OFF)
+  if (MTS_USE_PCH)
+    message (WARNING "PCH unsupported on this platform, disabling")
+    set (MTS_USE_PCH OFF)
+  endif ()
 endif ()
-CMAKE_DEPENDENT_OPTION (MTS_USE_PCH "Use precompiled headers (PCH)."
-  ${MTS_PCH_DEFAULT} "PCH_SUPPORTED" OFF)
 CMAKE_DEPENDENT_OPTION (MTS_USE_PCH_ALL_PLUGINS
   "Use PCH for all plugins irrespective of their number of source files."
   OFF "MTS_USE_PCH" OFF)
@@ -185,10 +156,10 @@ macro (add_mts_corelib _corelib_name)
       "lib${_corelib_name}" ".dll" "${_corelib_description}")
     list(APPEND _corelib_srcs "${_corelib_res}")
   endif()
- 
-  add_library (${_corelib_name} SHARED ${_corelib_srcs}) 
+  
+  add_library (${_corelib_name} SHARED ${_corelib_srcs})
   if (MTS_USE_PCH)
-    target_precompiled_header(${_corelib_name} "${MTS_DEFAULT_PCH}")
+    target_precompiled_header(${_corelib_name} ${MTS_DEFAULT_PCH})
   endif ()
   set (_corelib_link_propagation PUBLIC)
   #  if (WIN32)
@@ -255,7 +226,7 @@ macro (add_mts_plugin _plugin_name)
   CMAKE_PARSE_ARGUMENTS(_plugin "MTS_HW;MTS_BIDIR;NO_MTS_PCH"
     "TYPE" "LINK_LIBRARIES" ${ARGN})
   set (_plugin_srcs ${_plugin_UNPARSED_ARGUMENTS})
-  
+
   if (WIN32)
     set(_plugin_res "${CMAKE_CURRENT_BINARY_DIR}/${_plugin_name}_res.rc")
     if (_plugin_TYPE)
@@ -275,7 +246,7 @@ macro (add_mts_plugin _plugin_name)
       math(EXPR _plugin_cxx_count "${_plugin_cxx_count} + 1")
     endif()
   endforeach()
- 
+  
   add_library (${_plugin_name} MODULE ${_plugin_srcs}) 
   if (NOT _plugin_NO_MTS_PCH AND MTS_USE_PCH AND
       (MTS_USE_PCH_ALL_PLUGINS OR _plugin_cxx_count GREATER 1))
@@ -389,22 +360,22 @@ macro (add_mts_exe _exe_name)
     mts_win_resource(${_exe_res_args})
     list(APPEND _exe_srcs "${_exe_res}")
   endif()
- 
-  add_executable (${_exe_name} ${_exe_TYPE} ${_exe_srcs}) 
+  
+  add_executable (${_exe_name} ${_exe_TYPE} ${_exe_srcs})
   if (MTS_USE_PCH AND (NOT _exe_NO_MTS_PCH OR _exe_PCH))
-    set (_exe_pch_header "${MTS_DEFAULT_PCH}")
+    set (_exe_pch_header ${MTS_DEFAULT_PCH})
     if (_exe_PCH)
-      set (_exe_pch_header "${_exe_PCH}")
+      set (_exe_pch_header ${_exe_PCH})
       if (_exe_NO_MTS_PCH)
         message (AUTHOR_WARNING
 	  "'NO_MTS_PCH' ignored due to 'PCH ${_exe_PCH}'.")
       endif ()
     endif ()
-    target_precompiled_header(${_exe_name} "${_exe_pch_header}")
+    target_precompiled_header(${_exe_name} ${_exe_pch_header})
   endif ()
 
   set(_exe_core_libraries "mitsuba-core" "mitsuba-render")
-  if (_exe_MTS_HW AND MTS_HAS_HW)
+  if (MTS_HAS_HW) # ignore '_exe_MTS_HW AND ', always required to make linker happy
     list(APPEND _exe_core_libraries "mitsuba-hw")
   endif()
   if (_exe_MTS_BIDIR)

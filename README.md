@@ -38,10 +38,6 @@ $ cd ..
 $ ln -s projects/binaries/im-mts
 ````
 
-## Known Issues
-
-* Some utilities not ported to standard C++ w/o boost yet
-
 ## About (Original official description)
 
 http://mitsuba-renderer.org/

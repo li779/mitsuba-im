@@ -21,7 +21,7 @@
 #include <mitsuba/core/chisquare.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/render/testcase.h>
-#include <boost/bind.hpp>
+#include <functional>
 #include "../bsdfs/microfacet.h"
 
 /* Statistical significance level of the test. Set to

@@ -22,8 +22,11 @@
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/plugin.h>
+#include <mitsuba/core/filesystem.h>
 #if defined(WIN32)
 # include <mitsuba/core/getopt.h>
+#else
+#include <unistd.h>
 #endif
 #ifdef MTS_OPENMP
 # include <omp.h>
@@ -300,9 +303,9 @@ public:
 					thread->setLogger(logger);
 				}
 				try {
-					fs::path inputFile = fileResolver->resolve(argv[i]);
+					fs::path inputFile = fs::decode_pathstr( fileResolver->resolve(fs::pathstr(argv[i])) );
 					Log(EInfo, "Loading image \"%s\" ..", inputFile.string().c_str());
-					ref<FileStream> is = new FileStream(inputFile, FileStream::EReadOnly);
+					ref<FileStream> is = new FileStream(fs::encode_pathstr(inputFile), FileStream::EReadOnly);
 					ref<Bitmap> input = new Bitmap(Bitmap::EAuto, is);
 
 					if (crop[2] != -1 && crop[3] != -1)
@@ -353,7 +356,7 @@ public:
 
 					Log(EInfo, "Writing tonemapped image to \"%s\" ..", outputFile.string().c_str());
 
-					ref<FileStream> os = new FileStream(outputFile, FileStream::ETruncReadWrite);
+					ref<FileStream> os = new FileStream(fs::encode_pathstr(outputFile), FileStream::ETruncReadWrite);
 					output->write(format, os);
 				} catch (const std::exception &e) {
 					#pragma omp critical
@@ -368,9 +371,9 @@ public:
 		} else {
 			ref<Bitmap> bloomFilter;
 			for (int i=optind; i<argc; ++i) {
-				fs::path inputFile = fileResolver->resolve(argv[i]);
+				fs::path inputFile = fs::decode_pathstr( fileResolver->resolve(fs::pathstr(argv[i])) );
 				Log(EInfo, "Loading image \"%s\" ..", inputFile.string().c_str());
-				ref<FileStream> is = new FileStream(inputFile, FileStream::EReadOnly);
+				ref<FileStream> is = new FileStream(fs::encode_pathstr(inputFile), FileStream::EReadOnly);
 				ref<Bitmap> input = new Bitmap(Bitmap::EAuto, is);
 
 				if (crop[2] != -1 && crop[3] != -1)
@@ -429,7 +432,7 @@ public:
 
 				Log(EInfo, "Writing tonemapped image to \"%s\" ..", outputFile.string().c_str());
 
-				ref<FileStream> os = new FileStream(outputFile, FileStream::ETruncReadWrite);
+				ref<FileStream> os = new FileStream(fs::encode_pathstr(outputFile), FileStream::ETruncReadWrite);
 				output->write(format, os);
 			}
 		}

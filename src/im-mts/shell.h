@@ -146,4 +146,7 @@ struct WorkLane {
 
 	virtual int synchronized(Sync& sync) const = 0;
 	virtual void synchronize() const = 0;
+
+	static void yield();
+	static void sleep(int time);
 };

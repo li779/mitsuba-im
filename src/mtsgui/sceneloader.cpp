@@ -21,34 +21,29 @@
 #if defined(Assert)
 # undef Assert
 #endif
-#include <xercesc/parsers/SAXParser.hpp>
 #include "glwidget.h"
 #include "sceneloader.h"
-#include <mitsuba/render/scenehandler.h>
+#include <mitsuba/render/sceneloader.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/filesystem.h>
 
-XERCES_CPP_NAMESPACE_USE
-
-SceneLoader::SceneLoader(FileResolver *resolver, const fs::path &filename,
-		const fs::path &destFile, const std::map<std::string, std::string, SimpleStringOrdering> &parameters)
+GuiSceneLoader::GuiSceneLoader(FileResolver *resolver, const fs::pathstr &filename,
+		const fs::pathstr &destFile, const std::map<std::string, std::string, SimpleStringOrdering> &parameters)
 	: Thread("load"), m_resolver(resolver), m_filename(fromFsPath(filename)), m_destFile(destFile),
 	  m_parameters(parameters) {
 	m_wait = new WaitFlag();
 	m_versionError = false;
 }
 
-SceneLoader::~SceneLoader() {
+GuiSceneLoader::~GuiSceneLoader() {
 }
 
-void SceneLoader::run() {
+void GuiSceneLoader::run() {
 	Thread::getThread()->setFileResolver(m_resolver);
-	SAXParser* parser = new SAXParser();
 	QFileInfo fileInfo(m_filename);
 	QString suffix = fileInfo.suffix().toLower();
 
-	SceneHandler *handler = new SceneHandler(m_parameters);
 	m_result = new SceneContext();
 	try {
 		QSettings settings;
@@ -93,21 +88,8 @@ void SceneLoader::run() {
 			m_result->scrollOffset = Vector2i(0, 0);
 			m_result->pathLength = 2;
 		} else {
-			fs::path schemaPath = m_resolver->resolveAbsolute("data/schema/scene.xsd");
-
-			/* Check against the 'scene.xsd' XML Schema */
-			parser->setDoSchema(true);
-			parser->setValidationSchemaFullChecking(true);
-			parser->setValidationScheme(SAXParser::Val_Always);
-			parser->setExternalNoNamespaceSchemaLocation(schemaPath.c_str());
-
-			/* Set the SAX handler */
-			parser->setDoNamespaces(true);
-			parser->setDocumentHandler(handler);
-			parser->setErrorHandler(handler);
-
 			fs::path
-				filename = toFsPath(m_filename),
+				filename = fs::decode_pathstr(toFsPath(m_filename)),
 				filePath = fs::absolute(filename).parent_path(),
 				baseName = filename.stem();
 
@@ -117,18 +99,17 @@ void SceneLoader::run() {
 				SLog(EError, "Unable to load scene \"%s\": file not found!",
 					filename.string().c_str());
 
+			ref<Scene> scene;
 			try {
-				parser->parse(filename.c_str());
+				scene = mitsuba::SceneLoader::loadScene(fs::encode_pathstr(filename), m_parameters);
 			} catch (const VersionException &ex) {
 				m_versionError = true;
 				m_version = ex.getVersion();
 				throw;
 			}
 
-			ref<Scene> scene = handler->getScene();
-
-			scene->setSourceFile(filename);
-			scene->setDestinationFile(m_destFile.empty() ? (filePath / baseName) : m_destFile);
+			scene->setSourceFile(fs::encode_pathstr(filename));
+			scene->setDestinationFile(m_destFile.s.empty() ? fs::encode_pathstr(filePath / baseName) : m_destFile);
 			scene->initialize();
 
 			if (scene->getIntegrator() == NULL)
@@ -184,7 +165,5 @@ void SceneLoader::run() {
 		m_result = NULL;
 	}
 	m_wait->set(true);
-	delete parser;
-	delete handler;
 }
 

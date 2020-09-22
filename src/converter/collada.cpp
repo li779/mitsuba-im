@@ -37,7 +37,7 @@
 #include <dae.h>
 #include <dae/daeErrorHandler.h>
 #include <dom/domProfile_COMMON.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/core/filesystem.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <set>
@@ -484,7 +484,7 @@ void writeGeometry(ColladaContext &ctx, const std::string &prefixName, std::stri
 
 	if (!ctx.cvt->m_geometryFile) {
 		filename = id + std::string(".serialized");
-		ref<FileStream> stream = new FileStream(ctx.meshesDirectory / filename, FileStream::ETruncReadWrite);
+		ref<FileStream> stream = new FileStream(fs::encode_pathstr(ctx.meshesDirectory / filename), FileStream::ETruncReadWrite);
 		stream->setByteOrder(Stream::ELittleEndian);
 		mesh->serialize(stream);
 		stream->close();
@@ -541,7 +541,7 @@ void exportAnimation(ColladaContext &ctx, const fs::path &path, const std::strin
 		trafo->addTrack(track);
 	}
 	SLog(EDebug, "Writing animation track \"%s\"", path.filename().string().c_str());
-	ref<FileStream> fs = new FileStream(path, FileStream::ETruncReadWrite);
+	ref<FileStream> fs = new FileStream(fs::encode_pathstr(path), FileStream::ETruncReadWrite);
 	trafo->serialize(fs);
 }
 
@@ -1082,7 +1082,7 @@ void loadImage(ColladaContext &ctx, domImage &image) {
 	fs::path path = fs::path(filename);
 	fs::path targetPath = ctx.texturesDirectory / path.filename();
 
-	std::string extension = boost::to_lower_copy(path.extension().string());
+	std::string extension = to_lower_copy(path.extension().string());
 	if (extension == ".rgb")
 		SLog(EWarn, "Maya RGB images must be converted to PNG, EXR or JPEG! The 'imgcvt' "
 			"utility found in the Maya binary directory can be used to do this.");
@@ -1090,7 +1090,7 @@ void loadImage(ColladaContext &ctx, domImage &image) {
 	if (!fs::exists(targetPath)) {
 		if (!fs::exists(path)) {
 			ref<FileResolver> fRes = Thread::getThread()->getFileResolver();
-			path = fRes->resolve(path.filename());
+			path = fs::decode_pathstr(fRes->resolve( fs::encode_pathstr(path.filename()) ));
 
 			if (!fs::exists(path)) {
 				SLog(EWarn, "Found neither \"%s\" nor \"%s\"!", filename.c_str(), path.string().c_str());
@@ -1099,12 +1099,12 @@ void loadImage(ColladaContext &ctx, domImage &image) {
 				if (path.empty())
 					SLog(EError, "Unable to locate a resource -- aborting conversion.");
 				else
-					fRes->appendPath(path.parent_path());
+					fRes->appendPath(fs::encode_pathstr( path.parent_path() ));
 			}
 		}
 		if (fs::absolute(path) != fs::absolute(targetPath)) {
-			ref<FileStream> input = new FileStream(path, FileStream::EReadOnly);
-			ref<FileStream> output = new FileStream(targetPath, FileStream::ETruncReadWrite);
+			ref<FileStream> input = new FileStream(fs::encode_pathstr(path), FileStream::EReadOnly);
+			ref<FileStream> output = new FileStream(fs::encode_pathstr(targetPath), FileStream::ETruncReadWrite);
 			input->copyTo(output);
 			input->close();
 			output->close();
@@ -1386,9 +1386,9 @@ void loadAnimation(ColladaContext &ctx, domAnimation &anim) {
 		const domInputLocal_Array &inputs = sampler->getInput_array();
 		AbstractAnimationTrack *track = NULL;
 		AbstractAnimationTrack::EType trackType = AbstractAnimationTrack::EInvalid;
-		boost::to_lower(target[1]);
+		target[1] = to_lower_copy(target[1]);
 		if (target.size() > 2)
-			boost::to_lower(target[2]);
+			target[2] = to_lower_copy(target[2]);
 		if (target[1] == "location" || target[1] == "translate") {
 			if (target.size() == 2) {
 				trackType = VectorTrack::ETranslationXYZ;

@@ -27,14 +27,15 @@
 #include <mitsuba/hw/glgeometry.h>
 #include <mitsuba/hw/glprogram.h>
 #include <mitsuba/hw/glsync.h>
-#include <mitsuba/hw/font.h>
-#include <boost/algorithm/string.hpp>
+#include <mitsuba/render/font.h>
 
+#ifdef GLEW_MX
 static mitsuba::PrimitiveThreadLocal<GLEWContextStruct> glewContext;
 
 GLEWContextStruct *glewGetContext() {
 	return &glewContext.get();
 }
+#endif
 
 MTS_NAMESPACE_BEGIN
 
@@ -178,7 +179,7 @@ void GLRenderer::init(Device *device, Renderer *other) {
 #if defined(__OSX__)
 	/* Synchronization objects cause problem with ATI cards on OSX -- ignore
 	   them even if the driver claims to support it */
-	radeonOnOSX = boost::to_lower_copy(m_driverRenderer).find("radeon") != std::string::npos;
+	radeonOnOSX = to_lower_copy(m_driverRenderer).find("radeon") != std::string::npos;
 #endif
 
 	if (glewIsSupported("GL_ARB_sync") && !radeonOnOSX) {

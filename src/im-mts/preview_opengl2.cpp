@@ -1,6 +1,8 @@
 #include "shell.h"
-#include <SDL2/SDL_video.h>
-#include <SDL2/SDL_opengl.h>
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#include "../external/GL/glext.h"
+#endif
 
 namespace impl {
 
@@ -136,25 +138,25 @@ namespace impl {
 
 			bool needComposition = maxT > 1;
 			if (needComposition) {
-				this->glBindFramebuffer = (PFNGLBINDFRAMEBUFFEREXTPROC) SDL_GL_GetProcAddress("glBindFramebufferEXT");
+				this->glBindFramebuffer = (PFNGLBINDFRAMEBUFFEREXTPROC) glfwGetProcAddress("glBindFramebufferEXT");
 				if (glBindFramebuffer) {
-					PFNGLGENFRAMEBUFFERSPROC glGenFramebuffers = (PFNGLGENFRAMEBUFFERSEXTPROC) SDL_GL_GetProcAddress("glGenFramebuffersEXT");
+					PFNGLGENFRAMEBUFFERSPROC glGenFramebuffers = (PFNGLGENFRAMEBUFFERSEXTPROC) glfwGetProcAddress("glGenFramebuffersEXT");
 					assert(glGenFramebuffers);
 					glGenFramebuffers(1, &fbo);
 					assert(glBindFramebuffer);
 					glBindFramebuffer(GL_FRAMEBUFFER_EXT, fbo);
 
-					PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DEXTPROC) SDL_GL_GetProcAddress("glFramebufferTexture2DEXT");
+					PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DEXTPROC) glfwGetProcAddress("glFramebufferTexture2DEXT");
 					assert(glFramebufferTexture2D);
 					glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, fbt, 0);
 
-					PFNGLDRAWBUFFERSPROC glDrawBuffers = (PFNGLDRAWBUFFERSARBPROC) SDL_GL_GetProcAddress("glDrawBuffersARB");
+					PFNGLDRAWBUFFERSPROC glDrawBuffers = (PFNGLDRAWBUFFERSARBPROC) glfwGetProcAddress("glDrawBuffersARB");
 					if (glDrawBuffers) {
 						GLenum drawBuffer0 = GL_COLOR_ATTACHMENT0;
 						glDrawBuffers(1, &drawBuffer0);
 					}
 
-					PFNGLCHECKFRAMEBUFFERSTATUSPROC glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC) SDL_GL_GetProcAddress("glCheckFramebufferStatusEXT");
+					PFNGLCHECKFRAMEBUFFERSTATUSPROC glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC) glfwGetProcAddress("glCheckFramebufferStatusEXT");
 					assert(glCheckFramebufferStatus);
 					GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT);
 					printf("Framebuffer status: %x (%d off)\n", (int) status, (int) status - GL_FRAMEBUFFER_COMPLETE_EXT);
@@ -163,10 +165,10 @@ namespace impl {
 					glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
 				}
 
-				this->glBlendColor = (PFNGLBLENDCOLOREXTPROC) SDL_GL_GetProcAddress("glBlendColorEXT");
+				this->glBlendColor = (PFNGLBLENDCOLOREXTPROC) glfwGetProcAddress("glBlendColorEXT");
 			}
 
-			this->glGenMipmap = (PFNGLGENERATEMIPMAPEXTPROC) SDL_GL_GetProcAddress("glGenerateMipmapEXT");
+			this->glGenMipmap = (PFNGLGENERATEMIPMAPEXTPROC) glfwGetProcAddress("glGenerateMipmapEXT");
 
 			this->previewImg = (intptr_t) fbt;
 		}
@@ -176,7 +178,7 @@ namespace impl {
 				glDeleteTextures((int) textures.size(), textures.data());
 			}
 			if (fbo) {
-				PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSEXTPROC) SDL_GL_GetProcAddress("glDeleteFramebuffersEXT");
+				PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSEXTPROC) glfwGetProcAddress("glDeleteFramebuffersEXT");
 				if (glDeleteFramebuffers)
 					glDeleteFramebuffers(1, &fbo);
 			}

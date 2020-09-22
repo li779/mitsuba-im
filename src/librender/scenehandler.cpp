@@ -24,18 +24,23 @@
 # undef Assert
 #endif
 
+#ifndef MTS_USE_PUGIXML
 #include <xercesc/parsers/SAXParser.hpp>
 #include <xercesc/framework/MemBufInputSource.hpp>
 #include <xercesc/util/TransService.hpp>
 #include <xercesc/sax/Locator.hpp>
+#endif
 #include <mitsuba/render/scenehandler.h>
 #include <mitsuba/render/sceneloader.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/filesystem.h>
 #include <mitsuba/render/scene.h>
 #include <unordered_set>
+#include <fstream>
 
 MTS_NAMESPACE_BEGIN
+
+#ifndef MTS_USE_PUGIXML
 XERCES_CPP_NAMESPACE_USE
 
 #define TRANSCODE_BLOCKSIZE 2048
@@ -45,16 +50,44 @@ XERCES_CPP_NAMESPACE_USE
 	m_locator ? transcode(m_locator->getSystemId()).c_str() : "<unknown>", \
 	m_locator ? m_locator->getLineNumber() : -1, \
 	## __VA_ARGS__)
+#else
+using namespace pugi;
+
+#define transcode(x) x
+
+#define XMLLog(level, fmt, ...) Thread::getThread()->getLogger()->log(\
+	level, NULL, __FILE__, __LINE__, "%s (offset %ti): " fmt, \
+	m_locatorCtx ? m_locatorCtx(m_locator).c_str() : "<unknown>", \
+	m_locator, \
+	## __VA_ARGS__)
+#endif
+
 
 typedef void (*CleanupFun) ();
 typedef std::unordered_set<CleanupFun> CleanupSet;
 static PrimitiveThreadLocal<CleanupSet> __cleanup_tls;
 
+struct NestedFileResolver {
+	ref<FileResolver> resolver = Thread::getThread()->getFileResolver();
+	ref<FileResolver> docResolver = resolver->clone();
+
+	NestedFileResolver(fs::pathstr const &file) {
+		fs::path docDir = fs::absolute(fs::decode_pathstr(file)).parent_path();
+		docResolver->appendPath(fs::encode_pathstr(docDir));
+		Thread::getThread()->setFileResolver(docResolver);
+	}
+	~NestedFileResolver() {
+		Thread::getThread()->setFileResolver(resolver);
+	}
+};
+
 SceneHandler::SceneHandler(const ParameterMap &params,
 	NamedObjectMap *namedObjects, bool isIncludedFile) : m_params(params),
 		m_namedObjects(namedObjects), m_isIncludedFile(isIncludedFile) {
 	m_pluginManager = PluginManager::getInstance();
+#ifndef MTS_USE_PUGIXML
 	m_locator = NULL;
+#endif
 
 	if (m_isIncludedFile) {
 		SAssert(namedObjects != NULL);
@@ -106,21 +139,27 @@ SceneHandler::SceneHandler(const ParameterMap &params,
 	m_tags["alias"]      = TagEntry(EAlias,      (Class *) NULL);
 	m_tags["default"]    = TagEntry(EDefault,    (Class *) NULL);
 
+#ifndef MTS_USE_PUGIXML
 	XMLTransService::Codes failReason;
 	m_transcoder = XMLPlatformUtils::fgTransService->makeNewTranscoderFor(
 			"UTF-8", failReason, TRANSCODE_BLOCKSIZE);
+#endif
 }
 
 SceneHandler::~SceneHandler() {
+#ifndef MTS_USE_PUGIXML
 	delete m_transcoder;
+#endif
 	clear();
 	if (!m_isIncludedFile)
 		delete m_namedObjects;
 }
 
+#ifndef MTS_USE_PUGIXML
 void SceneHandler::setDocumentLocator(const xercesc::Locator* const locator) {
 	m_locator = locator;
 }
+#endif
 
 void SceneHandler::clear() {
 	if (!m_isIncludedFile) {
@@ -132,6 +171,7 @@ void SceneHandler::clear() {
 	}
 }
 
+#ifndef MTS_USE_PUGIXML
 std::string SceneHandler::transcode(const XMLCh * input) const {
 	XMLSize_t charsToBeConsumed = XMLString::stringLen(input);
 	char output[TRANSCODE_BLOCKSIZE + 4];
@@ -153,6 +193,40 @@ std::string SceneHandler::transcode(const XMLCh * input) const {
 
 	return result;
 }
+#else
+static std::string file_offset(const fs::pathstr &filename, ptrdiff_t pos);
+#endif
+
+// -----------------------------------------------------------------------
+
+#ifdef MTS_USE_PUGIXML
+void upgrade_to_030(pugi::xml_node& root);
+void upgrade_to_040(pugi::xml_node& root);
+void upgrade_to_050(pugi::xml_node& root);
+void upgrade_to_060(pugi::xml_node& root);
+
+static pugi::xml_node automatic_upgrade(pugi::xml_node scene, char const* filename) {
+	Version version;
+	pugi::xml_attribute va = scene.attribute("version");
+	if (!va) {
+		SLog(EWarn, "Lacking version string, automatically upgrading scene \"%s\" to 0.3.0", filename);
+		upgrade_to_030(scene);
+		version = Version(0, 3, 0);
+	} else
+		version = Version(va.value());
+	if (version < Version(0, 4, 0)) {
+		SLog(EWarn, "Automatically upgrading scene \"%s\" to 0.4.0", filename);
+		upgrade_to_040(scene);
+		version = Version(0, 3, 0);
+	}
+	if (version < Version(0, 5, 0)) {
+		SLog(EWarn, "Automatically upgrading scene \"%s\" to 0.5.0", filename);
+		upgrade_to_050(scene);
+		version = Version(0, 5, 0);
+	}
+	return scene;
+}
+#endif
 
 // -----------------------------------------------------------------------
 //  Implementation of the SAX DocumentHandler interface
@@ -206,8 +280,13 @@ void SceneHandler::startElement(const XMLCh* const xmlName,
 	const TagEntry &tag = it->second;
 	ParseContext context((name == "scene") ? NULL : &m_context.top(), tag.first);
 
+#ifndef MTS_USE_PUGIXML
 	for (size_t i=0; i<xmlAttributes.getLength(); i++) {
 		std::string attrValue = transcode(xmlAttributes.getValue(i));
+#else
+	for (auto attrib = xmlAttributes; attrib; attrib = attrib.next_attribute()) {
+		std::string attrValue = attrib.value();
+#endif
 		if (attrValue.length() > 0 && attrValue.find('$') != attrValue.npos) {
 			for (ParameterMap::const_reverse_iterator it = m_params.rbegin(); it != m_params.rend(); ++it) {
 				std::string::size_type pos = 0;
@@ -221,7 +300,11 @@ void SceneHandler::startElement(const XMLCh* const xmlName,
 				XMLLog(EError, "The scene referenced an undefined parameter: \"%s\"", attrValue.c_str());
 		}
 
+#ifndef MTS_USE_PUGIXML
 		context.attributes[transcode(xmlAttributes.getName(i))] = attrValue;
+#else
+		context.attributes[attrib.name()] = attrValue;
+#endif
 	}
 
 	switch (tag.first) {
@@ -657,8 +740,14 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 			break;
 
 		case EInclude: {
-				SAXParser* parser = new SAXParser();
 				FileResolver *resolver = Thread::getThread()->getFileResolver();
+				fs::pathstr path = resolver->resolve(fs::pathstr(context.attributes["filename"]));
+				NestedFileResolver docResolverGuard(path);
+				XMLLog(EInfo, "Parsing included file \"%s\" ..", path.s.c_str());
+
+				SceneHandler handler{m_params, m_namedObjects, true};
+#ifndef MTS_USE_PUGIXML
+				std::unique_ptr<SAXParser> parser{ new SAXParser() };
 				fs::pathstr schemaPath = resolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
 
 				/* Check against the 'scene.xsd' XML Schema */
@@ -668,17 +757,29 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 				parser->setExternalNoNamespaceSchemaLocation(schemaPath.s.c_str());
 
 				/* Set the handler and start parsing */
-				SceneHandler *handler = new SceneHandler(m_params, m_namedObjects, true);
 				parser->setDoNamespaces(true);
-				parser->setDocumentHandler(handler);
-				parser->setErrorHandler(handler);
-				fs::pathstr path = resolver->resolve(fs::pathstr(context.attributes["filename"]));
-				XMLLog(EInfo, "Parsing included file \"%s\" ..", path.s.c_str());
+				parser->setDocumentHandler(&handler);
+				parser->setErrorHandler(&handler);
 				parser->parse(path.s.c_str());
+#else
+				pugi::xml_document doc;
+				auto res = doc.load_file(path.s.c_str());
+				if (!res)
+					SLog(EError, "XML parse error. %s (offset %ti): %s", file_offset(path, res.offset).c_str(), res.offset, res.description());
+				else {
+					handler.m_locatorCtx = [&path](ptrdiff_t pos){ return file_offset(path, pos); };
+					automatic_upgrade(doc.first_child(), path.s.c_str()).traverse(handler);
+				}
+#endif
+				object = handler.getScene();
 
-				object = handler->getScene();
-				delete parser;
-				delete handler;
+				/* import defaults, if requested */
+				if (context.attributes.find("import") != context.attributes.end()) {
+					if (context.attributes["import"] == "defaults")
+						for (auto& v : handler.m_params)
+							if (m_params.find(v.first) == m_params.end())
+								m_params[v.first] = v.second;
+				}
 			}
 			break;
 
@@ -711,9 +812,11 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 						props.setTransform("toWorld", trafo->eval(0));
 
 					object = m_pluginManager->createObject(tag.second, props);
+					object->storeQueriedFlags(props);
 
 					if (!trafo->isStatic()) {
 						object = m_pluginManager->createObject(tag.second, props);
+						object->storeQueriedFlags(props);
 						/* If the object has children, append them */
 						for (std::vector<std::pair<std::string, ConfigurableObject *> >
 								::iterator it = context.children.begin();
@@ -736,12 +839,14 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 						Properties instanceProps("instance");
 						instanceProps.setAnimatedTransform("toWorld", trafo);
 						object = m_pluginManager->createObject(instanceProps);
+						object->storeQueriedFlags(instanceProps);
 						object->addChild(shapeGroup);
 
 					}
 				} else {
 					try {
 						object = m_pluginManager->createObject(tag.second, props);
+						object->storeQueriedFlags(props);
 					} catch (const std::exception &ex) {
 						XMLLog(EError, "Error while creating object: %s", ex.what());
 					}
@@ -802,6 +907,7 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 //  Implementation of the SAX ErrorHandler interface
 // -----------------------------------------------------------------------
 
+#ifndef MTS_USE_PUGIXML
 void SceneHandler::warning(const SAXParseException& e) {
 	SLog(EWarn, "Warning in file \"%s\" (line %i): %s",
 		transcode(e.getSystemId()).c_str(), e.getLineNumber(),
@@ -819,70 +925,164 @@ void SceneHandler::fatalError(const SAXParseException& e) {
 		transcode(e.getSystemId()).c_str(), e.getLineNumber(),
 		transcode(e.getMessage()).c_str());
 }
+#else
+// Override somewhat ridiculous xml_tree_walker interface
+bool SceneHandler::begin(xml_node& node) {
+	m_locator = node.offset_debug();
+	auto attributes = node.first_attribute();
+	this->startElement(node.name(), attributes);
+	for (auto c : node.children())
+		begin(c);
+	this->endElement(node.name());
+	return false;
+}
+bool SceneHandler::for_each(xml_node& node) {
+	SAssert(false);
+	return false;
+}
+bool SceneHandler::end(xml_node& node) {
+	SAssert(false);
+	return false;
+}
+
+/// Helper function: map a position offset in bytes to a more readable line/column value
+static std::string string_offset(const std::string &string, ptrdiff_t pos) {
+	std::istringstream is(string);
+	char buffer[1024];
+	int line = 0, line_start = 0, offset = 0;
+	while (is.good()) {
+		is.read(buffer, sizeof(buffer));
+		for (int i = 0; i < is.gcount(); ++i) {
+			if (buffer[i] == '\n') {
+				if (offset + i >= pos)
+					return formatString("line %i, col %i", line + 1, pos - line_start);
+				++line;
+				line_start = offset + i;
+			}
+		}
+		offset += (int) is.gcount();
+	}
+	return "byte offset " + std::to_string(pos);
+}
+
+/// Helper function: map a position offset in bytes to a more readable line/column value
+static std::string file_offset(const fs::pathstr &filename, ptrdiff_t pos) {
+	std::fstream is(fs::decode_pathstr(filename).native().c_str());
+	char buffer[1024];
+	int line = 0, line_start = 0, offset = 0;
+	while (is.good()) {
+		is.read(buffer, sizeof(buffer));
+		for (int i = 0; i < is.gcount(); ++i) {
+			if (buffer[i] == '\n') {
+				if (offset + i >= pos)
+					return formatString("In file \"%s\", line %i, col %i", filename.s.c_str(), line + 1, pos - line_start);
+				++line;
+				line_start = offset + i;
+			}
+		}
+		offset += (int) is.gcount();
+	}
+	return "byte offset " + std::to_string(pos);
+}
+#endif
 
 // -----------------------------------------------------------------------
 
 ref<Scene> SceneHandler::loadScene(const fs::pathstr &filename, const ParameterMap &params) {
 	/* Prepare for parsing scene descriptions */
+#ifndef MTS_USE_PUGIXML
 	FileResolver *resolver = Thread::getThread()->getFileResolver();
-	SAXParser* parser = new SAXParser();
+	std::unique_ptr<SAXParser> parser{ new SAXParser() };
 	fs::pathstr schemaPath = resolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
+#endif
 	SLog(EDebug, "Loading scene \"%s\" ..", filename.s.c_str());
 
+	SceneHandler handler{params};
+#ifndef MTS_USE_PUGIXML
 	/* Check against the 'scene.xsd' XML Schema */
 	parser->setDoSchema(true);
 	parser->setValidationSchemaFullChecking(true);
 	parser->setValidationScheme(SAXParser::Val_Always);
 	parser->setExternalNoNamespaceSchemaLocation(schemaPath.s.c_str());
 
-	SceneHandler *handler = new SceneHandler(params);
 	parser->setDoNamespaces(true);
-	parser->setDocumentHandler(handler);
-	parser->setErrorHandler(handler);
+	parser->setDocumentHandler(&handler);
+	parser->setErrorHandler(&handler);
 
 	parser->parse(filename.s.c_str());
-	ref<Scene> scene = handler->getScene();
+	return handler.getScene();
+#else
+	pugi::xml_document doc;
+	auto res = doc.load_file(filename.s.c_str());
+	if (!res)
+		SLog(EError, "XML parse error. %s (offset %ti): %s", file_offset(filename, res.offset).c_str(), res.offset, res.description());
+	else {
+		handler.m_locatorCtx = [&filename](ptrdiff_t pos){ return file_offset(filename, pos); };
+		automatic_upgrade(doc.first_child(), filename.s.c_str()).traverse(handler);
+		return handler.getScene();
+	}
+	SAssert(false);
+#endif
+}
 
-	delete parser;
-	delete handler;
-
-	return scene;
+ref<Scene> SceneLoader::loadScene(const fs::pathstr &filename,
+		const ParameterMap &params) {
+	return SceneHandler::loadScene(filename, params);
 }
 
 ref<Scene> SceneHandler::loadSceneFromString(const std::string &content, const ParameterMap &params) {
+#ifndef MTS_USE_PUGIXML
 	/* Prepare for parsing scene descriptions */
 	FileResolver *resolver = Thread::getThread()->getFileResolver();
 	SAXParser* parser = new SAXParser();
 	fs::pathstr schemaPath = resolver->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
+#endif
 
+	SceneHandler handler{params};
+#ifndef MTS_USE_PUGIXML
 	/* Check against the 'scene.xsd' XML Schema */
 	parser->setDoSchema(true);
 	parser->setValidationSchemaFullChecking(true);
 	parser->setValidationScheme(SAXParser::Val_Always);
 	parser->setExternalNoNamespaceSchemaLocation(schemaPath.s.c_str());
 
-	SceneHandler *handler = new SceneHandler(params);
 	parser->setDoNamespaces(true);
-	parser->setDocumentHandler(handler);
-	parser->setErrorHandler(handler);
+	parser->setDocumentHandler(&handler);
+	parser->setErrorHandler(&handler);
 
 	XMLCh *inputName = XMLString::transcode("<string input>");
 
 	MemBufInputSource input((const XMLByte *) content.c_str(),
 			content.length(), inputName);
 	parser->parse(input);
-	ref<Scene> scene = handler->getScene();
+	ref<Scene> scene = handler.getScene();
+
 	XMLString::release(&inputName);
 
-	delete parser;
-	delete handler;
-
 	return scene;
+#else
+	pugi::xml_document doc;
+	auto res = doc.load_string(content.c_str());
+	if (!res)
+		SLog(EError, "XML parse error. %s (offset %ti): %s", string_offset(content, res.offset).c_str(), res.offset, res.description());
+	else {
+		handler.m_locatorCtx = [&content](ptrdiff_t pos){ return string_offset(content, pos); };
+		automatic_upgrade(doc.first_child(), "<string input>").traverse(handler);
+		return handler.getScene();
+	}
+	SAssert(false);
+#endif
+}
+
+ref<Scene> SceneLoader::loadSceneFromString(const std::string &content,
+		const ParameterMap &params) {
+	return SceneHandler::loadSceneFromString(content, params);
 }
 
 SceneLoader::SceneLoader(ParameterMap const& parameters, fs::pathstr const &schemaPathIn) {
 	this->handler.reset( new SceneHandler(parameters) );
 
+#ifndef MTS_USE_PUGIXML
 	fs::pathstr schemaPath = schemaPathIn;
 	if (schemaPath.s.empty())
 		schemaPath = Thread::getThread()->getFileResolver()->resolveAbsolute(fs::pathstr("data/schema/scene.xsd"));
@@ -901,31 +1101,35 @@ SceneLoader::SceneLoader(ParameterMap const& parameters, fs::pathstr const &sche
 	parser->setDoNamespaces(true);
 	parser->setDocumentHandler(handler.get());
 	parser->setErrorHandler(handler.get());
+#else
+	this->parser = nullptr;
+#endif
 }
 
 SceneLoader::~SceneLoader() {
+#ifndef MTS_USE_PUGIXML
 	SAXParser* parser = static_cast<SAXParser*>(this->parser);
 	delete parser;
+#endif
 }
 
 ref<Scene> SceneLoader::load(fs::pathstr const &file) {
+	NestedFileResolver docResolverGuard(file);
+
+#ifndef MTS_USE_PUGIXML
 	SAXParser* parser = static_cast<SAXParser*>(this->parser);
-
-	struct DocResolver {
-		ref<FileResolver> resolver = Thread::getThread()->getFileResolver();
-		ref<FileResolver> docResolver = resolver->clone();
-
-		DocResolver(fs::pathstr const &file) {
-			fs::path docDir = fs::absolute(fs::decode_pathstr(file)).parent_path();
-			docResolver->appendPath(fs::encode_pathstr(docDir));
-			Thread::getThread()->setFileResolver(docResolver);
-		}
-		~DocResolver() {
-			Thread::getThread()->setFileResolver(resolver);
-		}
-	} docPathGuard(file);
-
 	parser->parse(file.s.c_str()); // todo: xerces might not handle arbirary special char paths in UTF-8 encoding?
+#else
+	pugi::xml_document doc;
+	auto res = doc.load_file(file.s.c_str());
+	if (!res)
+		SLog(EError, "XML parse error. %s (offset %ti): %s", file_offset(file, res.offset).c_str(), res.offset, res.description());
+	else {
+		handler->m_locatorCtx = [&file](ptrdiff_t pos){ return file_offset(file, pos); };
+		automatic_upgrade(doc.first_child(), file.s.c_str()).traverse(*handler);
+	}
+#endif
+
 	return handler->getScene();
 }
 
@@ -933,6 +1137,7 @@ void SceneLoader::staticInitialization() { SceneHandler::staticInitialization();
 void SceneLoader::staticShutdown() { SceneHandler::staticShutdown(); }
 
 void SceneHandler::staticInitialization() {
+#ifndef MTS_USE_PUGIXML
 	/* Initialize Xerces-C */
 	try {
 		XMLPlatformUtils::Initialize();
@@ -940,10 +1145,13 @@ void SceneHandler::staticInitialization() {
 		SLog(EError, "Error during Xerces initialization: %s",
 			XMLString::transcode(toCatch.getMessage()));
 	}
+#endif
 }
 
 void SceneHandler::staticShutdown() {
+#ifndef MTS_USE_PUGIXML
 	XMLPlatformUtils::Terminate();
+#endif
 }
 
 VersionException::~VersionException() noexcept {}

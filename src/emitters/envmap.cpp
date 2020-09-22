@@ -26,6 +26,7 @@
 #include <mitsuba/render/mipmap.h>
 #ifdef MTS_HAS_HW
 #include <mitsuba/hw/basicshader.h>
+#include <mitsuba/hw/gputexture.h>
 #endif
 
 MTS_NAMESPACE_BEGIN

@@ -76,6 +76,8 @@ void help() {
 	cout <<  "   -n name     Assign a node name to this instance (Default: host name)" << endl << endl;
 	cout <<  "   -x          Skip rendering of files where output already exists" << endl << endl;
 	cout <<  "   -r sec      Write (partial) output images every 'sec' seconds" << endl << endl;
+	cout <<  "   -C          Force classic mitsuba render job scheduling / code paths" << endl << endl;
+	cout <<  "   -S          Write progressive sequence of images to separate files" << endl << endl;
 	cout <<  "   -b res      Specify the block resolution used to split images into parallel" << endl;
 	cout <<  "               workloads (default: 32). Only applies to some integrators." << endl << endl;
 	cout <<  "   -v          Be more verbose (can be specified twice)" << endl << endl;
@@ -143,6 +145,7 @@ int mitsuba_app(int argc, char*const* argv) {
 		int blockSize = 32;
 		int flushTimer = -1;
 		bool classicRendering = false;
+		bool saveProgression = false;
 
 		if (argc < 2) {
 			help();
@@ -151,7 +154,7 @@ int mitsuba_app(int argc, char*const* argv) {
 
 		optind = 1;
 		/* Parse command-line arguments */
-		while ((optchar = getopt(argc, argv, "a:c:D:s:j:n:o:r:b:p:L:qhzvtwxC")) != -1) {
+		while ((optchar = getopt(argc, argv, "a:c:D:s:j:n:o:r:b:p:L:qhzvtwxCS")) != -1) {
 			switch (optchar) {
 				case 'a': {
 						std::vector<std::string> paths = tokenize(optarg, ";");
@@ -187,6 +190,10 @@ int mitsuba_app(int argc, char*const* argv) {
 						}
 					}
 					break;
+				case 'S': {
+					saveProgression = true;
+					break;
+				}
 				case 'n':
 					nodeName = optarg;
 					break;
@@ -383,6 +390,13 @@ int mitsuba_app(int argc, char*const* argv) {
 			);
 			if (ithr) {
 				SLog(EInfo, "Using responsive integrator interface");
+				const Properties &iprops = scene->getIntegrator()->getProperties();
+				if (iprops.hasProperty("timeout") && !iprops.wasQueried("timeout")) {
+					ithr->timeout = iprops.getInteger("timeout");
+					SLog(EInfo, "Setting timeout of %i s from unused integrator property", ithr->timeout);
+				}
+				ithr->flushTimer = flushTimer;
+				ithr->writeProgression = saveProgression;
 				ithr->render();
 			}
 			else {

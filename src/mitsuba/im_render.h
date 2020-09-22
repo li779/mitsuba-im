@@ -18,6 +18,10 @@ struct InteractiveSceneProcess {
 	float volatile *volatile *imageData;
 	int numActiveThreads;
 
+	int timeout = -1;
+	int flushTimer = -1;
+	int writeProgression = false;
+
 	static InteractiveSceneProcess* create(mitsuba::Scene* scene, mitsuba::Sampler* sampler, mitsuba::ResponsiveIntegrator* integrator, ProcessConfig const& config);
 	static InteractiveSceneProcess* create(mitsuba::Scene* scene, mitsuba::Sampler* sampler, mitsuba::Integrator* integrator, ProcessConfig const& config);
 	virtual ~InteractiveSceneProcess();

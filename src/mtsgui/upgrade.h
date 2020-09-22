@@ -20,7 +20,7 @@
 #define __UPGRADEMGR_H
 
 #include "common.h"
-#include <boost/filesystem.hpp>
+#include <mitsuba/core/filesystem.h>
 
 class UpgradeManager : public QObject {
     Q_OBJECT
