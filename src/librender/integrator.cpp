@@ -330,6 +330,11 @@ bool ImageOrderIntegrator::allocate(const Scene &scene, Sampler *const *samplers
 
 int ImageOrderIntegrator::render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
 	, Controls controls, int threadIdx, int threadCount) {
+	return this->render(scene, sensor, sampler, target, controls, threadIdx, threadCount, nullptr);
+}
+
+int ImageOrderIntegrator::render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+	, Controls controls, int threadIdx, int threadCount, void* userData) {
 	Vector2i resolution = target.getBitmap()->getSize();
 	int planeSamples = resolution.x * resolution.y;
 	assert(planeSamples == this->m_pxPermutation.size());
@@ -382,7 +387,7 @@ int ImageOrderIntegrator::render(const Scene &scene, const Sensor &sensor, Sampl
 		mitsuba::Point2i offset(j % resolution.x, j / resolution.x);
 		sampler.generate(offset, ~0);
 
-		returnCode = this->render(scene, sensor, sampler, target, offset, threadIdx, threadCount);
+		returnCode = this->render(scene, sensor, sampler, target, offset, threadIdx, threadCount, userData);
 
 		++currentSamples;
 		// precise sample tracking
@@ -457,13 +462,17 @@ bool ClassicSamplingIntegrator::preprocess(const Scene *scene, const Sensor* sen
 	return this->classicIntegrator->preprocess(scene, nullptr, nullptr, ctx.sceneID, ctx.sensorID, ctx.samplerID);
 }
 
-int  ClassicSamplingIntegrator::render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) {
+int  ClassicSamplingIntegrator::render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount, void* userData) {
+	return this->render(userData ? *(SamplingIntegrator*) userData : *this->classicIntegrator, scene, sensor, sampler, target, pixel, threadIdx, threadCount);
+}
+
+int  ClassicSamplingIntegrator::render(SamplingIntegrator& threadLocalIntegrator, const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) {
 	PixelSample pxSample;
 	Spectrum spec = this->pixelDifferential.sample(pxSample, sensor, pixel, sampler);
 	
 	RadianceQueryRecord rRec(&scene, &sampler);
 	rRec.newQuery(RadianceQueryRecord::ESensorRay, sensor.getMedium());
-	spec *= this->classicIntegrator->Li(pxSample.ray, rRec);
+	spec *= threadLocalIntegrator.Li(pxSample.ray, rRec);
 
 	if (rRec.alpha >= 0.0f) {
 #ifndef MTS_NO_ATOMIC_SPLAT

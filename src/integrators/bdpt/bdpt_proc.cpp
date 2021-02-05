@@ -246,7 +246,7 @@ public:
 			return returnCode;
 		}
 
-		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) {
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount, void* userData) {
 			m_state[threadIdx].process(&scene, &sensor, &sampler, pixel);
 			return 0;
 		}

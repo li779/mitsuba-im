@@ -457,7 +457,7 @@ public:
 			return returnCode;
 		}
 
-		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) override {
+		int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount, void* userData) override {
 			m_state[threadIdx].process(pixel);
 			return 0;
 		}

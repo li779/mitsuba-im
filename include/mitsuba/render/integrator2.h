@@ -107,7 +107,8 @@ public:
 	/**
 	 * \brief Render the scene as seen by the given sensor (or default sensor, for some path-space algorithms).
 	 */
-	virtual int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) = 0;
+	virtual int render(const Scene &scene, const Sensor &sensor, Sampler &sampler
+		, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount, void* userData) = 0;
 
 	// prepare px permutation
 	bool allocate(const Scene &scene, Sampler *const *samplers, ImageBlock *const *targets, int threadCount) override;
@@ -123,6 +124,12 @@ public:
 	virtual ~ImageOrderIntegrator();
 
 protected:
+	/**
+	 * \brief Actual render loop, for derived classes to call with additional data.
+	 */
+	int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target
+		, Controls controls, int threadIdx, int threadCount, void* userData);
+
 	std::vector<int> m_pxPermutation;
 };
 
@@ -159,7 +166,11 @@ public:
 
 	bool preprocess(const Scene *scene, const Sensor* sensor, const Sampler* sampler) override;
 	using ImageOrderIntegrator::render;
-	int render(const Scene &scene, const Sensor &sensor, Sampler &sampler, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount) override;
+	int render(const Scene &scene, const Sensor &sensor, Sampler &sampler
+		, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount, void* userData) override;
+	// utility function for derived classes using mutable classic integrators
+	int render(SamplingIntegrator& threadLocalIntegrator, const Scene &scene, const Sensor &sensor, Sampler &sampler
+		, ImageBlock& target, Point2i pixel, int threadIdx, int threadCount);
 
 	MTS_DECLARE_CLASS()
 
