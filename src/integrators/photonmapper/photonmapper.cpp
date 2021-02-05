@@ -777,6 +777,7 @@ public:
 			return nullptr;
 		else
 			Log(EWarn, "Interactive implementation is not identical to the classic implementation!");
+		this->setParent(this);
 		return new PMRefresh(this);
 	}
 
