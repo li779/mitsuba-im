@@ -38,8 +38,12 @@ endif()
   endif()
   #endif()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if (MSVC OR (WIN32 AND CMAKE_C_COMPILER_ID MATCHES "Intel"))
+  # breaks current hacky GCC PCH. TODO: Transition to builtin CMake PCH eventually!
+  set(CMAKE_CXX_STANDARD 17)
+endif ()
+# breaks current hacky GCC PCH. TODO: Transition to builtin CMake PCH eventually!
+#set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Top level configuration definitions
 option (MTS_ENABLE_SYSTEM_LIBS "Enable use of system libraries instead of submodules, if present" OFF)
