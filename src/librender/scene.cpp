@@ -445,8 +445,11 @@ bool Scene::preprocess(RenderQueue *queue, const RenderJob *job,
 				}
 			}
 			~TmpJop() {
-				tmpQueue->removeJob(tmpJob, false);
-				tmpJob->decRef();
+				if (tmpJob) {
+					if (tmpQueue)
+						tmpQueue->removeJob(tmpJob, false);
+					tmpJob->decRef();
+				}
 			}
 		} tmpJob(queue, job, this, sceneResID, sensorResID, samplerResID);
 
