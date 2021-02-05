@@ -38,7 +38,7 @@ endif()
   endif()
   #endif()
 
-if (MSVC OR (WIN32 AND CMAKE_C_COMPILER_ID MATCHES "Intel"))
+if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   # breaks current hacky GCC PCH. TODO: Transition to builtin CMake PCH eventually!
   set(CMAKE_CXX_STANDARD 17)
 endif ()
