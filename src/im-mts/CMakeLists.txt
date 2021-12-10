@@ -29,4 +29,7 @@ include_directories(${GLFW_INCLUDE_DIRS} ../../external/imgui ../../external/tin
 
 add_mts_exe(im-mts  ${SRCS} ${HDRS} 
   RES_DESCRIPTION "Mitsuba immediate-mode UI"
-  LINK_LIBRARIES ${GLFW_LIBRARIES} ${OPENGL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} dl X11)
+  LINK_LIBRARIES ${GLFW_LIBRARIES} ${OPENGL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+
+  # in Linux machine change line 32 with following:
+  # LINK_LIBRARIES ${GLFW_LIBRARIES} ${OPENGL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} dl X11)
