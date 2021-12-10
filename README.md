@@ -38,6 +38,10 @@ $ cd ..
 $ ln -s projects/binaries/im-mts
 ````
 
+On Windows using MSVC 2019 or other variants. Use CMake GUI to configure and generate code into /projects folder. Then open solution in MSVC to build it.
+
+*Be careful: To build in linux, change line 32 in /src/im-mts/CMakeLists.txt as comment says*
+
 ## About (Original official description)
 
 http://mitsuba-renderer.org/
